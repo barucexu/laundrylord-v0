@@ -1,0 +1,263 @@
+import { useParams, Link } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusBadge } from "@/components/StatusBadge";
+import { renters, getMachineForRenter, getTimelineForRenter, getMaintenanceForRenter, getPaymentsForRenter } from "@/data/mock-data";
+import { ArrowLeft, Phone, Mail, MapPin, Calendar, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck } from "lucide-react";
+
+const timelineIcons: Record<string, typeof User> = {
+  created: User,
+  machine_assigned: Box,
+  payment_succeeded: CheckCircle,
+  payment_failed: AlertTriangle,
+  late_fee: DollarSign,
+  maintenance_opened: Wrench,
+  maintenance_resolved: CheckCircle,
+  pickup_scheduled: Truck,
+  pickup_completed: Truck,
+  note: MessageSquare,
+};
+
+export default function RenterDetail() {
+  const { id } = useParams();
+  const renter = renters.find(r => r.id === id);
+
+  if (!renter) {
+    return (
+      <div className="space-y-4">
+        <Link to="/renters" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" /> Back to Renters
+        </Link>
+        <p className="text-muted-foreground">Renter not found.</p>
+      </div>
+    );
+  }
+
+  const machine = getMachineForRenter(renter.id);
+  const timeline = getTimelineForRenter(renter.id);
+  const maintenance = getMaintenanceForRenter(renter.id);
+  const renterPayments = getPaymentsForRenter(renter.id);
+
+  return (
+    <div className="space-y-6">
+      <Link to="/renters" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="h-4 w-4" /> Renters
+      </Link>
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{renter.name}</h1>
+          <div className="flex items-center gap-3 mt-1">
+            <StatusBadge status={renter.status} />
+            {renter.leaseStartDate && <span className="text-xs text-muted-foreground font-mono">Since {renter.leaseStartDate}</span>}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-[1fr_360px] gap-6">
+        {/* Left column */}
+        <div className="space-y-6">
+          {/* Payment Summary */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-medium flex items-center gap-2"><CreditCard className="h-4 w-4" /> Payment Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <div className="text-xs text-muted-foreground">Monthly Rate</div>
+                  <div className="text-lg font-mono font-semibold">${renter.monthlyRate.toFixed(2)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Balance</div>
+                  <div className={`text-lg font-mono font-semibold ${renter.balance > 0 ? 'text-destructive' : 'text-success'}`}>
+                    ${renter.balance.toFixed(2)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Paid Through</div>
+                  <div className="text-sm font-mono">{renter.paidThroughDate || '—'}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Next Due</div>
+                  <div className="text-sm font-mono">{renter.nextDueDate || '—'}</div>
+                </div>
+              </div>
+              {renter.daysLate > 0 && (
+                <div className="mt-3 px-3 py-2 bg-destructive/5 border border-destructive/20 rounded-md text-sm text-destructive">
+                  {renter.daysLate} days overdue
+                </div>
+              )}
+
+              {renterPayments.length > 0 && (
+                <div className="mt-4 divide-y">
+                  {renterPayments.slice(0, 5).map(p => (
+                    <div key={p.id} className="flex items-center justify-between py-2">
+                      <div>
+                        <span className="text-sm capitalize">{p.type.replace('_', ' ')}</span>
+                        <span className="text-xs text-muted-foreground font-mono ml-2">{p.dueDate}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-mono">${p.amount.toFixed(2)}</span>
+                        <StatusBadge status={p.status} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Activity Timeline */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-medium flex items-center gap-2"><Clock className="h-4 w-4" /> Activity Timeline</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {timeline.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No activity yet</p>
+              ) : (
+                <div className="space-y-0">
+                  {timeline.map((event, i) => {
+                    const Icon = timelineIcons[event.type] || FileText;
+                    return (
+                      <div key={event.id} className="flex gap-3 pb-4">
+                        <div className="flex flex-col items-center">
+                          <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center shrink-0">
+                            <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                          </div>
+                          {i < timeline.length - 1 && <div className="w-px flex-1 bg-border mt-1" />}
+                        </div>
+                        <div className="pb-1">
+                          <div className="text-sm">{event.description}</div>
+                          <div className="text-xs text-muted-foreground font-mono">{event.date}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Maintenance */}
+          {maintenance.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-medium flex items-center gap-2"><Wrench className="h-4 w-4" /> Maintenance</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y">
+                  {maintenance.map(m => (
+                    <div key={m.id} className="px-6 py-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium">{m.issueCategory}</div>
+                          <div className="text-xs text-muted-foreground">{m.description}</div>
+                        </div>
+                        <StatusBadge status={m.status} />
+                      </div>
+                      <div className="flex gap-4 mt-1 text-xs text-muted-foreground font-mono">
+                        <span>Reported {m.reportedDate}</span>
+                        {m.resolvedDate && <span>Resolved {m.resolvedDate}</span>}
+                        {m.cost !== null && <span>${m.cost.toFixed(2)}</span>}
+                      </div>
+                      {m.resolutionNotes && <div className="text-xs text-muted-foreground mt-1">{m.resolutionNotes}</div>}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Right column */}
+        <div className="space-y-6">
+          {/* Contact Info */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-medium">Contact</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-2 text-sm">
+                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="font-mono">{renter.phone}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                <span>{renter.email}</span>
+              </div>
+              <div className="flex items-start gap-2 text-sm">
+                <MapPin className="h-3.5 w-3.5 text-muted-foreground mt-0.5" />
+                <span>{renter.address}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Lease Info */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-medium">Lease</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Start Date</span>
+                <span className="font-mono">{renter.leaseStartDate || '—'}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Min Term End</span>
+                <span className="font-mono">{renter.minTermEndDate || '—'}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Machine */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-medium flex items-center gap-2"><Box className="h-4 w-4" /> Machine</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {machine ? (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Model</span>
+                    <span className="text-xs">{machine.model}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Serial</span>
+                    <span className="font-mono text-xs">{machine.serial}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Prong</span>
+                    <span>{machine.prong}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Condition</span>
+                    <span>{machine.condition}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Status</span>
+                    <StatusBadge status={machine.status} />
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No machine assigned</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Notes */}
+          {renter.notes && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-medium">Notes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">{renter.notes}</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
