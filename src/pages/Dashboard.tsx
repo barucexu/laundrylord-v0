@@ -1,0 +1,150 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { renters, payments, maintenanceLogs } from "@/data/mock-data";
+import { AlertTriangle, Users, CreditCard, DollarSign, Wrench, Truck } from "lucide-react";
+import { Link } from "react-router-dom";
+import { StatusBadge } from "@/components/StatusBadge";
+
+const stats = [
+  {
+    label: "Active Renters",
+    value: renters.filter(r => r.status === 'active').length,
+    icon: Users,
+    color: "text-success",
+  },
+  {
+    label: "Overdue Renters",
+    value: renters.filter(r => r.status === 'late').length,
+    icon: AlertTriangle,
+    color: "text-destructive",
+  },
+  {
+    label: "Failed Payments",
+    value: payments.filter(p => p.status === 'failed').length,
+    icon: CreditCard,
+    color: "text-destructive",
+  },
+  {
+    label: "Upcoming (7 days)",
+    value: payments.filter(p => p.status === 'upcoming' || p.status === 'due_soon').length,
+    icon: DollarSign,
+    color: "text-primary",
+  },
+  {
+    label: "Open Maintenance",
+    value: maintenanceLogs.filter(m => m.status !== 'resolved').length,
+    icon: Wrench,
+    color: "text-warning",
+  },
+  {
+    label: "Pending Pickups",
+    value: renters.filter(r => r.status === 'pickup_scheduled').length,
+    icon: Truck,
+    color: "text-muted-foreground",
+  },
+];
+
+const overdueRenters = renters.filter(r => r.status === 'late').sort((a, b) => b.daysLate - a.daysLate);
+const upcomingPayments = payments.filter(p => p.status === 'upcoming' || p.status === 'due_soon').sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+const openMaintenance = maintenanceLogs.filter(m => m.status !== 'resolved');
+
+export default function Dashboard() {
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {stats.map(s => (
+          <Card key={s.label}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <s.icon className={`h-4 w-4 ${s.color}`} />
+              </div>
+              <div className="text-2xl font-semibold font-mono">{s.value}</div>
+              <div className="text-xs text-muted-foreground mt-1">{s.label}</div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-medium">Overdue Renters</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {overdueRenters.length === 0 ? (
+              <p className="text-sm text-muted-foreground p-6 pt-0">No overdue renters</p>
+            ) : (
+              <div className="divide-y">
+                {overdueRenters.map(r => (
+                  <Link key={r.id} to={`/renters/${r.id}`} className="flex items-center justify-between px-6 py-3 hover:bg-muted/50 transition-colors">
+                    <div>
+                      <div className="font-medium text-sm">{r.name}</div>
+                      <div className="text-xs text-muted-foreground">{r.phone}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-mono font-medium text-destructive">${r.balance.toFixed(2)}</div>
+                      <div className="text-xs text-muted-foreground">{r.daysLate}d late</div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-medium">Upcoming Payments</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {upcomingPayments.length === 0 ? (
+              <p className="text-sm text-muted-foreground p-6 pt-0">No upcoming payments</p>
+            ) : (
+              <div className="divide-y">
+                {upcomingPayments.map(p => (
+                  <div key={p.id} className="flex items-center justify-between px-6 py-3">
+                    <div>
+                      <div className="font-medium text-sm">{p.renterName}</div>
+                      <div className="text-xs text-muted-foreground font-mono">{p.dueDate}</div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-mono">${p.amount.toFixed(2)}</span>
+                      <StatusBadge status={p.status} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-medium">Open Maintenance</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {openMaintenance.length === 0 ? (
+              <p className="text-sm text-muted-foreground p-6 pt-0">No open issues</p>
+            ) : (
+              <div className="divide-y">
+                {openMaintenance.map(m => (
+                  <div key={m.id} className="flex items-center justify-between px-6 py-3">
+                    <div>
+                      <div className="font-medium text-sm">{m.renterName}</div>
+                      <div className="text-xs text-muted-foreground">{m.machineModel} — {m.issueCategory}</div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-muted-foreground font-mono">{m.reportedDate}</span>
+                      <StatusBadge status={m.status} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
