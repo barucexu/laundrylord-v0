@@ -3,17 +3,20 @@ import { Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
-import { renters, getMachineForRenter } from "@/data/mock-data";
-import { Search } from "lucide-react";
-import type { RenterStatus } from "@/data/mock-data";
+import { useRenters } from "@/hooks/useSupabaseData";
+import { Search, Plus } from "lucide-react";
+import { CreateRenterDialog } from "@/components/CreateRenterDialog";
 
 export default function RentersList() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const { data: renters = [], isLoading } = useRenters();
 
   const filtered = renters.filter(r => {
-    const matchesSearch = r.name.toLowerCase().includes(search.toLowerCase()) || r.phone.includes(search);
+    const matchesSearch = r.name.toLowerCase().includes(search.toLowerCase()) || (r.phone || "").includes(search);
     const matchesStatus = statusFilter === "all" || r.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -22,7 +25,12 @@ export default function RentersList() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Renters</h1>
-        <span className="text-sm text-muted-foreground">{filtered.length} renters</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground">{filtered.length} renters</span>
+          <Button size="sm" onClick={() => setDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Add Renter
+          </Button>
+        </div>
       </div>
 
       <div className="flex gap-3">
@@ -49,48 +57,53 @@ export default function RentersList() {
         </Select>
       </div>
 
-      <div className="border rounded-lg bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>Machine</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Balance</TableHead>
-              <TableHead>Paid Through</TableHead>
-              <TableHead className="text-right">Days Late</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map(r => {
-              const machine = getMachineForRenter(r.id);
-              return (
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      ) : (
+        <div className="border rounded-lg bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Balance</TableHead>
+                <TableHead>Paid Through</TableHead>
+                <TableHead className="text-right">Days Late</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map(r => (
                 <TableRow key={r.id} className="h-12">
                   <TableCell>
                     <Link to={`/renters/${r.id}`} className="font-medium text-primary hover:underline">{r.name}</Link>
                   </TableCell>
-                  <TableCell className="text-muted-foreground font-mono text-xs">{r.phone}</TableCell>
-                  <TableCell className="text-xs">{machine ? machine.model : <span className="text-muted-foreground">—</span>}</TableCell>
+                  <TableCell className="text-muted-foreground font-mono text-xs">{r.phone || '—'}</TableCell>
                   <TableCell><StatusBadge status={r.status} /></TableCell>
                   <TableCell className="text-right font-mono text-sm">
-                    {r.balance > 0 ? <span className="text-destructive">${r.balance.toFixed(2)}</span> : <span className="text-muted-foreground">$0.00</span>}
+                    {Number(r.balance) > 0 ? <span className="text-destructive">${Number(r.balance).toFixed(2)}</span> : <span className="text-muted-foreground">$0.00</span>}
                   </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">{r.paidThroughDate || '—'}</TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">{r.paid_through_date || '—'}</TableCell>
                   <TableCell className="text-right font-mono text-sm">
-                    {r.daysLate > 0 ? <span className="text-destructive">{r.daysLate}</span> : <span className="text-muted-foreground">0</span>}
+                    {r.days_late > 0 ? <span className="text-destructive">{r.days_late}</span> : <span className="text-muted-foreground">0</span>}
                   </TableCell>
                 </TableRow>
-              );
-            })}
-            {filtered.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">No renters found</TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              ))}
+              {filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    {renters.length === 0 ? "No renters yet. Click \"Add Renter\" to create one." : "No renters found"}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <CreateRenterDialog open={dialogOpen} onOpenChange={setDialogOpen} />
     </div>
   );
 }
