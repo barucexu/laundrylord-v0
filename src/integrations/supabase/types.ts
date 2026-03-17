@@ -14,7 +14,278 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      machines: {
+        Row: {
+          assigned_renter_id: string | null
+          condition: string | null
+          created_at: string
+          id: string
+          model: string
+          notes: string | null
+          prong: string | null
+          serial: string
+          status: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assigned_renter_id?: string | null
+          condition?: string | null
+          created_at?: string
+          id?: string
+          model: string
+          notes?: string | null
+          prong?: string | null
+          serial: string
+          status?: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assigned_renter_id?: string | null
+          condition?: string | null
+          created_at?: string
+          id?: string
+          model?: string
+          notes?: string | null
+          prong?: string | null
+          serial?: string
+          status?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machines_assigned_renter_id_fkey"
+            columns: ["assigned_renter_id"]
+            isOneToOne: false
+            referencedRelation: "renters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maintenance_logs: {
+        Row: {
+          cost: number | null
+          created_at: string
+          description: string
+          id: string
+          issue_category: string
+          machine_id: string
+          renter_id: string | null
+          reported_date: string
+          resolution_notes: string | null
+          resolved_date: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string
+          description?: string
+          id?: string
+          issue_category: string
+          machine_id: string
+          renter_id?: string | null
+          reported_date?: string
+          resolution_notes?: string | null
+          resolved_date?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string
+          description?: string
+          id?: string
+          issue_category?: string
+          machine_id?: string
+          renter_id?: string | null
+          reported_date?: string
+          resolution_notes?: string | null
+          resolved_date?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_logs_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_logs_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "renters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          due_date: string
+          id: string
+          paid_date: string | null
+          renter_id: string
+          status: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          due_date: string
+          id?: string
+          paid_date?: string | null
+          renter_id: string
+          status?: string
+          type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          due_date?: string
+          id?: string
+          paid_date?: string | null
+          renter_id?: string
+          status?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "renters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      renters: {
+        Row: {
+          address: string | null
+          balance: number
+          created_at: string
+          days_late: number
+          email: string | null
+          id: string
+          lease_start_date: string | null
+          machine_id: string | null
+          min_term_end_date: string | null
+          monthly_rate: number
+          name: string
+          next_due_date: string | null
+          notes: string | null
+          paid_through_date: string | null
+          phone: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          balance?: number
+          created_at?: string
+          days_late?: number
+          email?: string | null
+          id?: string
+          lease_start_date?: string | null
+          machine_id?: string | null
+          min_term_end_date?: string | null
+          monthly_rate?: number
+          name: string
+          next_due_date?: string | null
+          notes?: string | null
+          paid_through_date?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          balance?: number
+          created_at?: string
+          days_late?: number
+          email?: string | null
+          id?: string
+          lease_start_date?: string | null
+          machine_id?: string | null
+          min_term_end_date?: string | null
+          monthly_rate?: number
+          name?: string
+          next_due_date?: string | null
+          notes?: string | null
+          paid_through_date?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_renters_machine"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      timeline_events: {
+        Row: {
+          created_at: string
+          date: string
+          description: string
+          id: string
+          renter_id: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          description: string
+          id?: string
+          renter_id: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          description?: string
+          id?: string
+          renter_id?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timeline_events_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "renters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
