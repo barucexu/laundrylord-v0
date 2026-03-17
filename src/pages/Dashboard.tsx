@@ -1,53 +1,40 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { renters, payments, maintenanceLogs } from "@/data/mock-data";
+import { useRenters, usePayments, useMaintenanceLogs } from "@/hooks/useSupabaseData";
 import { AlertTriangle, Users, CreditCard, DollarSign, Wrench, Truck } from "lucide-react";
 import { Link } from "react-router-dom";
 import { StatusBadge } from "@/components/StatusBadge";
 
-const stats = [
-  {
-    label: "Active Renters",
-    value: renters.filter(r => r.status === 'active').length,
-    icon: Users,
-    color: "text-success",
-  },
-  {
-    label: "Overdue Renters",
-    value: renters.filter(r => r.status === 'late').length,
-    icon: AlertTriangle,
-    color: "text-destructive",
-  },
-  {
-    label: "Failed Payments",
-    value: payments.filter(p => p.status === 'failed').length,
-    icon: CreditCard,
-    color: "text-destructive",
-  },
-  {
-    label: "Upcoming (7 days)",
-    value: payments.filter(p => p.status === 'upcoming' || p.status === 'due_soon').length,
-    icon: DollarSign,
-    color: "text-primary",
-  },
-  {
-    label: "Open Maintenance",
-    value: maintenanceLogs.filter(m => m.status !== 'resolved').length,
-    icon: Wrench,
-    color: "text-warning",
-  },
-  {
-    label: "Pending Pickups",
-    value: renters.filter(r => r.status === 'pickup_scheduled').length,
-    icon: Truck,
-    color: "text-muted-foreground",
-  },
-];
-
-const overdueRenters = renters.filter(r => r.status === 'late').sort((a, b) => b.daysLate - a.daysLate);
-const upcomingPayments = payments.filter(p => p.status === 'upcoming' || p.status === 'due_soon').sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-const openMaintenance = maintenanceLogs.filter(m => m.status !== 'resolved');
-
 export default function Dashboard() {
+  const { data: renters = [], isLoading: loadingRenters } = useRenters();
+  const { data: payments = [], isLoading: loadingPayments } = usePayments();
+  const { data: maintenanceLogs = [], isLoading: loadingMaint } = useMaintenanceLogs();
+
+  const isLoading = loadingRenters || loadingPayments || loadingMaint;
+
+  const stats = [
+    { label: "Active Renters", value: renters.filter(r => r.status === 'active').length, icon: Users, color: "text-success" },
+    { label: "Overdue Renters", value: renters.filter(r => r.status === 'late').length, icon: AlertTriangle, color: "text-destructive" },
+    { label: "Failed Payments", value: payments.filter(p => p.status === 'failed').length, icon: CreditCard, color: "text-destructive" },
+    { label: "Upcoming (7 days)", value: payments.filter(p => p.status === 'upcoming' || p.status === 'due_soon').length, icon: DollarSign, color: "text-primary" },
+    { label: "Open Maintenance", value: maintenanceLogs.filter(m => m.status !== 'resolved').length, icon: Wrench, color: "text-warning" },
+    { label: "Pending Pickups", value: renters.filter(r => r.status === 'pickup_scheduled').length, icon: Truck, color: "text-muted-foreground" },
+  ];
+
+  const overdueRenters = renters.filter(r => r.status === 'late').sort((a, b) => b.days_late - a.days_late);
+  const upcomingPayments = payments.filter(p => p.status === 'upcoming' || p.status === 'due_soon').sort((a, b) => a.due_date.localeCompare(b.due_date));
+  const openMaintenance = maintenanceLogs.filter(m => m.status !== 'resolved');
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <div className="flex items-center justify-center py-12">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
@@ -83,8 +70,8 @@ export default function Dashboard() {
                       <div className="text-xs text-muted-foreground">{r.phone}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm font-mono font-medium text-destructive">${r.balance.toFixed(2)}</div>
-                      <div className="text-xs text-muted-foreground">{r.daysLate}d late</div>
+                      <div className="text-sm font-mono font-medium text-destructive">${Number(r.balance).toFixed(2)}</div>
+                      <div className="text-xs text-muted-foreground">{r.days_late}d late</div>
                     </div>
                   </Link>
                 ))}
@@ -105,11 +92,10 @@ export default function Dashboard() {
                 {upcomingPayments.map(p => (
                   <div key={p.id} className="flex items-center justify-between px-6 py-3">
                     <div>
-                      <div className="font-medium text-sm">{p.renterName}</div>
-                      <div className="text-xs text-muted-foreground font-mono">{p.dueDate}</div>
+                      <div className="text-xs text-muted-foreground font-mono">{p.due_date}</div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-sm font-mono">${p.amount.toFixed(2)}</span>
+                      <span className="text-sm font-mono">${Number(p.amount).toFixed(2)}</span>
                       <StatusBadge status={p.status} />
                     </div>
                   </div>
@@ -131,11 +117,10 @@ export default function Dashboard() {
                 {openMaintenance.map(m => (
                   <div key={m.id} className="flex items-center justify-between px-6 py-3">
                     <div>
-                      <div className="font-medium text-sm">{m.renterName}</div>
-                      <div className="text-xs text-muted-foreground">{m.machineModel} — {m.issueCategory}</div>
+                      <div className="text-xs text-muted-foreground">{m.issue_category}</div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-xs text-muted-foreground font-mono">{m.reportedDate}</span>
+                      <span className="text-xs text-muted-foreground font-mono">{m.reported_date}</span>
                       <StatusBadge status={m.status} />
                     </div>
                   </div>

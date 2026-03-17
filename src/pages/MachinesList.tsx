@@ -1,9 +1,14 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
-import { machines, getRenterForMachine } from "@/data/mock-data";
+import { useMachines, useRenters } from "@/hooks/useSupabaseData";
 import { Link } from "react-router-dom";
 
 export default function MachinesList() {
+  const { data: machines = [], isLoading } = useMachines();
+  const { data: renters = [] } = useRenters();
+
+  const getRenterForMachine = (machineId: string) => renters.find(r => r.machine_id === machineId);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -11,43 +16,54 @@ export default function MachinesList() {
         <span className="text-sm text-muted-foreground">{machines.length} machines</span>
       </div>
 
-      <div className="border rounded-lg bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Type</TableHead>
-              <TableHead>Model</TableHead>
-              <TableHead>Serial</TableHead>
-              <TableHead>Prong</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Assigned To</TableHead>
-              <TableHead>Condition</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {machines.map(m => {
-              const renter = getRenterForMachine(m.id);
-              return (
-                <TableRow key={m.id} className="h-12">
-                  <TableCell className="capitalize text-sm">{m.type}</TableCell>
-                  <TableCell className="text-sm">{m.model}</TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">{m.serial}</TableCell>
-                  <TableCell className="text-sm">{m.prong}</TableCell>
-                  <TableCell><StatusBadge status={m.status} /></TableCell>
-                  <TableCell>
-                    {renter ? (
-                      <Link to={`/renters/${renter.id}`} className="text-sm text-primary hover:underline">{renter.name}</Link>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{m.condition}</TableCell>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      ) : (
+        <div className="border rounded-lg bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Type</TableHead>
+                <TableHead>Model</TableHead>
+                <TableHead>Serial</TableHead>
+                <TableHead>Prong</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Assigned To</TableHead>
+                <TableHead>Condition</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {machines.map(m => {
+                const renter = getRenterForMachine(m.id);
+                return (
+                  <TableRow key={m.id} className="h-12">
+                    <TableCell className="capitalize text-sm">{m.type}</TableCell>
+                    <TableCell className="text-sm">{m.model}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{m.serial}</TableCell>
+                    <TableCell className="text-sm">{m.prong || '—'}</TableCell>
+                    <TableCell><StatusBadge status={m.status} /></TableCell>
+                    <TableCell>
+                      {renter ? (
+                        <Link to={`/renters/${renter.id}`} className="text-sm text-primary hover:underline">{renter.name}</Link>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{m.condition || '—'}</TableCell>
+                  </TableRow>
+                );
+              })}
+              {machines.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">No machines yet</TableCell>
                 </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   );
 }

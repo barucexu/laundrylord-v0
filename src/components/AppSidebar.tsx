@@ -1,5 +1,7 @@
-import { LayoutDashboard, Users, Box, CreditCard, Wrench, Settings } from "lucide-react";
+import { LayoutDashboard, Users, Box, CreditCard, Wrench, Settings, LogOut } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -9,6 +11,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
+  SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
 
@@ -23,6 +26,7 @@ const navItems = [
 
 export function AppSidebar() {
   const { state } = useSidebar();
+  const { signOut, user } = useAuth();
   const collapsed = state === "collapsed";
 
   return (
@@ -64,6 +68,20 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="p-3">
+        {!collapsed ? (
+          <div className="space-y-2">
+            <div className="text-xs text-muted-foreground truncate px-1">{user?.email}</div>
+            <Button variant="ghost" size="sm" className="w-full justify-start gap-2" onClick={signOut}>
+              <LogOut className="h-4 w-4" /> Sign Out
+            </Button>
+          </div>
+        ) : (
+          <Button variant="ghost" size="icon" className="mx-auto" onClick={signOut}>
+            <LogOut className="h-4 w-4" />
+          </Button>
+        )}
+      </SidebarFooter>
     </Sidebar>
   );
 }
