@@ -183,8 +183,12 @@ export type Database = {
           balance: number
           created_at: string
           days_late: number
+          deposit_amount: number
+          deposit_collected: boolean
           email: string | null
           id: string
+          install_fee: number
+          install_fee_collected: boolean
           lease_start_date: string | null
           machine_id: string | null
           min_term_end_date: string | null
@@ -194,6 +198,7 @@ export type Database = {
           notes: string | null
           paid_through_date: string | null
           phone: string | null
+          rent_collected: number
           status: string
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
@@ -205,8 +210,12 @@ export type Database = {
           balance?: number
           created_at?: string
           days_late?: number
+          deposit_amount?: number
+          deposit_collected?: boolean
           email?: string | null
           id?: string
+          install_fee?: number
+          install_fee_collected?: boolean
           lease_start_date?: string | null
           machine_id?: string | null
           min_term_end_date?: string | null
@@ -216,6 +225,7 @@ export type Database = {
           notes?: string | null
           paid_through_date?: string | null
           phone?: string | null
+          rent_collected?: number
           status?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -227,8 +237,12 @@ export type Database = {
           balance?: number
           created_at?: string
           days_late?: number
+          deposit_amount?: number
+          deposit_collected?: boolean
           email?: string | null
           id?: string
+          install_fee?: number
+          install_fee_collected?: boolean
           lease_start_date?: string | null
           machine_id?: string | null
           min_term_end_date?: string | null
@@ -238,6 +252,7 @@ export type Database = {
           notes?: string | null
           paid_through_date?: string | null
           phone?: string | null
+          rent_collected?: number
           status?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
