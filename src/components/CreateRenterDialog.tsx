@@ -6,6 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface CreateRenterDialogProps {
@@ -15,12 +22,18 @@ interface CreateRenterDialogProps {
 
 export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogProps) {
   const createRenter = useCreateRenter();
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [form, setForm] = useState({
     name: "",
     phone: "",
     email: "",
     address: "",
     monthly_rate: "150",
+    rent_collected: "0",
+    install_fee: "75",
+    install_fee_collected: false,
+    deposit_amount: "0",
+    deposit_collected: false,
     notes: "",
   });
 
@@ -38,11 +51,18 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
         email: form.email.trim() || null,
         address: form.address.trim() || null,
         monthly_rate: parseFloat(form.monthly_rate) || 150,
+        rent_collected: parseFloat(form.rent_collected) || 0,
+        install_fee: parseFloat(form.install_fee) || 0,
+        install_fee_collected: form.install_fee_collected,
+        deposit_amount: parseFloat(form.deposit_amount) || 0,
+        deposit_collected: form.deposit_collected,
+        lease_start_date: startDate ? format(startDate, "yyyy-MM-dd") : null,
         notes: form.notes.trim(),
         status: "lead",
       });
       toast.success(`${form.name} added as a new lead`);
-      setForm({ name: "", phone: "", email: "", address: "", monthly_rate: "150", notes: "" });
+      setForm({ name: "", phone: "", email: "", address: "", monthly_rate: "150", rent_collected: "0", install_fee: "75", install_fee_collected: false, deposit_amount: "0", deposit_collected: false, notes: "" });
+      setStartDate(undefined);
       onOpenChange(false);
     } catch (err: any) {
       toast.error(err.message || "Failed to create renter");
@@ -51,7 +71,7 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Renter</DialogTitle>
           <DialogDescription>Create a new renter record. They'll start as a lead.</DialogDescription>
@@ -75,10 +95,69 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
             <Label htmlFor="r-address">Address</Label>
             <Input id="r-address" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="123 Main St, Atlanta, GA" />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="r-rate">Monthly Rate ($)</Label>
-            <Input id="r-rate" type="number" step="0.01" value={form.monthly_rate} onChange={e => setForm(f => ({ ...f, monthly_rate: e.target.value }))} />
+
+          <Separator />
+
+          <div className="space-y-1">
+            <h4 className="text-sm font-medium">Financial Terms</h4>
+            <p className="text-xs text-muted-foreground">Key money terms for this renter</p>
           </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Start Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !startDate && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {startDate ? format(startDate, "MMM d, yyyy") : "Pick date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="r-rate">Monthly Rent ($)</Label>
+              <Input id="r-rate" type="number" step="0.01" value={form.monthly_rate} onChange={e => setForm(f => ({ ...f, monthly_rate: e.target.value }))} className="font-mono" />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="r-rent-collected">Rent Collected So Far ($)</Label>
+            <Input id="r-rent-collected" type="number" step="0.01" value={form.rent_collected} onChange={e => setForm(f => ({ ...f, rent_collected: e.target.value }))} className="font-mono" placeholder="0" />
+            <p className="text-xs text-muted-foreground">Monthly rent already collected — not deposit or install fee</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="r-install-fee">Install Fee ($)</Label>
+              <Input id="r-install-fee" type="number" step="0.01" value={form.install_fee} onChange={e => setForm(f => ({ ...f, install_fee: e.target.value }))} className="font-mono" />
+            </div>
+            <div className="flex items-end pb-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox id="r-install-collected" checked={form.install_fee_collected} onCheckedChange={(checked) => setForm(f => ({ ...f, install_fee_collected: !!checked }))} />
+                <Label htmlFor="r-install-collected" className="text-sm font-normal">Collected</Label>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="r-deposit">Deposit ($)</Label>
+              <Input id="r-deposit" type="number" step="0.01" value={form.deposit_amount} onChange={e => setForm(f => ({ ...f, deposit_amount: e.target.value }))} className="font-mono" />
+            </div>
+            <div className="flex items-end pb-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox id="r-deposit-collected" checked={form.deposit_collected} onCheckedChange={(checked) => setForm(f => ({ ...f, deposit_collected: !!checked }))} />
+                <Label htmlFor="r-deposit-collected" className="text-sm font-normal">Collected</Label>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
           <div className="space-y-2">
             <Label htmlFor="r-notes">Notes</Label>
             <Textarea id="r-notes" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Any relevant details..." rows={2} />
