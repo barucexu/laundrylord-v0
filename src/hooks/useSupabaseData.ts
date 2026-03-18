@@ -6,6 +6,7 @@ import type { Database } from "@/integrations/supabase/types";
 type RenterRow = Database["public"]["Tables"]["renters"]["Row"];
 type RenterInsert = Database["public"]["Tables"]["renters"]["Insert"];
 type MachineRow = Database["public"]["Tables"]["machines"]["Row"];
+type MachineInsert = Database["public"]["Tables"]["machines"]["Insert"];
 type PaymentRow = Database["public"]["Tables"]["payments"]["Row"];
 type MaintenanceRow = Database["public"]["Tables"]["maintenance_logs"]["Row"];
 type TimelineRow = Database["public"]["Tables"]["timeline_events"]["Row"];
@@ -70,6 +71,26 @@ export function useMachines() {
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as MachineRow[];
+    },
+  });
+}
+
+export function useCreateMachine() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (machine: Omit<MachineInsert, "user_id">) => {
+      const { data, error } = await supabase
+        .from("machines")
+        .insert({ ...machine, user_id: user!.id })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["machines"] });
     },
   });
 }
@@ -163,6 +184,18 @@ export function useMachineForRenter(machineId: string | null | undefined) {
       if (error) throw error;
       return data as MachineRow;
     },
+  });
+}
+
+export function useStripeConnection() {
+  return useQuery({
+    queryKey: ["stripe-connection"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("check-stripe-connection");
+      if (error) return { connected: false, reason: "error" } as const;
+      return data as { connected: boolean; reason?: string; account_name?: string; account_id?: string };
+    },
+    staleTime: 5 * 60 * 1000,
   });
 }
 

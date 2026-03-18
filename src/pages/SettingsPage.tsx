@@ -3,8 +3,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { useStripeConnection } from "@/hooks/useSupabaseData";
+import { CheckCircle, AlertTriangle, Loader2, ExternalLink } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function SettingsPage() {
+  const { data: stripe, isLoading: stripeLoading } = useStripeConnection();
+  const navigate = useNavigate();
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
@@ -83,10 +89,56 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Stripe Connection</CardTitle>
-          <CardDescription>Connect your Stripe account to accept payments</CardDescription>
+          <CardDescription>Connect your Stripe account to charge renters for monthly rent</CardDescription>
         </CardHeader>
         <CardContent>
-          <Button variant="outline" disabled>Connect Stripe (Coming Soon)</Button>
+          {stripeLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Checking connection…
+            </div>
+          ) : stripe?.connected ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-green-500/10 border border-green-500/20">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <div>
+                  <div className="text-sm font-medium text-green-700">Connected</div>
+                  <div className="text-xs text-muted-foreground">{stripe.account_name}</div>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Your Stripe account is linked. You can send card setup links and activate autopay for renters.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {stripe?.reason === "invalid_key" ? (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-destructive/10 border border-destructive/20">
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                  <div>
+                    <div className="text-sm font-medium text-destructive">Connection Error</div>
+                    <div className="text-xs text-muted-foreground">Your Stripe key appears to be invalid. Please update it.</div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted border">
+                  <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <div className="text-sm font-medium">Not Connected</div>
+                    <div className="text-xs text-muted-foreground">Add your Stripe secret key to start accepting payments.</div>
+                  </div>
+                </div>
+              )}
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p>To connect Stripe:</p>
+                <ol className="list-decimal list-inside space-y-0.5">
+                  <li>Go to your <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">Stripe Dashboard <ExternalLink className="h-3 w-3" /></a></li>
+                  <li>Copy your <strong>Secret key</strong> (starts with sk_live_ or sk_test_)</li>
+                  <li>Contact your LaundryLord admin to add it as a project secret</li>
+                </ol>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
