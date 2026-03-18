@@ -1,1 +1,10 @@
 project_id = "olbedjfebvbojlahhvpq"
+
+[functions.create-setup-link]
+verify_jwt = false
+
+[functions.create-subscription]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false

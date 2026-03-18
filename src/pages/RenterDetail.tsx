@@ -1,8 +1,13 @@
-import { useParams, Link } from "react-router-dom";
+import { useState } from "react";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
+import { supabase } from "@/integrations/supabase/client";
 import { useRenter, useMachineForRenter, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter } from "@/hooks/useSupabaseData";
-import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Copy, ExternalLink } from "lucide-react";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 const timelineIcons: Record<string, typeof User> = {
   created: User,
@@ -19,11 +24,56 @@ const timelineIcons: Record<string, typeof User> = {
 
 export default function RenterDetail() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const { data: renter, isLoading } = useRenter(id);
   const { data: machine } = useMachineForRenter(renter?.machine_id);
   const { data: timeline = [] } = useTimelineEvents(id);
   const { data: maintenance = [] } = useMaintenanceForRenter(id);
   const { data: renterPayments = [] } = usePaymentsForRenter(id);
+  const [sendingSetup, setSendingSetup] = useState(false);
+  const [activating, setActivating] = useState(false);
+
+  // Show toast on setup return
+  const setupResult = searchParams.get("setup");
+  if (setupResult === "success") {
+    toast.success("Card saved successfully! You can now activate billing.");
+    window.history.replaceState({}, "", `/renters/${id}`);
+  }
+
+  const handleSendSetupLink = async () => {
+    setSendingSetup(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-setup-link", {
+        body: { renter_id: id },
+      });
+      if (error) throw error;
+      if (data?.url) {
+        await navigator.clipboard.writeText(data.url);
+        toast.success("Setup link copied to clipboard! Send it to the renter.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create setup link");
+    } finally {
+      setSendingSetup(false);
+    }
+  };
+
+  const handleActivateBilling = async () => {
+    setActivating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-subscription", {
+        body: { renter_id: id },
+      });
+      if (error) throw error;
+      toast.success(`Billing activated! Next due: ${data.next_due}`);
+      queryClient.invalidateQueries({ queryKey: ["renters", id] });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to activate billing");
+    } finally {
+      setActivating(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -49,6 +99,9 @@ export default function RenterDetail() {
     );
   }
 
+  const hasCard = !!renter.stripe_customer_id;
+  const hasSubscription = !!renter.stripe_subscription_id;
+
   return (
     <div className="space-y-6">
       <Link to="/renters" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
@@ -67,6 +120,60 @@ export default function RenterDetail() {
 
       <div className="grid lg:grid-cols-[1fr_360px] gap-6">
         <div className="space-y-6">
+          {/* Billing Actions Card */}
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <CreditCard className="h-4 w-4" /> Billing Actions
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant={hasCard ? "outline" : "default"}
+                  onClick={handleSendSetupLink}
+                  disabled={sendingSetup}
+                >
+                  {sendingSetup ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                  {hasCard ? "Resend Setup Link" : "Send Setup Link"}
+                </Button>
+
+                {hasCard && !hasSubscription && (
+                  <Button
+                    size="sm"
+                    onClick={handleActivateBilling}
+                    disabled={activating}
+                  >
+                    {activating ? (
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    ) : (
+                      <Play className="h-4 w-4" />
+                    )}
+                    Activate Recurring Billing
+                  </Button>
+                )}
+
+                {hasSubscription && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-green-500/10 text-green-700 text-sm font-medium">
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    Billing Active
+                  </span>
+                )}
+              </div>
+
+              <div className="text-xs text-muted-foreground space-y-1">
+                {!hasCard && <p>→ Step 1: Send setup link to collect card on file</p>}
+                {hasCard && !hasSubscription && <p>→ Card on file ✓ — Activate billing to start auto-charging ${Number(renter.monthly_rate).toFixed(2)}/mo</p>}
+                {hasSubscription && <p>Auto-billing ${Number(renter.monthly_rate).toFixed(2)}/mo • Next due: {renter.next_due_date || "—"}</p>}
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-medium flex items-center gap-2"><CreditCard className="h-4 w-4" /> Payment Summary</CardTitle>
@@ -79,7 +186,7 @@ export default function RenterDetail() {
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Balance</div>
-                  <div className={`text-lg font-mono font-semibold ${Number(renter.balance) > 0 ? 'text-destructive' : 'text-success'}`}>
+                  <div className={`text-lg font-mono font-semibold ${Number(renter.balance) > 0 ? 'text-destructive' : 'text-green-600'}`}>
                     ${Number(renter.balance).toFixed(2)}
                   </div>
                 </div>
