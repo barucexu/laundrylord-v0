@@ -195,6 +195,8 @@ export type Database = {
           paid_through_date: string | null
           phone: string | null
           status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           updated_at: string
           user_id: string
         }
@@ -215,6 +217,8 @@ export type Database = {
           paid_through_date?: string | null
           phone?: string | null
           status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -235,6 +239,8 @@ export type Database = {
           paid_through_date?: string | null
           phone?: string | null
           status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string
           user_id?: string
         }
