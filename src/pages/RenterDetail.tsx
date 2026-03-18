@@ -176,13 +176,17 @@ export default function RenterDetail() {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-medium flex items-center gap-2"><CreditCard className="h-4 w-4" /> Payment Summary</CardTitle>
+              <CardTitle className="text-base font-medium flex items-center gap-2"><CreditCard className="h-4 w-4" /> Financial Summary</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
-                  <div className="text-xs text-muted-foreground">Monthly Rate</div>
+                  <div className="text-xs text-muted-foreground">Monthly Rent</div>
                   <div className="text-lg font-mono font-semibold">${Number(renter.monthly_rate).toFixed(2)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Rent Collected</div>
+                  <div className="text-lg font-mono font-semibold">${Number(renter.rent_collected ?? 0).toFixed(2)}</div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Balance</div>
@@ -191,12 +195,42 @@ export default function RenterDetail() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground">Paid Through</div>
-                  <div className="text-sm font-mono">{renter.paid_through_date || '—'}</div>
-                </div>
-                <div>
                   <div className="text-xs text-muted-foreground">Next Due</div>
                   <div className="text-sm font-mono">{renter.next_due_date || '—'}</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t">
+                <div>
+                  <div className="text-xs text-muted-foreground">Install Fee</div>
+                  <div className="text-sm font-mono font-semibold">${Number(renter.install_fee ?? 0).toFixed(2)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Install Collected</div>
+                  <div className={`text-sm font-medium ${renter.install_fee_collected ? 'text-green-600' : 'text-destructive'}`}>
+                    {renter.install_fee_collected ? '✓ Yes' : '✗ No'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Deposit</div>
+                  <div className="text-sm font-mono font-semibold">${Number(renter.deposit_amount ?? 0).toFixed(2)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Deposit Collected</div>
+                  <div className={`text-sm font-medium ${renter.deposit_collected ? 'text-green-600' : 'text-destructive'}`}>
+                    {renter.deposit_collected ? '✓ Yes' : '✗ No'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t">
+                <div>
+                  <div className="text-xs text-muted-foreground">Start Date</div>
+                  <div className="text-sm font-mono">{renter.lease_start_date || '—'}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Paid Through</div>
+                  <div className="text-sm font-mono">{renter.paid_through_date || '—'}</div>
                 </div>
               </div>
               {renter.days_late > 0 && (

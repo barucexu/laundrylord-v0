@@ -44,6 +44,10 @@ export default function SettingsPage() {
               <Input id="installFee" type="number" defaultValue="75" className="font-mono" />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="depositAmount">Default Deposit ($)</Label>
+              <Input id="depositAmount" type="number" defaultValue="0" className="font-mono" />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="lateFee">Late Fee Amount ($)</Label>
               <Input id="lateFee" type="number" defaultValue="25" className="font-mono" />
             </div>
