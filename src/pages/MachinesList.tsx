@@ -1,11 +1,16 @@
+import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useMachines, useRenters } from "@/hooks/useSupabaseData";
 import { Link } from "react-router-dom";
+import { Plus } from "lucide-react";
+import { CreateMachineDialog } from "@/components/CreateMachineDialog";
 
 export default function MachinesList() {
   const { data: machines = [], isLoading } = useMachines();
   const { data: renters = [] } = useRenters();
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const getRenterForMachine = (machineId: string) => renters.find(r => r.machine_id === machineId);
 
@@ -13,7 +18,12 @@ export default function MachinesList() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Machines</h1>
-        <span className="text-sm text-muted-foreground">{machines.length} machines</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground">{machines.length} machines</span>
+          <Button size="sm" onClick={() => setDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Add Machine
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -51,19 +61,23 @@ export default function MachinesList() {
                         <span className="text-sm text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{m.condition || '—'}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground capitalize">{m.condition || '—'}</TableCell>
                   </TableRow>
                 );
               })}
               {machines.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">No machines yet</TableCell>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    No machines yet. Click "Add Machine" to get started.
+                  </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </div>
       )}
+
+      <CreateMachineDialog open={dialogOpen} onOpenChange={setDialogOpen} />
     </div>
   );
 }

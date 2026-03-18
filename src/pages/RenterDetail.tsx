@@ -4,10 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { supabase } from "@/integrations/supabase/client";
-import { useRenter, useMachineForRenter, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter } from "@/hooks/useSupabaseData";
-import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Copy, ExternalLink } from "lucide-react";
+import { useRenter, useMachineForRenter, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection } from "@/hooks/useSupabaseData";
+import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 
 const timelineIcons: Record<string, typeof User> = {
   created: User,
@@ -26,11 +27,13 @@ export default function RenterDetail() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { data: renter, isLoading } = useRenter(id);
   const { data: machine } = useMachineForRenter(renter?.machine_id);
   const { data: timeline = [] } = useTimelineEvents(id);
   const { data: maintenance = [] } = useMaintenanceForRenter(id);
   const { data: renterPayments = [] } = usePaymentsForRenter(id);
+  const { data: stripeStatus } = useStripeConnection();
   const [sendingSetup, setSendingSetup] = useState(false);
   const [activating, setActivating] = useState(false);
 
@@ -99,8 +102,19 @@ export default function RenterDetail() {
     );
   }
 
+  const stripeConnected = stripeStatus?.connected === true;
   const hasCard = !!renter.stripe_customer_id;
   const hasSubscription = !!renter.stripe_subscription_id;
+
+  // Determine billing state
+  const getBillingState = () => {
+    if (!stripeConnected) return "no_stripe";
+    if (!hasCard) return "no_card";
+    if (!hasSubscription) return "no_autopay";
+    return "active";
+  };
+
+  const billingState = getBillingState();
 
   return (
     <div className="space-y-6">
@@ -124,53 +138,69 @@ export default function RenterDetail() {
           <Card className="border-primary/20 bg-primary/5">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-medium flex items-center gap-2">
-                <CreditCard className="h-4 w-4" /> Billing Actions
+                <CreditCard className="h-4 w-4" /> Billing
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant={hasCard ? "outline" : "default"}
-                  onClick={handleSendSetupLink}
-                  disabled={sendingSetup}
-                >
-                  {sendingSetup ? (
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                  {hasCard ? "Resend Setup Link" : "Send Setup Link"}
-                </Button>
+              {billingState === "no_stripe" && (
+                <>
+                  <Button size="sm" onClick={() => navigate("/settings")}>
+                    <Settings className="h-4 w-4" />
+                    Connect Business Stripe
+                  </Button>
+                  <p className="text-xs text-muted-foreground">Connect your Stripe account in Settings before you can charge renters.</p>
+                </>
+              )}
 
-                {hasCard && !hasSubscription && (
-                  <Button
-                    size="sm"
-                    onClick={handleActivateBilling}
-                    disabled={activating}
-                  >
-                    {activating ? (
+              {billingState === "no_card" && (
+                <>
+                  <Button size="sm" onClick={handleSendSetupLink} disabled={sendingSetup}>
+                    {sendingSetup ? (
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                     ) : (
-                      <Play className="h-4 w-4" />
+                      <Send className="h-4 w-4" />
                     )}
-                    Activate Recurring Billing
+                    Send Card Setup Link
                   </Button>
-                )}
+                  <p className="text-xs text-muted-foreground">→ Send a secure link to collect the renter's card on file</p>
+                </>
+              )}
 
-                {hasSubscription && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-green-500/10 text-green-700 text-sm font-medium">
-                    <CheckCircle className="h-3.5 w-3.5" />
-                    Billing Active
-                  </span>
-                )}
-              </div>
+              {billingState === "no_autopay" && (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={handleActivateBilling} disabled={activating}>
+                      {activating ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      ) : (
+                        <Play className="h-4 w-4" />
+                      )}
+                      Start Autopay
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleSendSetupLink} disabled={sendingSetup}>
+                      <Send className="h-4 w-4" />
+                      Resend Setup Link
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">→ Card on file ✓ — Start auto-charging ${Number(renter.monthly_rate).toFixed(2)}/mo</p>
+                </>
+              )}
 
-              <div className="text-xs text-muted-foreground space-y-1">
-                {!hasCard && <p>→ Step 1: Send setup link to collect card on file</p>}
-                {hasCard && !hasSubscription && <p>→ Card on file ✓ — Activate billing to start auto-charging ${Number(renter.monthly_rate).toFixed(2)}/mo</p>}
-                {hasSubscription && <p>Auto-billing ${Number(renter.monthly_rate).toFixed(2)}/mo • Next due: {renter.next_due_date || "—"}</p>}
-              </div>
+              {billingState === "active" && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-green-500/10 text-green-700 text-sm font-medium">
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      Autopay Active
+                    </span>
+                    <Button size="sm" variant="ghost" onClick={handleSendSetupLink} disabled={sendingSetup}>
+                      <Send className="h-4 w-4" />
+                      Update Card
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Auto-billing ${Number(renter.monthly_rate).toFixed(2)}/mo • Next due: {renter.next_due_date || "—"}</p>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -186,7 +216,7 @@ export default function RenterDetail() {
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Rent Collected</div>
-                  <div className="text-lg font-mono font-semibold">${Number(renter.rent_collected ?? 0).toFixed(2)}</div>
+                  <div className="text-lg font-mono font-semibold">${Number((renter as any).rent_collected ?? 0).toFixed(2)}</div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Balance</div>
@@ -203,22 +233,22 @@ export default function RenterDetail() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t">
                 <div>
                   <div className="text-xs text-muted-foreground">Install Fee</div>
-                  <div className="text-sm font-mono font-semibold">${Number(renter.install_fee ?? 0).toFixed(2)}</div>
+                  <div className="text-sm font-mono font-semibold">${Number((renter as any).install_fee ?? 0).toFixed(2)}</div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Install Collected</div>
-                  <div className={`text-sm font-medium ${renter.install_fee_collected ? 'text-green-600' : 'text-destructive'}`}>
-                    {renter.install_fee_collected ? '✓ Yes' : '✗ No'}
+                  <div className={`text-sm font-medium ${(renter as any).install_fee_collected ? 'text-green-600' : 'text-destructive'}`}>
+                    {(renter as any).install_fee_collected ? '✓ Yes' : '✗ No'}
                   </div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Deposit</div>
-                  <div className="text-sm font-mono font-semibold">${Number(renter.deposit_amount ?? 0).toFixed(2)}</div>
+                  <div className="text-sm font-mono font-semibold">${Number((renter as any).deposit_amount ?? 0).toFixed(2)}</div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Deposit Collected</div>
-                  <div className={`text-sm font-medium ${renter.deposit_collected ? 'text-green-600' : 'text-destructive'}`}>
-                    {renter.deposit_collected ? '✓ Yes' : '✗ No'}
+                  <div className={`text-sm font-medium ${(renter as any).deposit_collected ? 'text-green-600' : 'text-destructive'}`}>
+                    {(renter as any).deposit_collected ? '✓ Yes' : '✗ No'}
                   </div>
                 </div>
               </div>
@@ -233,6 +263,7 @@ export default function RenterDetail() {
                   <div className="text-sm font-mono">{renter.paid_through_date || '—'}</div>
                 </div>
               </div>
+
               {renter.days_late > 0 && (
                 <div className="mt-3 px-3 py-2 bg-destructive/5 border border-destructive/20 rounded-md text-sm text-destructive">
                   {renter.days_late} days overdue

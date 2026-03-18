@@ -2,6 +2,7 @@ import { LayoutDashboard, Users, Box, CreditCard, Wrench, Settings, LogOut } fro
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import logoImg from "@/assets/laundrylord-logo.png";
 import {
   Sidebar,
   SidebarContent,
@@ -34,15 +35,11 @@ export function AppSidebar() {
       <SidebarHeader className="p-4">
         {!collapsed ? (
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
-              <span className="text-sidebar-primary-foreground font-bold text-sm">LL</span>
-            </div>
+            <img src={logoImg} alt="LaundryLord" className="h-8 w-8 rounded-lg object-contain" />
             <span className="font-semibold text-sidebar-accent-foreground text-lg tracking-tight">LaundryLord</span>
           </div>
         ) : (
-          <div className="h-8 w-8 rounded-lg bg-sidebar-primary flex items-center justify-center mx-auto">
-            <span className="text-sidebar-primary-foreground font-bold text-sm">LL</span>
-          </div>
+          <img src={logoImg} alt="LaundryLord" className="h-8 w-8 rounded-lg object-contain mx-auto" />
         )}
       </SidebarHeader>
       <SidebarContent>
