@@ -135,7 +135,7 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
             </div>
             <div className="space-y-2">
               <Label htmlFor="r-rate">Monthly Rent ($)</Label>
-              <Input id="r-rate" type="number" step="0.01" value={form.monthly_rate} onChange={e => setForm(f => ({ ...f, monthly_rate: e.target.value }))} className="font-mono" />
+              <Input id="r-rate" type="number" step="0.01" value={form.monthly_rate || getDefault("monthly_rate", "150")} onChange={e => setForm(f => ({ ...f, monthly_rate: e.target.value }))} className="font-mono" />
             </div>
           </div>
 
