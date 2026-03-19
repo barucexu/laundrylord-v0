@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useCreateRenter } from "@/hooks/useSupabaseData";
+import { useCreateRenter, useOperatorSettings } from "@/hooks/useSupabaseData";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,20 +22,34 @@ interface CreateRenterDialogProps {
 
 export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogProps) {
   const createRenter = useCreateRenter();
+  const { data: opSettings } = useOperatorSettings();
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [form, setForm] = useState({
     name: "",
     phone: "",
     email: "",
     address: "",
-    monthly_rate: "150",
+    monthly_rate: "",
     rent_collected: "0",
-    install_fee: "75",
+    install_fee: "",
     install_fee_collected: false,
-    deposit_amount: "0",
+    deposit_amount: "",
     deposit_collected: false,
+    late_fee: "",
     notes: "",
   });
+
+  const getDefault = (field: string, fallback: string) => {
+    if (form[field as keyof typeof form] !== "") return form[field as keyof typeof form] as string;
+    if (!opSettings) return fallback;
+    const map: Record<string, string> = {
+      monthly_rate: String(opSettings.default_monthly_rate),
+      install_fee: String(opSettings.default_install_fee),
+      deposit_amount: String(opSettings.default_deposit),
+      late_fee: String(opSettings.late_fee_amount),
+    };
+    return map[field] || fallback;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,18 +64,19 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
         phone: form.phone.trim() || null,
         email: form.email.trim() || null,
         address: form.address.trim() || null,
-        monthly_rate: parseFloat(form.monthly_rate) || 150,
+        monthly_rate: parseFloat(getDefault("monthly_rate", "150")) || 150,
         rent_collected: parseFloat(form.rent_collected) || 0,
-        install_fee: parseFloat(form.install_fee) || 0,
+        install_fee: parseFloat(getDefault("install_fee", "75")) || 0,
         install_fee_collected: form.install_fee_collected,
-        deposit_amount: parseFloat(form.deposit_amount) || 0,
+        deposit_amount: parseFloat(getDefault("deposit_amount", "0")) || 0,
         deposit_collected: form.deposit_collected,
+        late_fee: parseFloat(getDefault("late_fee", "25")) || 25,
         lease_start_date: startDate ? format(startDate, "yyyy-MM-dd") : null,
         notes: form.notes.trim(),
         status: "lead",
-      });
+      } as any);
       toast.success(`${form.name} added as a new lead`);
-      setForm({ name: "", phone: "", email: "", address: "", monthly_rate: "150", rent_collected: "0", install_fee: "75", install_fee_collected: false, deposit_amount: "0", deposit_collected: false, notes: "" });
+      setForm({ name: "", phone: "", email: "", address: "", monthly_rate: "", rent_collected: "0", install_fee: "", install_fee_collected: false, deposit_amount: "", deposit_collected: false, late_fee: "", notes: "" });
       setStartDate(undefined);
       onOpenChange(false);
     } catch (err: any) {
@@ -120,7 +135,7 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
             </div>
             <div className="space-y-2">
               <Label htmlFor="r-rate">Monthly Rent ($)</Label>
-              <Input id="r-rate" type="number" step="0.01" value={form.monthly_rate} onChange={e => setForm(f => ({ ...f, monthly_rate: e.target.value }))} className="font-mono" />
+              <Input id="r-rate" type="number" step="0.01" value={form.monthly_rate || getDefault("monthly_rate", "150")} onChange={e => setForm(f => ({ ...f, monthly_rate: e.target.value }))} className="font-mono" />
             </div>
           </div>
 
@@ -133,7 +148,7 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="r-install-fee">Install Fee ($)</Label>
-              <Input id="r-install-fee" type="number" step="0.01" value={form.install_fee} onChange={e => setForm(f => ({ ...f, install_fee: e.target.value }))} className="font-mono" />
+              <Input id="r-install-fee" type="number" step="0.01" value={form.install_fee || getDefault("install_fee", "75")} onChange={e => setForm(f => ({ ...f, install_fee: e.target.value }))} className="font-mono" />
             </div>
             <div className="flex items-end pb-2">
               <div className="flex items-center space-x-2">
@@ -146,7 +161,7 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="r-deposit">Deposit ($)</Label>
-              <Input id="r-deposit" type="number" step="0.01" value={form.deposit_amount} onChange={e => setForm(f => ({ ...f, deposit_amount: e.target.value }))} className="font-mono" />
+              <Input id="r-deposit" type="number" step="0.01" value={form.deposit_amount || getDefault("deposit_amount", "0")} onChange={e => setForm(f => ({ ...f, deposit_amount: e.target.value }))} className="font-mono" />
             </div>
             <div className="flex items-end pb-2">
               <div className="flex items-center space-x-2">
@@ -154,6 +169,11 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
                 <Label htmlFor="r-deposit-collected" className="text-sm font-normal">Collected</Label>
               </div>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="r-late-fee">Late Fee ($)</Label>
+            <Input id="r-late-fee" type="number" step="0.01" value={form.late_fee || getDefault("late_fee", "25")} onChange={e => setForm(f => ({ ...f, late_fee: e.target.value }))} className="font-mono" />
           </div>
 
           <Separator />

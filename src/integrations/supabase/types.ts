@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      billing_reminders: {
+        Row: {
+          billing_cycle: string
+          id: string
+          reminder_type: string
+          renter_id: string
+          sent_at: string
+          user_id: string
+        }
+        Insert: {
+          billing_cycle: string
+          id?: string
+          reminder_type: string
+          renter_id: string
+          sent_at?: string
+          user_id: string
+        }
+        Update: {
+          billing_cycle?: string
+          id?: string
+          reminder_type?: string
+          renter_id?: string
+          sent_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_reminders_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "renters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       machines: {
         Row: {
           assigned_renter_id: string | null
@@ -130,6 +165,45 @@ export type Database = {
           },
         ]
       }
+      operator_settings: {
+        Row: {
+          created_at: string
+          default_deposit: number
+          default_install_fee: number
+          default_monthly_rate: number
+          id: string
+          late_fee_after_days: number
+          late_fee_amount: number
+          reminder_days_before: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          default_deposit?: number
+          default_install_fee?: number
+          default_monthly_rate?: number
+          id?: string
+          late_fee_after_days?: number
+          late_fee_amount?: number
+          reminder_days_before?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          default_deposit?: number
+          default_install_fee?: number
+          default_monthly_rate?: number
+          id?: string
+          late_fee_after_days?: number
+          late_fee_amount?: number
+          reminder_days_before?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
@@ -186,9 +260,11 @@ export type Database = {
           deposit_amount: number
           deposit_collected: boolean
           email: string | null
+          has_payment_method: boolean
           id: string
           install_fee: number
           install_fee_collected: boolean
+          late_fee: number
           lease_start_date: string | null
           machine_id: string | null
           min_term_end_date: string | null
@@ -213,9 +289,11 @@ export type Database = {
           deposit_amount?: number
           deposit_collected?: boolean
           email?: string | null
+          has_payment_method?: boolean
           id?: string
           install_fee?: number
           install_fee_collected?: boolean
+          late_fee?: number
           lease_start_date?: string | null
           machine_id?: string | null
           min_term_end_date?: string | null
@@ -240,9 +318,11 @@ export type Database = {
           deposit_amount?: number
           deposit_collected?: boolean
           email?: string | null
+          has_payment_method?: boolean
           id?: string
           install_fee?: number
           install_fee_collected?: boolean
+          late_fee?: number
           lease_start_date?: string | null
           machine_id?: string | null
           min_term_end_date?: string | null
