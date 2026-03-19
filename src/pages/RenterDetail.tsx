@@ -103,7 +103,7 @@ export default function RenterDetail() {
   }
 
   const stripeConnected = stripeStatus?.connected === true;
-  const hasCard = !!renter.stripe_customer_id;
+  const hasCard = !!(renter as any).has_payment_method;
   const hasSubscription = !!renter.stripe_subscription_id;
 
   // Determine billing state
