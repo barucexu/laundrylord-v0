@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useCreateRenter } from "@/hooks/useSupabaseData";
+import { useCreateRenter, useOperatorSettings } from "@/hooks/useSupabaseData";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,20 +22,34 @@ interface CreateRenterDialogProps {
 
 export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogProps) {
   const createRenter = useCreateRenter();
+  const { data: opSettings } = useOperatorSettings();
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [form, setForm] = useState({
     name: "",
     phone: "",
     email: "",
     address: "",
-    monthly_rate: "150",
+    monthly_rate: "",
     rent_collected: "0",
-    install_fee: "75",
+    install_fee: "",
     install_fee_collected: false,
-    deposit_amount: "0",
+    deposit_amount: "",
     deposit_collected: false,
+    late_fee: "",
     notes: "",
   });
+
+  const getDefault = (field: string, fallback: string) => {
+    if (form[field as keyof typeof form] !== "") return form[field as keyof typeof form] as string;
+    if (!opSettings) return fallback;
+    const map: Record<string, string> = {
+      monthly_rate: String(opSettings.default_monthly_rate),
+      install_fee: String(opSettings.default_install_fee),
+      deposit_amount: String(opSettings.default_deposit),
+      late_fee: String(opSettings.late_fee_amount),
+    };
+    return map[field] || fallback;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
