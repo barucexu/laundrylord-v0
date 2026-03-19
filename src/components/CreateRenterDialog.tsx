@@ -148,7 +148,7 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="r-install-fee">Install Fee ($)</Label>
-              <Input id="r-install-fee" type="number" step="0.01" value={form.install_fee} onChange={e => setForm(f => ({ ...f, install_fee: e.target.value }))} className="font-mono" />
+              <Input id="r-install-fee" type="number" step="0.01" value={form.install_fee || getDefault("install_fee", "75")} onChange={e => setForm(f => ({ ...f, install_fee: e.target.value }))} className="font-mono" />
             </div>
             <div className="flex items-end pb-2">
               <div className="flex items-center space-x-2">
