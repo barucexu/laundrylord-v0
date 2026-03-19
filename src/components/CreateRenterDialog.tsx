@@ -64,18 +64,19 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
         phone: form.phone.trim() || null,
         email: form.email.trim() || null,
         address: form.address.trim() || null,
-        monthly_rate: parseFloat(form.monthly_rate) || 150,
+        monthly_rate: parseFloat(getDefault("monthly_rate", "150")) || 150,
         rent_collected: parseFloat(form.rent_collected) || 0,
-        install_fee: parseFloat(form.install_fee) || 0,
+        install_fee: parseFloat(getDefault("install_fee", "75")) || 0,
         install_fee_collected: form.install_fee_collected,
-        deposit_amount: parseFloat(form.deposit_amount) || 0,
+        deposit_amount: parseFloat(getDefault("deposit_amount", "0")) || 0,
         deposit_collected: form.deposit_collected,
+        late_fee: parseFloat(getDefault("late_fee", "25")) || 25,
         lease_start_date: startDate ? format(startDate, "yyyy-MM-dd") : null,
         notes: form.notes.trim(),
         status: "lead",
-      });
+      } as any);
       toast.success(`${form.name} added as a new lead`);
-      setForm({ name: "", phone: "", email: "", address: "", monthly_rate: "150", rent_collected: "0", install_fee: "75", install_fee_collected: false, deposit_amount: "0", deposit_collected: false, notes: "" });
+      setForm({ name: "", phone: "", email: "", address: "", monthly_rate: "", rent_collected: "0", install_fee: "", install_fee_collected: false, deposit_amount: "", deposit_collected: false, late_fee: "", notes: "" });
       setStartDate(undefined);
       onOpenChange(false);
     } catch (err: any) {
