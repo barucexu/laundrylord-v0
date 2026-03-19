@@ -187,7 +187,7 @@ async function sendEmail(to: string, subject: string, text: string) {
         to,
         subject,
         text,
-        from: "LaundryLord <notifications@notify.laundrylord.com>",
+        from: "LaundryLord <notifications@notify.laundrylord.club>",
       }),
     });
 
