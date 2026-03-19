@@ -32,7 +32,6 @@ serve(async (req) => {
     if (webhookSecret && sig) {
       event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
     } else {
-      // Fallback for dev: parse raw body
       event = JSON.parse(body) as Stripe.Event;
       console.warn("[WEBHOOK] No signature verification - dev mode");
     }
@@ -40,12 +39,40 @@ serve(async (req) => {
     console.log(`[WEBHOOK] ${event.type}`);
 
     switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        if (session.mode !== "setup") break;
+
+        const customerId = session.customer as string;
+        if (!customerId) break;
+
+        const { data: renter } = await supabase
+          .from("renters")
+          .select("id, user_id")
+          .eq("stripe_customer_id", customerId)
+          .single();
+
+        if (renter) {
+          await supabase
+            .from("renters")
+            .update({ has_payment_method: true })
+            .eq("id", renter.id);
+
+          await supabase.from("timeline_events").insert({
+            renter_id: renter.id,
+            user_id: renter.user_id,
+            type: "payment_succeeded",
+            description: "Card on file saved via Stripe setup",
+          });
+        }
+        break;
+      }
+
       case "invoice.payment_succeeded": {
         const invoice = event.data.object as Stripe.Invoice;
         const subId = invoice.subscription as string;
         if (!subId) break;
 
-        // Find renter by subscription ID
         const { data: renter } = await supabase
           .from("renters")
           .select("id, user_id")
@@ -66,7 +93,6 @@ serve(async (req) => {
             })
             .eq("id", renter.id);
 
-          // Record payment
           await supabase.from("payments").insert({
             renter_id: renter.id,
             user_id: renter.user_id,
@@ -78,7 +104,6 @@ serve(async (req) => {
             type: "rent",
           });
 
-          // Timeline event
           await supabase.from("timeline_events").insert({
             renter_id: renter.id,
             user_id: renter.user_id,

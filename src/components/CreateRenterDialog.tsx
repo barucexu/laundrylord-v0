@@ -161,7 +161,7 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="r-deposit">Deposit ($)</Label>
-              <Input id="r-deposit" type="number" step="0.01" value={form.deposit_amount} onChange={e => setForm(f => ({ ...f, deposit_amount: e.target.value }))} className="font-mono" />
+              <Input id="r-deposit" type="number" step="0.01" value={form.deposit_amount || getDefault("deposit_amount", "0")} onChange={e => setForm(f => ({ ...f, deposit_amount: e.target.value }))} className="font-mono" />
             </div>
             <div className="flex items-end pb-2">
               <div className="flex items-center space-x-2">
@@ -169,6 +169,11 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
                 <Label htmlFor="r-deposit-collected" className="text-sm font-normal">Collected</Label>
               </div>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="r-late-fee">Late Fee ($)</Label>
+            <Input id="r-late-fee" type="number" step="0.01" value={form.late_fee || getDefault("late_fee", "25")} onChange={e => setForm(f => ({ ...f, late_fee: e.target.value }))} className="font-mono" />
           </div>
 
           <Separator />

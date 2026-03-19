@@ -262,6 +262,16 @@ export default function RenterDetail() {
                   <div className="text-xs text-muted-foreground">Paid Through</div>
                   <div className="text-sm font-mono">{renter.paid_through_date || '—'}</div>
                 </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Late Fee</div>
+                  <div className="text-sm font-mono">${Number((renter as any).late_fee ?? 25).toFixed(2)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Card on File</div>
+                  <div className={`text-sm font-medium ${hasCard ? 'text-green-600' : 'text-muted-foreground'}`}>
+                    {hasCard ? '✓ Yes' : '✗ No'}
+                  </div>
+                </div>
               </div>
 
               {renter.days_late > 0 && (

@@ -199,4 +199,52 @@ export function useStripeConnection() {
   });
 }
 
+// Operator Settings
+export function useOperatorSettings() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["operator_settings"],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("operator_settings")
+        .select("*")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useSaveOperatorSettings() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (settings: {
+      default_monthly_rate: number;
+      default_install_fee: number;
+      default_deposit: number;
+      late_fee_amount: number;
+      late_fee_after_days: number;
+      reminder_days_before: number;
+    }) => {
+      const { data, error } = await supabase
+        .from("operator_settings")
+        .upsert(
+          { ...settings, user_id: user!.id },
+          { onConflict: "user_id" }
+        )
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["operator_settings"] });
+    },
+  });
+}
+
 export type { RenterRow, MachineRow, PaymentRow, MaintenanceRow, TimelineRow };
