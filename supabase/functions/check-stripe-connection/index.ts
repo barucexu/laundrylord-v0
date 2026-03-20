@@ -1,8 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 serve(async (req) => {
@@ -10,15 +11,33 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-
-  if (!stripeKey || stripeKey.trim() === "") {
-    return new Response(JSON.stringify({ connected: false, reason: "no_key" }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+  );
 
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) throw new Error("No authorization header");
+    const token = authHeader.replace("Bearer ", "");
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !userData.user) throw new Error("Unauthorized");
+
+    // Read operator's own Stripe key from operator_settings
+    const { data: settings } = await supabase
+      .from("operator_settings")
+      .select("stripe_secret_key")
+      .eq("user_id", userData.user.id)
+      .maybeSingle();
+
+    const stripeKey = settings?.stripe_secret_key;
+
+    if (!stripeKey || stripeKey.trim() === "") {
+      return new Response(JSON.stringify({ connected: false, reason: "no_key" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const res = await fetch("https://api.stripe.com/v1/account", {
       headers: { Authorization: `Bearer ${stripeKey}` },
     });

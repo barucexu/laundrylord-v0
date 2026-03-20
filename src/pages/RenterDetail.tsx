@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { supabase } from "@/integrations/supabase/client";
-import { useRenter, useMachineForRenter, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection } from "@/hooks/useSupabaseData";
+import { useRenter, useMachineForRenter, useMachines, useUpdateRenter, useUpdateMachine, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection } from "@/hooks/useSupabaseData";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -31,10 +32,13 @@ export default function RenterDetail() {
   const navigate = useNavigate();
   const { data: renter, isLoading } = useRenter(id);
   const { data: machine } = useMachineForRenter(renter?.machine_id);
+  const { data: allMachines = [] } = useMachines();
   const { data: timeline = [] } = useTimelineEvents(id);
   const { data: maintenance = [] } = useMaintenanceForRenter(id);
   const { data: renterPayments = [] } = usePaymentsForRenter(id);
   const { data: stripeStatus } = useStripeConnection();
+  const updateRenter = useUpdateRenter();
+  const updateMachine = useUpdateMachine();
   const [sendingSetup, setSendingSetup] = useState(false);
   const [activating, setActivating] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -80,6 +84,28 @@ export default function RenterDetail() {
     }
   };
 
+  const handleAssignMachine = async (machineId: string) => {
+    if (!renter || !id) return;
+    try {
+      // If renter already had a machine, unassign old one
+      if (renter.machine_id) {
+        await updateMachine.mutateAsync({ id: renter.machine_id, assigned_renter_id: null, status: "available" });
+      }
+
+      if (machineId === "none") {
+        await updateRenter.mutateAsync({ id, machine_id: null });
+      } else {
+        await updateRenter.mutateAsync({ id, machine_id: machineId });
+        await updateMachine.mutateAsync({ id: machineId, assigned_renter_id: id, status: "rented" });
+      }
+      queryClient.invalidateQueries({ queryKey: ["renters", id] });
+      queryClient.invalidateQueries({ queryKey: ["machines"] });
+      toast.success(machineId === "none" ? "Machine unassigned" : "Machine assigned");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to assign machine");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -105,10 +131,9 @@ export default function RenterDetail() {
   }
 
   const stripeConnected = stripeStatus?.connected === true;
-  const hasCard = !!(renter as any).has_payment_method;
+  const hasCard = !!renter.has_payment_method;
   const hasSubscription = !!renter.stripe_subscription_id;
 
-  // Determine billing state
   const getBillingState = () => {
     if (!stripeConnected) return "no_stripe";
     if (!hasCard) return "no_card";
@@ -117,6 +142,9 @@ export default function RenterDetail() {
   };
 
   const billingState = getBillingState();
+
+  // Available machines for assignment dropdown
+  const availableMachines = allMachines.filter(m => m.status === "available" || m.id === renter.machine_id);
 
   return (
     <div className="space-y-6">
@@ -221,7 +249,7 @@ export default function RenterDetail() {
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Rent Collected</div>
-                  <div className="text-lg font-mono font-semibold">${Number((renter as any).rent_collected ?? 0).toFixed(2)}</div>
+                  <div className="text-lg font-mono font-semibold">${Number(renter.rent_collected ?? 0).toFixed(2)}</div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Balance</div>
@@ -238,22 +266,22 @@ export default function RenterDetail() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t">
                 <div>
                   <div className="text-xs text-muted-foreground">Install Fee</div>
-                  <div className="text-sm font-mono font-semibold">${Number((renter as any).install_fee ?? 0).toFixed(2)}</div>
+                  <div className="text-sm font-mono font-semibold">${Number(renter.install_fee ?? 0).toFixed(2)}</div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Install Collected</div>
-                  <div className={`text-sm font-medium ${(renter as any).install_fee_collected ? 'text-green-600' : 'text-destructive'}`}>
-                    {(renter as any).install_fee_collected ? '✓ Yes' : '✗ No'}
+                  <div className={`text-sm font-medium ${renter.install_fee_collected ? 'text-green-600' : 'text-destructive'}`}>
+                    {renter.install_fee_collected ? '✓ Yes' : '✗ No'}
                   </div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Deposit</div>
-                  <div className="text-sm font-mono font-semibold">${Number((renter as any).deposit_amount ?? 0).toFixed(2)}</div>
+                  <div className="text-sm font-mono font-semibold">${Number(renter.deposit_amount ?? 0).toFixed(2)}</div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Deposit Collected</div>
-                  <div className={`text-sm font-medium ${(renter as any).deposit_collected ? 'text-green-600' : 'text-destructive'}`}>
-                    {(renter as any).deposit_collected ? '✓ Yes' : '✗ No'}
+                  <div className={`text-sm font-medium ${renter.deposit_collected ? 'text-green-600' : 'text-destructive'}`}>
+                    {renter.deposit_collected ? '✓ Yes' : '✗ No'}
                   </div>
                 </div>
               </div>
@@ -269,7 +297,7 @@ export default function RenterDetail() {
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Late Fee</div>
-                  <div className="text-sm font-mono">${Number((renter as any).late_fee ?? 25).toFixed(2)}</div>
+                  <div className="text-sm font-mono">${Number(renter.late_fee ?? 25).toFixed(2)}</div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Card on File</div>
@@ -414,9 +442,27 @@ export default function RenterDetail() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-medium flex items-center gap-2"><Box className="h-4 w-4" /> Machine</CardTitle>
             </CardHeader>
-            <CardContent>
-              {machine ? (
-                <div className="space-y-2">
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <Select
+                  value={renter.machine_id || "none"}
+                  onValueChange={handleAssignMachine}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Assign a machine" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No machine</SelectItem>
+                    {availableMachines.map(m => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.type} — {m.model} ({m.serial})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {machine && (
+                <div className="space-y-2 pt-2 border-t">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Model</span>
                     <span className="text-xs">{machine.model}</span>
@@ -438,8 +484,6 @@ export default function RenterDetail() {
                     <StatusBadge status={machine.status} />
                   </div>
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No machine assigned</p>
               )}
             </CardContent>
           </Card>

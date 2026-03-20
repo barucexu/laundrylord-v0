@@ -19,7 +19,6 @@ serve(async (req) => {
   );
 
   try {
-    // Auth check
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header");
     const token = authHeader.replace("Bearer ", "");
@@ -38,7 +37,16 @@ serve(async (req) => {
       .single();
     if (renterError || !renter) throw new Error("Renter not found");
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+    // Get operator's Stripe key
+    const { data: settings } = await supabase
+      .from("operator_settings")
+      .select("stripe_secret_key")
+      .eq("user_id", userData.user.id)
+      .maybeSingle();
+    const stripeKey = settings?.stripe_secret_key;
+    if (!stripeKey) throw new Error("Stripe not connected. Add your Stripe key in Settings.");
+
+    const stripe = new Stripe(stripeKey, {
       apiVersion: "2025-08-27.basil",
     });
 
@@ -58,7 +66,6 @@ serve(async (req) => {
         .eq("id", renter_id);
     }
 
-    // Create Checkout session in setup mode (save card for future billing)
     const origin = req.headers.get("origin") || "https://laundrylord-v0.lovable.app";
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
