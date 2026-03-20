@@ -132,6 +132,9 @@ export default function RenterDetail() {
             {renter.lease_start_date && <span className="text-xs text-muted-foreground font-mono">Since {renter.lease_start_date}</span>}
           </div>
         </div>
+        <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+          <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+        </Button>
       </div>
 
       <div className="grid lg:grid-cols-[1fr_360px] gap-6">
