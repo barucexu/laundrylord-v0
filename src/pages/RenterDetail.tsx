@@ -37,6 +37,7 @@ export default function RenterDetail() {
   const { data: stripeStatus } = useStripeConnection();
   const [sendingSetup, setSendingSetup] = useState(false);
   const [activating, setActivating] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   // Show toast on setup return
   const setupResult = searchParams.get("setup");
