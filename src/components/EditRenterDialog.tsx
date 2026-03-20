@@ -5,6 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 import { useUpdateRenter, type RenterRow } from "@/hooks/useSupabaseData";
 import { toast } from "sonner";
 
@@ -13,6 +19,18 @@ interface EditRenterDialogProps {
   onOpenChange: (open: boolean) => void;
   renter: RenterRow;
 }
+
+const ALL_STATUSES = [
+  { value: "lead", label: "Lead" },
+  { value: "scheduled", label: "Scheduled" },
+  { value: "active", label: "Active" },
+  { value: "late", label: "Late" },
+  { value: "maintenance", label: "Maintenance" },
+  { value: "termination_requested", label: "Termination Requested" },
+  { value: "pickup_scheduled", label: "Pickup Scheduled" },
+  { value: "closed", label: "Closed" },
+  { value: "defaulted", label: "Defaulted" },
+];
 
 export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialogProps) {
   const updateRenter = useUpdateRenter();
@@ -27,7 +45,12 @@ export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialo
     late_fee: String(renter.late_fee),
     notes: renter.notes || "",
     status: renter.status,
+    install_fee_collected: renter.install_fee_collected,
+    deposit_collected: renter.deposit_collected,
   });
+  const [startDate, setStartDate] = useState<Date | undefined>(
+    renter.lease_start_date ? new Date(renter.lease_start_date + "T00:00:00") : undefined
+  );
 
   useEffect(() => {
     if (open) {
@@ -42,7 +65,10 @@ export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialo
         late_fee: String(renter.late_fee),
         notes: renter.notes || "",
         status: renter.status,
+        install_fee_collected: renter.install_fee_collected,
+        deposit_collected: renter.deposit_collected,
       });
+      setStartDate(renter.lease_start_date ? new Date(renter.lease_start_date + "T00:00:00") : undefined);
     }
   }, [open, renter]);
 
@@ -65,6 +91,9 @@ export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialo
         late_fee: parseFloat(form.late_fee) || 0,
         notes: form.notes,
         status: form.status,
+        install_fee_collected: form.install_fee_collected,
+        deposit_collected: form.deposit_collected,
+        lease_start_date: startDate ? format(startDate, "yyyy-MM-dd") : null,
       });
       toast.success("Renter updated");
       onOpenChange(false);
@@ -103,12 +132,25 @@ export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialo
             <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="lead">Lead</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="late">Late</SelectItem>
-                <SelectItem value="closed">Closed</SelectItem>
+                {ALL_STATUSES.map(s => (
+                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Lease Start Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !startDate && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {startDate ? format(startDate, "PPP") : "Pick a date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
@@ -128,6 +170,24 @@ export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialo
             <div className="space-y-2">
               <Label>Deposit ($)</Label>
               <Input type="number" value={form.deposit_amount} onChange={e => setForm(f => ({ ...f, deposit_amount: e.target.value }))} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="installCollected"
+                checked={form.install_fee_collected}
+                onCheckedChange={(checked) => setForm(f => ({ ...f, install_fee_collected: !!checked }))}
+              />
+              <Label htmlFor="installCollected" className="text-sm">Install Fee Collected</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="depositCollected"
+                checked={form.deposit_collected}
+                onCheckedChange={(checked) => setForm(f => ({ ...f, deposit_collected: !!checked }))}
+              />
+              <Label htmlFor="depositCollected" className="text-sm">Deposit Collected</Label>
             </div>
           </div>
           <div className="space-y-2">

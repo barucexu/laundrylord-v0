@@ -28,7 +28,6 @@ serve(async (req) => {
     const { renter_id, billing_anchor_day } = await req.json();
     if (!renter_id) throw new Error("renter_id is required");
 
-    // Fetch renter
     const { data: renter, error: renterError } = await supabase
       .from("renters")
       .select("*")
@@ -39,11 +38,19 @@ serve(async (req) => {
     if (!renter.stripe_customer_id) throw new Error("Renter has no card on file. Send setup link first.");
     if (renter.stripe_subscription_id) throw new Error("Renter already has an active subscription.");
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+    // Get operator's Stripe key
+    const { data: settings } = await supabase
+      .from("operator_settings")
+      .select("stripe_secret_key")
+      .eq("user_id", userData.user.id)
+      .maybeSingle();
+    const stripeKey = settings?.stripe_secret_key;
+    if (!stripeKey) throw new Error("Stripe not connected. Add your Stripe key in Settings.");
+
+    const stripe = new Stripe(stripeKey, {
       apiVersion: "2025-08-27.basil",
     });
 
-    // Check customer has a payment method
     const paymentMethods = await stripe.paymentMethods.list({
       customer: renter.stripe_customer_id,
       type: "card",
@@ -52,14 +59,12 @@ serve(async (req) => {
       throw new Error("No payment method on file. Send setup link first.");
     }
 
-    // Set default payment method
     await stripe.customers.update(renter.stripe_customer_id, {
       invoice_settings: {
         default_payment_method: paymentMethods.data[0].id,
       },
     });
 
-    // Create a price dynamically based on renter's monthly rate
     const amountCents = Math.round(Number(renter.monthly_rate) * 100);
     const price = await stripe.prices.create({
       currency: "usd",
@@ -71,7 +76,6 @@ serve(async (req) => {
       },
     });
 
-    // Determine billing anchor day from lease start or explicit param
     const anchorDay = billing_anchor_day ||
       (renter.lease_start_date ? new Date(renter.lease_start_date).getUTCDate() : new Date().getUTCDate());
 
@@ -79,13 +83,12 @@ serve(async (req) => {
       customer: renter.stripe_customer_id,
       items: [{ price: price.id }],
       billing_cycle_anchor_config: {
-        day_of_month: Math.min(anchorDay, 28), // cap at 28 to avoid month-length issues
+        day_of_month: Math.min(anchorDay, 28),
       },
       proration_behavior: "none",
       metadata: { renter_id: renter.id, user_id: userData.user.id },
     });
 
-    // Update renter record
     const nextDue = new Date(subscription.current_period_end * 1000).toISOString().split("T")[0];
     await supabase
       .from("renters")
