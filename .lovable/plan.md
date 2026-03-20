@@ -1,70 +1,59 @@
 
 
-# Plan: Fix Bugs + Add Edit Capabilities + Testing Guide
+# Plan: Multi-tenant Stripe, Bug Fixes, Machine Assignment, Edit Enhancements
 
-## Issue 1: "Set" machine type blocked by database constraint
+## 0. Per-Operator Stripe Keys (Multi-Tenant)
 
-The error `machines_type_check` is a database CHECK constraint that only allows `'washer'` or `'dryer'`. The UI offers "Set" but the database rejects it.
+Currently, one `STRIPE_SECRET_KEY` env var is shared by all operators. To support multiple laundrylords, each operator stores their own Stripe key.
 
-**Fix:** Run a migration to update the constraint to include `'set'`:
-```sql
-ALTER TABLE machines DROP CONSTRAINT machines_type_check;
-ALTER TABLE machines ADD CONSTRAINT machines_type_check CHECK (type = ANY (ARRAY['washer','dryer','set']));
-```
+**Database**: Add `stripe_secret_key` (encrypted text) column to `operator_settings`.
 
-## Issue 2: Add Edit Renter + Edit Machine dialogs
+**Settings Page**: Replace the read-only Stripe status panel with an input field where operators paste their own `sk_test_...` or `sk_live_...` key. The `check-stripe-connection` function verifies it.
 
-No edit functionality exists anywhere in the codebase. Need to build:
+**Edge Functions** (`create-setup-link`, `create-subscription`, `check-stripe-connection`): Instead of `Deno.env.get("STRIPE_SECRET_KEY")`, these functions read the authenticated user's key from `operator_settings.stripe_secret_key`.
 
-**A) EditRenterDialog** — opened from RenterDetail page
-- Pre-fill all editable fields: name, phone, email, address, monthly_rate, install_fee, deposit_amount, late_fee, notes, lease_start_date, status
-- Add an `useUpdateRenter` mutation to `useSupabaseData.ts`
-- Add an "Edit" button on the RenterDetail page header
+**Webhook**: The `stripe-webhook` function looks up the renter by `stripe_customer_id`, gets the `user_id`, then reads that operator's Stripe key from `operator_settings` for processing. Signature verification uses the platform-level `STRIPE_WEBHOOK_SECRET` env var (shared, since all webhook events route to the same endpoint).
 
-**B) EditMachineDialog** — opened from MachinesList page (per-row action)
-- Pre-fill: type, model, serial, prong, condition, notes, status
-- Add an `useUpdateMachine` mutation to `useSupabaseData.ts`
-- Add an edit icon/button on each machine row
+## 1. Fix: Email Edit Not Persisting + Webhook Not Updating `has_payment_method`
 
-Both dialogs reuse the same form layouts as their Create counterparts but with pre-populated values and an update mutation instead of insert.
+**Edit persistence**: The mutation code looks correct. Will add `queryClient.invalidateQueries` for the specific renter ID query key in the `onSuccess` to ensure the detail page refetches.
 
-## Issue 3: Stripe "Connection Error" + How to Test
+**Webhook issue**: The most likely cause is that the Stripe webhook URL is not configured in your Stripe Dashboard. The webhook at `https://olbedjfebvbojlahhvpq.supabase.co/functions/v1/stripe-webhook` must be registered in Stripe Dashboard > Developers > Webhooks, listening for `checkout.session.completed`, `invoice.payment_succeeded`, `invoice.payment_failed`, and `customer.subscription.deleted`. Will add instructions and a diagnostic log to the webhook function.
 
-Your screenshot shows "Connection Error — Your Stripe key appears to be invalid." This means the `STRIPE_SECRET_KEY` secret is either missing or wrong. Before any Stripe flow works, we need to fix this.
+## 2. Machine Assignment from Renter Detail Page
 
-**Action:** I'll prompt you to re-enter or verify your Stripe Secret Key (starts with `sk_test_` or `sk_live_`).
+Add a "Machine" card on the renter detail sidebar with:
+- A `Select` dropdown listing available machines (status = "available") plus the currently assigned one
+- Selecting a machine updates `renters.machine_id` and sets `machines.assigned_renter_id` + `machines.status = "rented"`
+- An "Unassign" option that clears both sides
 
-**How to test the full flow once Stripe is connected:**
+## 3. Edit Dialog Enhancements (Create + Edit)
 
-1. **Settings page** — should show "Connected" with your account name
-2. **Create a renter** with a name, phone, email, and billing terms
-3. **Open the renter detail** — click "Send Card Setup Link" — this generates a Stripe checkout URL
-4. **Open that URL** in a browser — use Stripe's test card `4242 4242 4242 4242` (any future date, any CVC)
-5. **After completing checkout** — Stripe fires `checkout.session.completed` webhook → the renter's `has_payment_method` flips to `true` → the page now shows "Start Autopay"
-6. **Click "Start Autopay"** — creates a Stripe subscription → renter status becomes `active`, next due date is set
-7. **Email reminders** fire daily at 9 AM UTC via the cron job — to test immediately, I can add a "Send Test Reminder" button or you can wait for the cron
-8. **Late fees** are applied automatically when `days_late` exceeds your configured grace period (default 7 days)
+**EditRenterDialog** additions:
+- Start date picker (calendar, like CreateRenterDialog already has)
+- `install_fee_collected` toggle (checkbox)
+- `deposit_collected` toggle (checkbox)
+- All lifecycle statuses in the status dropdown (lead, scheduled, active, late, maintenance, termination_requested, pickup_scheduled, closed, defaulted)
 
-For Stripe test mode, everything works with fake cards and no real money moves.
+**CreateRenterDialog**: Already has start date and collected checkboxes. No changes needed.
 
-## Issue 4: Full App Capabilities Summary
+## 4. Testing Recipe (Included in Response)
 
-This will be included as a written summary in the implementation message, covering:
-- Renter lifecycle management (lead → active → late → closed)
-- Machine inventory tracking
-- Stripe card-on-file collection via hosted checkout
-- Automated recurring billing via Stripe subscriptions
-- Automated email reminders (upcoming, failed, late fees)
-- Payment history and timeline tracking
-- Operator settings (default rates, late fee rules)
-- Maintenance log tracking
+Will provide a step-by-step guide covering:
+- Creating two separate accounts (two laundrylords)
+- Each connecting their own Stripe test key
+- Creating renters, assigning machines, editing records
+- Testing card setup link with `4242 4242 4242 4242`
+- Registering webhook URL in Stripe Dashboard
+- Verifying autopay activation
+- How email reminders and late fees trigger
 
 ## Build Order
 
-1. Fix `machines_type_check` constraint (migration)
-2. Add `useUpdateRenter` and `useUpdateMachine` mutations
-3. Create `EditRenterDialog` component
-4. Create `EditMachineDialog` component
-5. Wire edit buttons into RenterDetail and MachinesList
-6. Prompt for Stripe Secret Key verification
+1. Migration: add `stripe_secret_key` to `operator_settings`
+2. Update all 4 edge functions to read per-operator keys
+3. Update Settings page with Stripe key input
+4. Fix EditRenterDialog (add start date, collected toggles, all statuses)
+5. Add machine assignment UI to renter detail page
+6. Provide testing recipe in response text
 
