@@ -1,0 +1,1 @@
+ALTER TABLE public.operator_settings ADD COLUMN IF NOT EXISTS stripe_secret_key text;

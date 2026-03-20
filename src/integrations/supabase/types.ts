@@ -262,6 +262,7 @@ export type Database = {
           late_fee_after_days: number
           late_fee_amount: number
           reminder_days_before: number
+          stripe_secret_key: string | null
           updated_at: string
           user_id: string
         }
@@ -274,6 +275,7 @@ export type Database = {
           late_fee_after_days?: number
           late_fee_amount?: number
           reminder_days_before?: number
+          stripe_secret_key?: string | null
           updated_at?: string
           user_id: string
         }
@@ -286,6 +288,7 @@ export type Database = {
           late_fee_after_days?: number
           late_fee_amount?: number
           reminder_days_before?: number
+          stripe_secret_key?: string | null
           updated_at?: string
           user_id?: string
         }
