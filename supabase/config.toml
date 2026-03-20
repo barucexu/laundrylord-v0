@@ -1,5 +1,8 @@
 project_id = "olbedjfebvbojlahhvpq"
 
+[functions.check-stripe-connection]
+verify_jwt = false
+
 [functions.create-setup-link]
 verify_jwt = false
 
