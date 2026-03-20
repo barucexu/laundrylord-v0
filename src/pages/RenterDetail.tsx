@@ -456,6 +456,7 @@ export default function RenterDetail() {
           )}
         </div>
       </div>
+      <EditRenterDialog open={editOpen} onOpenChange={setEditOpen} renter={renter} />
     </div>
   );
 }
