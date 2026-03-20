@@ -2,15 +2,17 @@ import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
-import { useMachines, useRenters } from "@/hooks/useSupabaseData";
+import { useMachines, useRenters, type MachineRow } from "@/hooks/useSupabaseData";
 import { Link } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 import { CreateMachineDialog } from "@/components/CreateMachineDialog";
+import { EditMachineDialog } from "@/components/EditMachineDialog";
 
 export default function MachinesList() {
   const { data: machines = [], isLoading } = useMachines();
   const { data: renters = [] } = useRenters();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editMachine, setEditMachine] = useState<MachineRow | null>(null);
 
   const getRenterForMachine = (machineId: string) => renters.find(r => r.machine_id === machineId);
 
@@ -42,6 +44,7 @@ export default function MachinesList() {
                 <TableHead>Status</TableHead>
                 <TableHead>Assigned To</TableHead>
                 <TableHead>Condition</TableHead>
+                <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -62,12 +65,17 @@ export default function MachinesList() {
                       )}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground capitalize">{m.condition || '—'}</TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditMachine(m)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 );
               })}
               {machines.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                     No machines yet. Click "Add Machine" to get started.
                   </TableCell>
                 </TableRow>
@@ -78,6 +86,9 @@ export default function MachinesList() {
       )}
 
       <CreateMachineDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      {editMachine && (
+        <EditMachineDialog open={!!editMachine} onOpenChange={(o) => { if (!o) setEditMachine(null); }} machine={editMachine} />
+      )}
     </div>
   );
 }
