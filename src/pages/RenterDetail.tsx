@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { useRenter, useMachineForRenter, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection } from "@/hooks/useSupabaseData";
-import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { EditRenterDialog } from "@/components/EditRenterDialog";
 
 const timelineIcons: Record<string, typeof User> = {
   created: User,
@@ -36,6 +37,7 @@ export default function RenterDetail() {
   const { data: stripeStatus } = useStripeConnection();
   const [sendingSetup, setSendingSetup] = useState(false);
   const [activating, setActivating] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   // Show toast on setup return
   const setupResult = searchParams.get("setup");
@@ -130,6 +132,9 @@ export default function RenterDetail() {
             {renter.lease_start_date && <span className="text-xs text-muted-foreground font-mono">Since {renter.lease_start_date}</span>}
           </div>
         </div>
+        <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+          <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+        </Button>
       </div>
 
       <div className="grid lg:grid-cols-[1fr_360px] gap-6">
@@ -451,6 +456,7 @@ export default function RenterDetail() {
           )}
         </div>
       </div>
+      <EditRenterDialog open={editOpen} onOpenChange={setEditOpen} renter={renter} />
     </div>
   );
 }

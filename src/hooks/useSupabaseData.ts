@@ -95,6 +95,47 @@ export function useCreateMachine() {
   });
 }
 
+export function useUpdateMachine() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<MachineRow> & { id: string }) => {
+      const { data, error } = await supabase
+        .from("machines")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["machines"] });
+    },
+  });
+}
+
+export function useUpdateRenter() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<RenterRow> & { id: string }) => {
+      const { data, error } = await supabase
+        .from("renters")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["renters"] });
+      queryClient.invalidateQueries({ queryKey: ["renters", data.id] });
+    },
+  });
+}
+
 export function usePayments() {
   return useQuery({
     queryKey: ["payments"],
