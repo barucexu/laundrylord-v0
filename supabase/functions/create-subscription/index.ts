@@ -94,7 +94,31 @@ serve(async (req) => {
       metadata: { renter_id: renter.id, user_id: userData.user.id },
     });
 
-    const nextDue = new Date(subscription.current_period_end * 1000).toISOString().split("T")[0];
+    const subscriptionPeriodEnd = typeof subscription.current_period_end === "number"
+      ? new Date(subscription.current_period_end * 1000)
+      : null;
+
+    let nextDue: string;
+    if (subscriptionPeriodEnd && !isNaN(subscriptionPeriodEnd.getTime())) {
+      nextDue = subscriptionPeriodEnd.toISOString().split("T")[0];
+    } else {
+      const fallbackBase = renter.lease_start_date
+        ? new Date(`${renter.lease_start_date}T00:00:00Z`)
+        : new Date();
+      const safeBase = !isNaN(fallbackBase.getTime()) ? fallbackBase : new Date();
+      const fallbackDue = new Date(Date.UTC(
+        safeBase.getUTCFullYear(),
+        safeBase.getUTCMonth() + 1,
+        Math.min(anchorDay, 28)
+      ));
+      nextDue = fallbackDue.toISOString().split("T")[0];
+      console.log("[CREATE-SUBSCRIPTION] Missing/invalid current_period_end, using fallback", {
+        subscriptionId: subscription.id,
+        current_period_end: subscription.current_period_end,
+        nextDue,
+      });
+    }
+
     await supabase
       .from("renters")
       .update({
