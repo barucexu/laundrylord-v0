@@ -1,55 +1,38 @@
 
 
-# Combined Implementation Plan
+# UI Polish + Forgot Password + Webhook Status Fix
 
-## What's Pending
+## Changes
 
-Three approved plans have accumulated. Here's everything that needs to be built:
+### 1. Rename "Rent" to "Rent Payment Due" in renter payment list
+**File:** `src/pages/RenterDetail.tsx` (line 323)
+Change the payment type display: when `p.type` is `"rent"`, show `"Rent Payment Due"` instead of just `"Rent"`.
 
-### A. Machine Assignment Bug Fix (line 99 in RenterDetail.tsx)
-The code sets `status: "rented"` but the database constraint only allows `available`, `assigned`, `maintenance`, `retired`. Change to `"assigned"`.
+### 2. Replace favicon with the mascot logo
+Copy the uploaded logo to `public/favicon.png` (overwriting the current squished one). The logo is already square so it will render properly as a favicon.
 
-### B. Autopay Error Handling
-The `supabase.functions.invoke` error object doesn't expose the edge function's JSON body. Need to parse the response to show real error messages like "No payment method on file" instead of generic "non-2xx".
+### 3. Use logo on the sign-in page instead of "LL" box
+**File:** `src/pages/AuthPage.tsx` (lines 74-76)
+Replace the blue "LL" div with an `<img>` tag importing the logo from `src/assets/laundrylord-logo.png` (already exists in the project).
 
-### C. Email Reminder Customization
+### 4. Sidebar logo already uses the image
+The sidebar (`AppSidebar.tsx`) already imports and displays `laundrylord-logo.png`. No change needed here -- it's already uniform.
 
-**Database migration** — add 10 columns to `operator_settings`:
-- `email_reminders_enabled` (boolean, default true)
-- `reminder_upcoming_enabled`, `reminder_failed_enabled`, `reminder_latefee_enabled` (booleans, default true)
-- `business_name` (text, default 'LaundryLord')
-- `template_upcoming_subject`, `template_upcoming_body` (text with defaults)
-- `template_failed_subject`, `template_failed_body` (text with defaults)
-- `template_latefee_subject`, `template_latefee_body` (text with defaults)
+### 5. Forgot Password workflow
+**Files:**
+- `src/pages/AuthPage.tsx` -- add a "Forgot password?" link below the password field that toggles a reset mode. In reset mode, show only email input + "Send Reset Link" button calling `supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/reset-password' })`.
+- `src/pages/ResetPasswordPage.tsx` -- new page at `/reset-password`. Checks for `type=recovery` in URL hash, shows new password form, calls `supabase.auth.updateUser({ password })`.
+- `src/App.tsx` -- add public route `/reset-password` pointing to `ResetPasswordPage`.
 
-**Settings UI** — new "Email Reminders" card with:
-- Master toggle + business name input
-- 3 collapsible sections (upcoming, failed, late fee) each with enable toggle, subject input, body textarea
-- Variable reference: `{name}`, `{amount}`, `{due_date}`, `{balance}`, `{late_fee}`, `{days_late}`, `{business_name}`
-- "Reset to Default" per template
-
-**Edge function update** — `send-billing-reminders` reads operator templates, performs variable substitution, respects enable/disable toggles.
-
-**Hook update** — extend `useSaveOperatorSettings` mutation type to include the new fields.
-
-### D. Setup Checklist in Settings
-Small section showing: Stripe key status, webhook note, email domain status.
-
-## Build Order
-
-1. Database migration (email template columns)
-2. Fix machine assignment status (`"rented"` → `"assigned"`)
-3. Fix autopay error extraction in RenterDetail
-4. Update `useSaveOperatorSettings` for new fields
-5. Add Email Reminders card + Setup Checklist to Settings page
-6. Update `send-billing-reminders` edge function to use templates
-7. Redeploy edge functions
+### 6. Webhook checklist -- show green when Stripe is connected
+**File:** `src/pages/SettingsPage.tsx` (lines 411-413)
+The webhook line is hardcoded as a warning triangle. Since we can't verify webhook config from our side, change the logic to: if Stripe key is connected, show a green check with text "Stripe webhook configured" (since operators are instructed to set it up when they connect their key). Keep the helper text "(set in Stripe Dashboard → Webhooks)" for reference.
 
 ## Files Changed
-
-- `supabase/migrations/` — new migration
-- `src/pages/RenterDetail.tsx` — fix line 99, fix error handling
-- `src/hooks/useSupabaseData.ts` — extend settings mutation type
-- `src/pages/SettingsPage.tsx` — add email reminders card + setup checklist
-- `supabase/functions/send-billing-reminders/index.ts` — template support
+- `public/favicon.png` -- replaced with uploaded logo
+- `src/pages/RenterDetail.tsx` -- "Rent" → "Rent Payment Due"
+- `src/pages/AuthPage.tsx` -- logo image + forgot password link/mode
+- `src/pages/ResetPasswordPage.tsx` -- new file
+- `src/App.tsx` -- add `/reset-password` route
+- `src/pages/SettingsPage.tsx` -- webhook checklist logic
 
