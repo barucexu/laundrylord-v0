@@ -1,59 +1,55 @@
 
 
-# Plan: Multi-tenant Stripe, Bug Fixes, Machine Assignment, Edit Enhancements
+# Combined Implementation Plan
 
-## 0. Per-Operator Stripe Keys (Multi-Tenant)
+## What's Pending
 
-Currently, one `STRIPE_SECRET_KEY` env var is shared by all operators. To support multiple laundrylords, each operator stores their own Stripe key.
+Three approved plans have accumulated. Here's everything that needs to be built:
 
-**Database**: Add `stripe_secret_key` (encrypted text) column to `operator_settings`.
+### A. Machine Assignment Bug Fix (line 99 in RenterDetail.tsx)
+The code sets `status: "rented"` but the database constraint only allows `available`, `assigned`, `maintenance`, `retired`. Change to `"assigned"`.
 
-**Settings Page**: Replace the read-only Stripe status panel with an input field where operators paste their own `sk_test_...` or `sk_live_...` key. The `check-stripe-connection` function verifies it.
+### B. Autopay Error Handling
+The `supabase.functions.invoke` error object doesn't expose the edge function's JSON body. Need to parse the response to show real error messages like "No payment method on file" instead of generic "non-2xx".
 
-**Edge Functions** (`create-setup-link`, `create-subscription`, `check-stripe-connection`): Instead of `Deno.env.get("STRIPE_SECRET_KEY")`, these functions read the authenticated user's key from `operator_settings.stripe_secret_key`.
+### C. Email Reminder Customization
 
-**Webhook**: The `stripe-webhook` function looks up the renter by `stripe_customer_id`, gets the `user_id`, then reads that operator's Stripe key from `operator_settings` for processing. Signature verification uses the platform-level `STRIPE_WEBHOOK_SECRET` env var (shared, since all webhook events route to the same endpoint).
+**Database migration** — add 10 columns to `operator_settings`:
+- `email_reminders_enabled` (boolean, default true)
+- `reminder_upcoming_enabled`, `reminder_failed_enabled`, `reminder_latefee_enabled` (booleans, default true)
+- `business_name` (text, default 'LaundryLord')
+- `template_upcoming_subject`, `template_upcoming_body` (text with defaults)
+- `template_failed_subject`, `template_failed_body` (text with defaults)
+- `template_latefee_subject`, `template_latefee_body` (text with defaults)
 
-## 1. Fix: Email Edit Not Persisting + Webhook Not Updating `has_payment_method`
+**Settings UI** — new "Email Reminders" card with:
+- Master toggle + business name input
+- 3 collapsible sections (upcoming, failed, late fee) each with enable toggle, subject input, body textarea
+- Variable reference: `{name}`, `{amount}`, `{due_date}`, `{balance}`, `{late_fee}`, `{days_late}`, `{business_name}`
+- "Reset to Default" per template
 
-**Edit persistence**: The mutation code looks correct. Will add `queryClient.invalidateQueries` for the specific renter ID query key in the `onSuccess` to ensure the detail page refetches.
+**Edge function update** — `send-billing-reminders` reads operator templates, performs variable substitution, respects enable/disable toggles.
 
-**Webhook issue**: The most likely cause is that the Stripe webhook URL is not configured in your Stripe Dashboard. The webhook at `https://olbedjfebvbojlahhvpq.supabase.co/functions/v1/stripe-webhook` must be registered in Stripe Dashboard > Developers > Webhooks, listening for `checkout.session.completed`, `invoice.payment_succeeded`, `invoice.payment_failed`, and `customer.subscription.deleted`. Will add instructions and a diagnostic log to the webhook function.
+**Hook update** — extend `useSaveOperatorSettings` mutation type to include the new fields.
 
-## 2. Machine Assignment from Renter Detail Page
-
-Add a "Machine" card on the renter detail sidebar with:
-- A `Select` dropdown listing available machines (status = "available") plus the currently assigned one
-- Selecting a machine updates `renters.machine_id` and sets `machines.assigned_renter_id` + `machines.status = "rented"`
-- An "Unassign" option that clears both sides
-
-## 3. Edit Dialog Enhancements (Create + Edit)
-
-**EditRenterDialog** additions:
-- Start date picker (calendar, like CreateRenterDialog already has)
-- `install_fee_collected` toggle (checkbox)
-- `deposit_collected` toggle (checkbox)
-- All lifecycle statuses in the status dropdown (lead, scheduled, active, late, maintenance, termination_requested, pickup_scheduled, closed, defaulted)
-
-**CreateRenterDialog**: Already has start date and collected checkboxes. No changes needed.
-
-## 4. Testing Recipe (Included in Response)
-
-Will provide a step-by-step guide covering:
-- Creating two separate accounts (two laundrylords)
-- Each connecting their own Stripe test key
-- Creating renters, assigning machines, editing records
-- Testing card setup link with `4242 4242 4242 4242`
-- Registering webhook URL in Stripe Dashboard
-- Verifying autopay activation
-- How email reminders and late fees trigger
+### D. Setup Checklist in Settings
+Small section showing: Stripe key status, webhook note, email domain status.
 
 ## Build Order
 
-1. Migration: add `stripe_secret_key` to `operator_settings`
-2. Update all 4 edge functions to read per-operator keys
-3. Update Settings page with Stripe key input
-4. Fix EditRenterDialog (add start date, collected toggles, all statuses)
-5. Add machine assignment UI to renter detail page
-6. Provide testing recipe in response text
+1. Database migration (email template columns)
+2. Fix machine assignment status (`"rented"` → `"assigned"`)
+3. Fix autopay error extraction in RenterDetail
+4. Update `useSaveOperatorSettings` for new fields
+5. Add Email Reminders card + Setup Checklist to Settings page
+6. Update `send-billing-reminders` edge function to use templates
+7. Redeploy edge functions
+
+## Files Changed
+
+- `supabase/migrations/` — new migration
+- `src/pages/RenterDetail.tsx` — fix line 99, fix error handling
+- `src/hooks/useSupabaseData.ts` — extend settings mutation type
+- `src/pages/SettingsPage.tsx` — add email reminders card + setup checklist
+- `supabase/functions/send-billing-reminders/index.ts` — template support
 
