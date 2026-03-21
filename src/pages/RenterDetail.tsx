@@ -75,11 +75,10 @@ export default function RenterDetail() {
         body: { renter_id: id },
       });
       if (error) {
-        // Try to extract meaningful error from the response
         const msg = typeof data === "object" && data?.error ? data.error : error.message;
         throw new Error(msg || "Failed to activate billing");
       }
-      toast.success(`Billing activated! Next due: ${data.next_due}`);
+      toast.success(data?.already_active ? "Autopay is already active for this renter." : `Billing activated! Next due: ${data.next_due}`);
       queryClient.invalidateQueries({ queryKey: ["renters", id] });
     } catch (err: any) {
       toast.error(err.message || "Failed to activate billing");
