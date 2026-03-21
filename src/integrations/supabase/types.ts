@@ -254,41 +254,74 @@ export type Database = {
       }
       operator_settings: {
         Row: {
+          business_name: string | null
           created_at: string
           default_deposit: number
           default_install_fee: number
           default_monthly_rate: number
+          email_reminders_enabled: boolean
           id: string
           late_fee_after_days: number
           late_fee_amount: number
           reminder_days_before: number
+          reminder_failed_enabled: boolean
+          reminder_latefee_enabled: boolean
+          reminder_upcoming_enabled: boolean
           stripe_secret_key: string | null
+          template_failed_body: string | null
+          template_failed_subject: string | null
+          template_latefee_body: string | null
+          template_latefee_subject: string | null
+          template_upcoming_body: string | null
+          template_upcoming_subject: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          business_name?: string | null
           created_at?: string
           default_deposit?: number
           default_install_fee?: number
           default_monthly_rate?: number
+          email_reminders_enabled?: boolean
           id?: string
           late_fee_after_days?: number
           late_fee_amount?: number
           reminder_days_before?: number
+          reminder_failed_enabled?: boolean
+          reminder_latefee_enabled?: boolean
+          reminder_upcoming_enabled?: boolean
           stripe_secret_key?: string | null
+          template_failed_body?: string | null
+          template_failed_subject?: string | null
+          template_latefee_body?: string | null
+          template_latefee_subject?: string | null
+          template_upcoming_body?: string | null
+          template_upcoming_subject?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          business_name?: string | null
           created_at?: string
           default_deposit?: number
           default_install_fee?: number
           default_monthly_rate?: number
+          email_reminders_enabled?: boolean
           id?: string
           late_fee_after_days?: number
           late_fee_amount?: number
           reminder_days_before?: number
+          reminder_failed_enabled?: boolean
+          reminder_latefee_enabled?: boolean
+          reminder_upcoming_enabled?: boolean
           stripe_secret_key?: string | null
+          template_failed_body?: string | null
+          template_failed_subject?: string | null
+          template_latefee_body?: string | null
+          template_latefee_subject?: string | null
+          template_upcoming_body?: string | null
+          template_upcoming_subject?: string | null
           updated_at?: string
           user_id?: string
         }

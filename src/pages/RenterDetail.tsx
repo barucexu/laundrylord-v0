@@ -74,7 +74,11 @@ export default function RenterDetail() {
       const { data, error } = await supabase.functions.invoke("create-subscription", {
         body: { renter_id: id },
       });
-      if (error) throw error;
+      if (error) {
+        // Try to extract meaningful error from the response
+        const msg = typeof data === "object" && data?.error ? data.error : error.message;
+        throw new Error(msg || "Failed to activate billing");
+      }
       toast.success(`Billing activated! Next due: ${data.next_due}`);
       queryClient.invalidateQueries({ queryKey: ["renters", id] });
     } catch (err: any) {
@@ -96,7 +100,7 @@ export default function RenterDetail() {
         await updateRenter.mutateAsync({ id, machine_id: null });
       } else {
         await updateRenter.mutateAsync({ id, machine_id: machineId });
-        await updateMachine.mutateAsync({ id: machineId, assigned_renter_id: id, status: "rented" });
+        await updateMachine.mutateAsync({ id: machineId, assigned_renter_id: id, status: "assigned" });
       }
       queryClient.invalidateQueries({ queryKey: ["renters", id] });
       queryClient.invalidateQueries({ queryKey: ["machines"] });
