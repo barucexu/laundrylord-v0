@@ -90,7 +90,6 @@ export default function RenterDetail() {
   const handleAssignMachine = async (machineId: string) => {
     if (!renter || !id) return;
     try {
-      // If renter already had a machine, unassign old one
       if (renter.machine_id) {
         await updateMachine.mutateAsync({ id: renter.machine_id, assigned_renter_id: null, status: "available" });
       }
@@ -112,8 +111,8 @@ export default function RenterDetail() {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <Link to="/renters" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> Back to Renters
+        <Link to="/renters" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft className="h-3.5 w-3.5" /> Back to Renters
         </Link>
         <div className="flex items-center justify-center py-12">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -125,8 +124,8 @@ export default function RenterDetail() {
   if (!renter) {
     return (
       <div className="space-y-4">
-        <Link to="/renters" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> Back to Renters
+        <Link to="/renters" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft className="h-3.5 w-3.5" /> Back to Renters
         </Link>
         <p className="text-muted-foreground">Renter not found.</p>
       </div>
@@ -145,35 +144,33 @@ export default function RenterDetail() {
   };
 
   const billingState = getBillingState();
-
-  // Available machines for assignment dropdown
   const availableMachines = allMachines.filter(m => m.status === "available" || m.id === renter.machine_id);
 
   return (
-    <div className="space-y-6">
-      <Link to="/renters" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" /> Renters
+    <div className="space-y-5">
+      <Link to="/renters" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeft className="h-3.5 w-3.5" /> Renters
       </Link>
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{renter.name}</h1>
-          <div className="flex items-center gap-3 mt-1">
+          <h1 className="text-xl font-semibold tracking-tight">{renter.name}</h1>
+          <div className="flex items-center gap-3 mt-1.5">
             <StatusBadge status={renter.status} />
             {renter.lease_start_date && <span className="text-xs text-muted-foreground font-mono">Since {renter.lease_start_date}</span>}
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-          <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+          <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
         </Button>
       </div>
 
-      <div className="grid lg:grid-cols-[1fr_360px] gap-6">
-        <div className="space-y-6">
+      <div className="grid lg:grid-cols-[1fr_340px] gap-5">
+        <div className="space-y-5">
           {/* Billing Actions Card */}
-          <Card className="border-primary/20 bg-primary/5">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-medium flex items-center gap-2">
+          <Card className="border-primary/20 bg-primary/[0.03]">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
                 <CreditCard className="h-4 w-4" /> Billing
               </CardTitle>
             </CardHeader>
@@ -225,7 +222,7 @@ export default function RenterDetail() {
               {billingState === "active" && (
                 <>
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-green-500/10 text-green-700 text-sm font-medium">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-success/10 text-success text-sm font-medium">
                       <CheckCircle className="h-3.5 w-3.5" />
                       Autopay Active
                     </span>
@@ -241,49 +238,49 @@ export default function RenterDetail() {
           </Card>
 
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-medium flex items-center gap-2"><CreditCard className="h-4 w-4" /> Financial Summary</CardTitle>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><DollarSign className="h-4 w-4" /> Financial Summary</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
-                  <div className="text-xs text-muted-foreground">Monthly Rent</div>
-                  <div className="text-lg font-mono font-semibold">${Number(renter.monthly_rate).toFixed(2)}</div>
+                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Monthly Rent</div>
+                  <div className="text-lg font-mono font-semibold mt-0.5">${Number(renter.monthly_rate).toFixed(2)}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground">Rent Collected</div>
-                  <div className="text-lg font-mono font-semibold">${Number(renter.rent_collected ?? 0).toFixed(2)}</div>
+                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Rent Collected</div>
+                  <div className="text-lg font-mono font-semibold mt-0.5">${Number(renter.rent_collected ?? 0).toFixed(2)}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground">Balance</div>
-                  <div className={`text-lg font-mono font-semibold ${Number(renter.balance) > 0 ? 'text-destructive' : 'text-green-600'}`}>
+                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Balance</div>
+                  <div className={`text-lg font-mono font-semibold mt-0.5 ${Number(renter.balance) > 0 ? 'text-destructive' : 'text-success'}`}>
                     ${Number(renter.balance).toFixed(2)}
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground">Next Due</div>
-                  <div className="text-sm font-mono">{renter.next_due_date || '—'}</div>
+                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Next Due</div>
+                  <div className="text-sm font-mono mt-0.5">{renter.next_due_date || '—'}</div>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t">
                 <div>
-                  <div className="text-xs text-muted-foreground">Install Fee</div>
-                  <div className="text-sm font-mono font-semibold">${Number(renter.install_fee ?? 0).toFixed(2)}</div>
+                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Install Fee</div>
+                  <div className="text-sm font-mono font-semibold mt-0.5">${Number(renter.install_fee ?? 0).toFixed(2)}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground">Install Collected</div>
-                  <div className={`text-sm font-medium ${renter.install_fee_collected ? 'text-green-600' : 'text-destructive'}`}>
+                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Install Collected</div>
+                  <div className={`text-sm font-medium mt-0.5 ${renter.install_fee_collected ? 'text-success' : 'text-destructive'}`}>
                     {renter.install_fee_collected ? '✓ Yes' : '✗ No'}
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground">Deposit</div>
-                  <div className="text-sm font-mono font-semibold">${Number(renter.deposit_amount ?? 0).toFixed(2)}</div>
+                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Deposit</div>
+                  <div className="text-sm font-mono font-semibold mt-0.5">${Number(renter.deposit_amount ?? 0).toFixed(2)}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground">Deposit Collected</div>
-                  <div className={`text-sm font-medium ${renter.deposit_collected ? 'text-green-600' : 'text-destructive'}`}>
+                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Deposit Collected</div>
+                  <div className={`text-sm font-medium mt-0.5 ${renter.deposit_collected ? 'text-success' : 'text-destructive'}`}>
                     {renter.deposit_collected ? '✓ Yes' : '✗ No'}
                   </div>
                 </div>
@@ -291,40 +288,40 @@ export default function RenterDetail() {
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t">
                 <div>
-                  <div className="text-xs text-muted-foreground">Start Date</div>
-                  <div className="text-sm font-mono">{renter.lease_start_date || '—'}</div>
+                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Start Date</div>
+                  <div className="text-sm font-mono mt-0.5">{renter.lease_start_date || '—'}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground">Paid Through</div>
-                  <div className="text-sm font-mono">{renter.paid_through_date || '—'}</div>
+                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Paid Through</div>
+                  <div className="text-sm font-mono mt-0.5">{renter.paid_through_date || '—'}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground">Late Fee</div>
-                  <div className="text-sm font-mono">${Number(renter.late_fee ?? 25).toFixed(2)}</div>
+                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Late Fee</div>
+                  <div className="text-sm font-mono mt-0.5">${Number(renter.late_fee ?? 25).toFixed(2)}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground">Card on File</div>
-                  <div className={`text-sm font-medium ${hasCard ? 'text-green-600' : 'text-muted-foreground'}`}>
+                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Card on File</div>
+                  <div className={`text-sm font-medium mt-0.5 ${hasCard ? 'text-success' : 'text-muted-foreground'}`}>
                     {hasCard ? '✓ Yes' : '✗ No'}
                   </div>
                 </div>
               </div>
 
               {renter.days_late > 0 && (
-                <div className="mt-3 px-3 py-2 bg-destructive/5 border border-destructive/20 rounded-md text-sm text-destructive">
+                <div className="mt-4 px-3 py-2 bg-destructive/5 border border-destructive/20 rounded-md text-sm text-destructive font-medium">
                   {renter.days_late} days overdue
                 </div>
               )}
               {renterPayments.length > 0 && (
-                <div className="mt-4 divide-y">
+                <div className="mt-4 pt-4 border-t divide-y">
                   {renterPayments.slice(0, 5).map(p => (
-                    <div key={p.id} className="flex items-center justify-between py-2">
+                    <div key={p.id} className="flex items-center justify-between py-2.5">
                       <div>
                         <span className="text-sm capitalize">{p.type === 'rent' ? 'Rent Payment Due' : p.type.replace('_', ' ')}</span>
                         <span className="text-xs text-muted-foreground font-mono ml-2">{p.due_date}</span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-sm font-mono">${Number(p.amount).toFixed(2)}</span>
+                        <span className="text-sm font-mono font-medium">${Number(p.amount).toFixed(2)}</span>
                         <StatusBadge status={p.status} />
                       </div>
                     </div>
@@ -335,12 +332,12 @@ export default function RenterDetail() {
           </Card>
 
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-medium flex items-center gap-2"><Clock className="h-4 w-4" /> Activity Timeline</CardTitle>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Clock className="h-4 w-4" /> Activity Timeline</CardTitle>
             </CardHeader>
             <CardContent>
               {timeline.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No activity yet</p>
+                <p className="text-sm text-muted-foreground">No activity recorded yet.</p>
               ) : (
                 <div className="space-y-0">
                   {timeline.map((event, i) => {
@@ -355,7 +352,7 @@ export default function RenterDetail() {
                         </div>
                         <div className="pb-1">
                           <div className="text-sm">{event.description}</div>
-                          <div className="text-xs text-muted-foreground font-mono">{new Date(event.date).toLocaleDateString()}</div>
+                          <div className="text-[11px] text-muted-foreground font-mono">{new Date(event.date).toLocaleDateString()}</div>
                         </div>
                       </div>
                     );
@@ -367,13 +364,13 @@ export default function RenterDetail() {
 
           {maintenance.length > 0 && (
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-medium flex items-center gap-2"><Wrench className="h-4 w-4" /> Maintenance</CardTitle>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Wrench className="h-4 w-4" /> Maintenance</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="divide-y">
                   {maintenance.map(m => (
-                    <div key={m.id} className="px-6 py-3">
+                    <div key={m.id} className="px-5 py-3">
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="text-sm font-medium">{m.issue_category}</div>
@@ -381,7 +378,7 @@ export default function RenterDetail() {
                         </div>
                         <StatusBadge status={m.status} />
                       </div>
-                      <div className="flex gap-4 mt-1 text-xs text-muted-foreground font-mono">
+                      <div className="flex gap-4 mt-1 text-[11px] text-muted-foreground font-mono">
                         <span>Reported {m.reported_date}</span>
                         {m.resolved_date && <span>Resolved {m.resolved_date}</span>}
                         {m.cost !== null && <span>${Number(m.cost).toFixed(2)}</span>}
@@ -395,94 +392,92 @@ export default function RenterDetail() {
           )}
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-5">
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-medium">Contact</CardTitle>
+            <CardHeader>
+              <CardTitle>Contact</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {renter.phone && (
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-2.5 text-sm">
                   <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="font-mono">{renter.phone}</span>
+                  <span className="font-mono text-xs">{renter.phone}</span>
                 </div>
               )}
               {renter.email && (
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-2.5 text-sm">
                   <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span>{renter.email}</span>
+                  <span className="text-xs">{renter.email}</span>
                 </div>
               )}
               {renter.address && (
-                <div className="flex items-start gap-2 text-sm">
+                <div className="flex items-start gap-2.5 text-sm">
                   <MapPin className="h-3.5 w-3.5 text-muted-foreground mt-0.5" />
-                  <span>{renter.address}</span>
+                  <span className="text-xs">{renter.address}</span>
                 </div>
               )}
               {!renter.phone && !renter.email && !renter.address && (
-                <p className="text-sm text-muted-foreground">No contact info</p>
+                <p className="text-sm text-muted-foreground">No contact info on file.</p>
               )}
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-medium">Lease</CardTitle>
+            <CardHeader>
+              <CardTitle>Lease</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-2.5">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Start Date</span>
-                <span className="font-mono">{renter.lease_start_date || '—'}</span>
+                <span className="text-muted-foreground text-xs">Start Date</span>
+                <span className="font-mono text-xs">{renter.lease_start_date || '—'}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Min Term End</span>
-                <span className="font-mono">{renter.min_term_end_date || '—'}</span>
+                <span className="text-muted-foreground text-xs">Min Term End</span>
+                <span className="font-mono text-xs">{renter.min_term_end_date || '—'}</span>
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-medium flex items-center gap-2"><Box className="h-4 w-4" /> Machine</CardTitle>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Box className="h-4 w-4" /> Machine</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="space-y-2">
-                <Select
-                  value={renter.machine_id || "none"}
-                  onValueChange={handleAssignMachine}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Assign a machine" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No machine</SelectItem>
-                    {availableMachines.map(m => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.type} — {m.model} ({m.serial})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select
+                value={renter.machine_id || "none"}
+                onValueChange={handleAssignMachine}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Assign a machine" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No machine</SelectItem>
+                  {availableMachines.map(m => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.type} — {m.model} ({m.serial})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {machine && (
-                <div className="space-y-2 pt-2 border-t">
-                  <div className="flex justify-between text-sm">
+                <div className="space-y-2 pt-3 border-t">
+                  <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Model</span>
-                    <span className="text-xs">{machine.model}</span>
+                    <span>{machine.model}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Serial</span>
-                    <span className="font-mono text-xs">{machine.serial}</span>
+                    <span className="font-mono">{machine.serial}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Prong</span>
                     <span>{machine.prong}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Condition</span>
                     <span>{machine.condition}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-xs items-center">
                     <span className="text-muted-foreground">Status</span>
                     <StatusBadge status={machine.status} />
                   </div>
@@ -493,11 +488,11 @@ export default function RenterDetail() {
 
           {renter.notes && (
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-medium">Notes</CardTitle>
+              <CardHeader>
+                <CardTitle>Notes</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">{renter.notes}</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">{renter.notes}</p>
               </CardContent>
             </Card>
           )}

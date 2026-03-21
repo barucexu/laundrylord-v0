@@ -17,15 +17,15 @@ export default function MachinesList() {
   const getRenterForMachine = (machineId: string) => renters.find(r => r.machine_id === machineId);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Machines</h1>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-muted-foreground">{machines.length} machines</span>
-          <Button size="sm" onClick={() => setDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" /> Add Machine
-          </Button>
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Machines</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{machines.length} machines</p>
         </div>
+        <Button size="sm" onClick={() => setDialogOpen(true)}>
+          <Plus className="h-4 w-4 mr-1" /> Add Machine
+        </Button>
       </div>
 
       {isLoading ? (
@@ -33,10 +33,10 @@ export default function MachinesList() {
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
       ) : (
-        <div className="border rounded-lg bg-card">
+        <div className="border rounded-lg bg-card overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="bg-muted/30">
                 <TableHead>Type</TableHead>
                 <TableHead>Model</TableHead>
                 <TableHead>Serial</TableHead>
@@ -51,8 +51,8 @@ export default function MachinesList() {
               {machines.map(m => {
                 const renter = getRenterForMachine(m.id);
                 return (
-                  <TableRow key={m.id} className="h-12">
-                    <TableCell className="capitalize text-sm">{m.type}</TableCell>
+                  <TableRow key={m.id}>
+                    <TableCell className="capitalize text-sm font-medium">{m.type}</TableCell>
                     <TableCell className="text-sm">{m.model}</TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">{m.serial}</TableCell>
                     <TableCell className="text-sm">{m.prong || '—'}</TableCell>
@@ -75,7 +75,7 @@ export default function MachinesList() {
               })}
               {machines.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-12">
                     No machines yet. Click "Add Machine" to get started.
                   </TableCell>
                 </TableRow>

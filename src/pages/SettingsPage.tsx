@@ -67,7 +67,6 @@ export default function SettingsPage() {
       if ((settings as any).stripe_secret_key) {
         setStripeKey((settings as any).stripe_secret_key);
       }
-      // Hydrate email form from settings
       const s = settings as any;
       setEmailForm({
         email_reminders_enabled: s.email_reminders_enabled ?? true,
@@ -142,31 +141,34 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">Configure your billing defaults and integrations</p>
+      </div>
 
       {/* Billing Defaults */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Billing Defaults</CardTitle>
-          <CardDescription>Default values for new renters</CardDescription>
+          <CardTitle>Billing Defaults</CardTitle>
+          <CardDescription>Default values applied to new renters</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="monthlyRate">Default Monthly Rate ($)</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="monthlyRate" className="text-xs">Default Monthly Rate ($)</Label>
               <Input id="monthlyRate" type="number" value={form.default_monthly_rate} onChange={e => setForm(f => ({ ...f, default_monthly_rate: e.target.value }))} className="font-mono" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="installFee">Default Install Fee ($)</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="installFee" className="text-xs">Default Install Fee ($)</Label>
               <Input id="installFee" type="number" value={form.default_install_fee} onChange={e => setForm(f => ({ ...f, default_install_fee: e.target.value }))} className="font-mono" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="depositAmount">Default Deposit ($)</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="depositAmount" className="text-xs">Default Deposit ($)</Label>
               <Input id="depositAmount" type="number" value={form.default_deposit} onChange={e => setForm(f => ({ ...f, default_deposit: e.target.value }))} className="font-mono" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="lateFee">Late Fee Amount ($)</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="lateFee" className="text-xs">Late Fee Amount ($)</Label>
               <Input id="lateFee" type="number" value={form.late_fee_amount} onChange={e => setForm(f => ({ ...f, late_fee_amount: e.target.value }))} className="font-mono" />
             </div>
           </div>
@@ -176,17 +178,17 @@ export default function SettingsPage() {
       {/* Reminder Timing */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Reminder Timing</CardTitle>
+          <CardTitle>Reminder Timing</CardTitle>
           <CardDescription>When reminders and late fees are applied</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="reminderBefore">Days Before Due Date</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="reminderBefore" className="text-xs">Days Before Due Date</Label>
               <Input id="reminderBefore" type="number" value={form.reminder_days_before} onChange={e => setForm(f => ({ ...f, reminder_days_before: e.target.value }))} className="font-mono" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="lateFeeAfter">Apply Late Fee After (days)</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="lateFeeAfter" className="text-xs">Apply Late Fee After (days)</Label>
               <Input id="lateFeeAfter" type="number" value={form.late_fee_after_days} onChange={e => setForm(f => ({ ...f, late_fee_after_days: e.target.value }))} className="font-mono" />
             </div>
           </div>
@@ -196,7 +198,7 @@ export default function SettingsPage() {
       {/* Email Reminders */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <Mail className="h-4 w-4" /> Email Reminders
           </CardTitle>
           <CardDescription>Customize the emails your renters receive</CardDescription>
@@ -204,8 +206,8 @@ export default function SettingsPage() {
         <CardContent className="space-y-5">
           <div className="flex items-center justify-between">
             <div>
-              <Label>Enable Email Reminders</Label>
-              <p className="text-xs text-muted-foreground">Master switch for all automated emails</p>
+              <Label className="text-xs font-medium">Enable Email Reminders</Label>
+              <p className="text-[11px] text-muted-foreground">Master switch for all automated emails</p>
             </div>
             <Switch
               checked={emailForm.email_reminders_enabled}
@@ -215,15 +217,15 @@ export default function SettingsPage() {
 
           {emailForm.email_reminders_enabled && (
             <>
-              <div className="space-y-2">
-                <Label htmlFor="businessName">Business Name</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="businessName" className="text-xs">Business Name</Label>
                 <Input
                   id="businessName"
                   value={emailForm.business_name}
                   onChange={e => setEmailForm(f => ({ ...f, business_name: e.target.value }))}
                   placeholder="Your Business Name"
                 />
-                <p className="text-xs text-muted-foreground">Used as the sign-off in emails via {"{business_name}"}</p>
+                <p className="text-[11px] text-muted-foreground">Used as sign-off in emails via {"{business_name}"}</p>
               </div>
 
               <Separator />
@@ -236,7 +238,7 @@ export default function SettingsPage() {
                       checked={emailForm.reminder_upcoming_enabled}
                       onCheckedChange={v => setEmailForm(f => ({ ...f, reminder_upcoming_enabled: v }))}
                     />
-                    <Label>Upcoming Payment Reminder</Label>
+                    <Label className="text-xs font-medium">Upcoming Payment Reminder</Label>
                   </div>
                   <CollapsibleTrigger asChild>
                     <Button variant="ghost" size="sm"><ChevronDown className="h-4 w-4" /></Button>
@@ -244,11 +246,11 @@ export default function SettingsPage() {
                 </div>
                 <CollapsibleContent className="space-y-3 pt-3 pl-10">
                   <div className="space-y-1">
-                    <Label>Subject</Label>
+                    <Label className="text-xs">Subject</Label>
                     <Input value={emailForm.template_upcoming_subject} onChange={e => setEmailForm(f => ({ ...f, template_upcoming_subject: e.target.value }))} />
                   </div>
                   <div className="space-y-1">
-                    <Label>Body</Label>
+                    <Label className="text-xs">Body</Label>
                     <Textarea rows={5} value={emailForm.template_upcoming_body} onChange={e => setEmailForm(f => ({ ...f, template_upcoming_body: e.target.value }))} />
                   </div>
                   <Button variant="ghost" size="sm" onClick={() => resetTemplate("upcoming")}>
@@ -267,7 +269,7 @@ export default function SettingsPage() {
                       checked={emailForm.reminder_failed_enabled}
                       onCheckedChange={v => setEmailForm(f => ({ ...f, reminder_failed_enabled: v }))}
                     />
-                    <Label>Payment Failed Notice</Label>
+                    <Label className="text-xs font-medium">Payment Failed Notice</Label>
                   </div>
                   <CollapsibleTrigger asChild>
                     <Button variant="ghost" size="sm"><ChevronDown className="h-4 w-4" /></Button>
@@ -275,11 +277,11 @@ export default function SettingsPage() {
                 </div>
                 <CollapsibleContent className="space-y-3 pt-3 pl-10">
                   <div className="space-y-1">
-                    <Label>Subject</Label>
+                    <Label className="text-xs">Subject</Label>
                     <Input value={emailForm.template_failed_subject} onChange={e => setEmailForm(f => ({ ...f, template_failed_subject: e.target.value }))} />
                   </div>
                   <div className="space-y-1">
-                    <Label>Body</Label>
+                    <Label className="text-xs">Body</Label>
                     <Textarea rows={5} value={emailForm.template_failed_body} onChange={e => setEmailForm(f => ({ ...f, template_failed_body: e.target.value }))} />
                   </div>
                   <Button variant="ghost" size="sm" onClick={() => resetTemplate("failed")}>
@@ -298,7 +300,7 @@ export default function SettingsPage() {
                       checked={emailForm.reminder_latefee_enabled}
                       onCheckedChange={v => setEmailForm(f => ({ ...f, reminder_latefee_enabled: v }))}
                     />
-                    <Label>Late Fee Notice</Label>
+                    <Label className="text-xs font-medium">Late Fee Notice</Label>
                   </div>
                   <CollapsibleTrigger asChild>
                     <Button variant="ghost" size="sm"><ChevronDown className="h-4 w-4" /></Button>
@@ -306,11 +308,11 @@ export default function SettingsPage() {
                 </div>
                 <CollapsibleContent className="space-y-3 pt-3 pl-10">
                   <div className="space-y-1">
-                    <Label>Subject</Label>
+                    <Label className="text-xs">Subject</Label>
                     <Input value={emailForm.template_latefee_subject} onChange={e => setEmailForm(f => ({ ...f, template_latefee_subject: e.target.value }))} />
                   </div>
                   <div className="space-y-1">
-                    <Label>Body</Label>
+                    <Label className="text-xs">Body</Label>
                     <Textarea rows={6} value={emailForm.template_latefee_body} onChange={e => setEmailForm(f => ({ ...f, template_latefee_body: e.target.value }))} />
                   </div>
                   <Button variant="ghost" size="sm" onClick={() => resetTemplate("latefee")}>
@@ -319,7 +321,7 @@ export default function SettingsPage() {
                 </CollapsibleContent>
               </Collapsible>
 
-              <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
+              <div className="rounded-md bg-muted/50 p-3 text-[11px] text-muted-foreground">
                 <strong>Available variables:</strong> {"{name}"} {"{amount}"} {"{due_date}"} {"{balance}"} {"{late_fee}"} {"{days_late}"} {"{business_name}"}
               </div>
             </>
@@ -332,7 +334,7 @@ export default function SettingsPage() {
       {/* Stripe Connection */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Stripe Connection</CardTitle>
+          <CardTitle>Stripe Connection</CardTitle>
           <CardDescription>Connect your own Stripe account to charge your renters</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -342,25 +344,25 @@ export default function SettingsPage() {
               Checking connection…
             </div>
           ) : stripe?.connected ? (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-green-500/10 border border-green-500/20">
-              <CheckCircle className="h-4 w-4 text-green-600" />
+            <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-md bg-success/10 border border-success/20">
+              <CheckCircle className="h-4 w-4 text-success" />
               <div>
-                <div className="text-sm font-medium text-green-700">Connected</div>
-                <div className="text-xs text-muted-foreground">{stripe.account_name}</div>
+                <div className="text-sm font-medium text-success">Connected</div>
+                <div className="text-[11px] text-muted-foreground">{stripe.account_name}</div>
               </div>
             </div>
           ) : stripe?.reason === "invalid_key" ? (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-destructive/10 border border-destructive/20">
+            <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-md bg-destructive/10 border border-destructive/20">
               <AlertTriangle className="h-4 w-4 text-destructive" />
               <div>
                 <div className="text-sm font-medium text-destructive">Invalid Key</div>
-                <div className="text-xs text-muted-foreground">Your Stripe key is invalid. Update it below.</div>
+                <div className="text-[11px] text-muted-foreground">Your Stripe key is invalid. Update it below.</div>
               </div>
             </div>
           ) : null}
 
-          <div className="space-y-2">
-            <Label>Stripe Secret Key</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Stripe Secret Key</Label>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Input
@@ -373,7 +375,7 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => setShowKey(!showKey)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -382,7 +384,7 @@ export default function SettingsPage() {
                 {savingKey ? "Saving…" : "Connect"}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[11px] text-muted-foreground">
               Find your key at{" "}
               <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">
                 Stripe Dashboard <ExternalLink className="h-3 w-3" />
@@ -396,34 +398,34 @@ export default function SettingsPage() {
       {/* Setup Checklist */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Setup Checklist</CardTitle>
+          <CardTitle>Setup Checklist</CardTitle>
           <CardDescription>What's needed for full pilot operation</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             {stripe?.connected ? (
-              <CheckCircle className="h-4 w-4 text-green-600" />
+              <CheckCircle className="h-4 w-4 text-success" />
             ) : (
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+              <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />
             )}
             <span className="text-sm">Stripe key connected</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             {stripe?.connected ? (
-              <CheckCircle className="h-4 w-4 text-green-600" />
+              <CheckCircle className="h-4 w-4 text-success" />
             ) : (
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+              <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />
             )}
-            <span className="text-sm">Stripe webhook configured <span className="text-xs text-muted-foreground">(set in Stripe Dashboard → Webhooks)</span></span>
+            <span className="text-sm">Stripe webhook configured <span className="text-[11px] text-muted-foreground">(set in Stripe Dashboard → Webhooks)</span></span>
           </div>
-          <div className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            <span className="text-sm">Email sending active <span className="text-xs text-muted-foreground">(notify.laundrylord.club)</span></span>
+          <div className="flex items-center gap-2.5">
+            <CheckCircle className="h-4 w-4 text-success" />
+            <span className="text-sm">Email sending active <span className="text-[11px] text-muted-foreground">(notify.laundrylord.club)</span></span>
           </div>
         </CardContent>
       </Card>
 
-      <div className="flex justify-end">
+      <div className="flex justify-end pb-6">
         <Button onClick={handleSave} disabled={saveSettings.isPending}>
           {saveSettings.isPending ? "Saving..." : "Save Settings"}
         </Button>
