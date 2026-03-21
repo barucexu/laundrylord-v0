@@ -22,15 +22,15 @@ export default function RentersList() {
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Renters</h1>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-muted-foreground">{filtered.length} renters</span>
-          <Button size="sm" onClick={() => setDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" /> Add Renter
-          </Button>
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Renters</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{filtered.length} renters</p>
         </div>
+        <Button size="sm" onClick={() => setDialogOpen(true)}>
+          <Plus className="h-4 w-4 mr-1" /> Add Renter
+        </Button>
       </div>
 
       <div className="flex gap-3">
@@ -62,10 +62,10 @@ export default function RentersList() {
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
       ) : (
-        <div className="border rounded-lg bg-card">
+        <div className="border rounded-lg bg-card overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="bg-muted/30">
                 <TableHead>Name</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Status</TableHead>
@@ -76,25 +76,25 @@ export default function RentersList() {
             </TableHeader>
             <TableBody>
               {filtered.map(r => (
-                <TableRow key={r.id} className="h-12">
+                <TableRow key={r.id}>
                   <TableCell>
-                    <Link to={`/renters/${r.id}`} className="font-medium text-primary hover:underline">{r.name}</Link>
+                    <Link to={`/renters/${r.id}`} className="font-medium text-sm text-primary hover:underline">{r.name}</Link>
                   </TableCell>
                   <TableCell className="text-muted-foreground font-mono text-xs">{r.phone || '—'}</TableCell>
                   <TableCell><StatusBadge status={r.status} /></TableCell>
                   <TableCell className="text-right font-mono text-sm">
-                    {Number(r.balance) > 0 ? <span className="text-destructive">${Number(r.balance).toFixed(2)}</span> : <span className="text-muted-foreground">$0.00</span>}
+                    {Number(r.balance) > 0 ? <span className="text-destructive font-medium">${Number(r.balance).toFixed(2)}</span> : <span className="text-muted-foreground">$0.00</span>}
                   </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{r.paid_through_date || '—'}</TableCell>
                   <TableCell className="text-right font-mono text-sm">
-                    {r.days_late > 0 ? <span className="text-destructive">{r.days_late}</span> : <span className="text-muted-foreground">0</span>}
+                    {r.days_late > 0 ? <span className="text-destructive font-medium">{r.days_late}</span> : <span className="text-muted-foreground">0</span>}
                   </TableCell>
                 </TableRow>
               ))}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                    {renters.length === 0 ? "No renters yet. Click \"Add Renter\" to create one." : "No renters found"}
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-12">
+                    {renters.length === 0 ? "No renters yet. Click \"Add Renter\" to create one." : "No renters match your search."}
                   </TableCell>
                 </TableRow>
               )}

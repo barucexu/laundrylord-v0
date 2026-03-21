@@ -12,10 +12,12 @@ export default function MaintenanceView() {
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Maintenance</h1>
-        <span className="text-sm text-muted-foreground">{logs.length} issues</span>
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Maintenance</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{logs.length} issues</p>
+        </div>
       </div>
 
       {isLoading ? (
@@ -23,10 +25,10 @@ export default function MaintenanceView() {
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
       ) : (
-        <div className="border rounded-lg bg-card">
+        <div className="border rounded-lg bg-card overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="bg-muted/30">
                 <TableHead>Category</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Reported</TableHead>
@@ -36,8 +38,8 @@ export default function MaintenanceView() {
             </TableHeader>
             <TableBody>
               {sorted.map(m => (
-                <TableRow key={m.id} className="h-12">
-                  <TableCell className="text-sm">{m.issue_category}</TableCell>
+                <TableRow key={m.id}>
+                  <TableCell className="text-sm font-medium">{m.issue_category}</TableCell>
                   <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{m.description}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{m.reported_date}</TableCell>
                   <TableCell><StatusBadge status={m.status} /></TableCell>
@@ -46,7 +48,7 @@ export default function MaintenanceView() {
               ))}
               {sorted.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">No maintenance issues</TableCell>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-12">No maintenance issues reported.</TableCell>
                 </TableRow>
               )}
             </TableBody>
