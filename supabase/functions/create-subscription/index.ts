@@ -76,8 +76,13 @@ serve(async (req) => {
       },
     });
 
-    const anchorDay = billing_anchor_day ||
-      (renter.lease_start_date ? new Date(renter.lease_start_date).getUTCDate() : new Date().getUTCDate());
+    let anchorDay = billing_anchor_day || new Date().getUTCDate();
+    if (!billing_anchor_day && renter.lease_start_date) {
+      const parsed = new Date(renter.lease_start_date + "T00:00:00Z");
+      if (!isNaN(parsed.getTime())) {
+        anchorDay = parsed.getUTCDate();
+      }
+    }
 
     const subscription = await stripe.subscriptions.create({
       customer: renter.stripe_customer_id,
