@@ -36,7 +36,22 @@ serve(async (req) => {
       .single();
     if (renterError || !renter) throw new Error("Renter not found");
     if (!renter.stripe_customer_id) throw new Error("Renter has no card on file. Send setup link first.");
-    if (renter.stripe_subscription_id) throw new Error("Renter already has an active subscription.");
+    if (renter.stripe_subscription_id) {
+      console.log("[CREATE-SUBSCRIPTION] Renter already has subscription", {
+        renter_id,
+        subscription_id: renter.stripe_subscription_id,
+        next_due_date: renter.next_due_date,
+      });
+      return new Response(JSON.stringify({
+        subscription_id: renter.stripe_subscription_id,
+        status: renter.status,
+        next_due: renter.next_due_date,
+        already_active: true,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
 
     // Get operator's Stripe key
     const { data: settings } = await supabase
