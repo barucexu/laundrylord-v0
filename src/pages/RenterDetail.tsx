@@ -320,7 +320,7 @@ export default function RenterDetail() {
                   {renterPayments.slice(0, 5).map(p => (
                     <div key={p.id} className="flex items-center justify-between py-2">
                       <div>
-                        <span className="text-sm capitalize">{p.type.replace('_', ' ')}</span>
+                        <span className="text-sm capitalize">{p.type === 'rent' ? 'Rent Payment Due' : p.type.replace('_', ' ')}</span>
                         <span className="text-xs text-muted-foreground font-mono ml-2">{p.due_date}</span>
                       </div>
                       <div className="flex items-center gap-3">

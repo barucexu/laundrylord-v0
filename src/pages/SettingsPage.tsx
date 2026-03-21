@@ -409,7 +409,11 @@ export default function SettingsPage() {
             <span className="text-sm">Stripe key connected</span>
           </div>
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            {stripe?.connected ? (
+              <CheckCircle className="h-4 w-4 text-green-600" />
+            ) : (
+              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            )}
             <span className="text-sm">Stripe webhook configured <span className="text-xs text-muted-foreground">(set in Stripe Dashboard → Webhooks)</span></span>
           </div>
           <div className="flex items-center gap-2">
