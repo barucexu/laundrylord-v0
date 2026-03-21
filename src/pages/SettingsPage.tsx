@@ -4,13 +4,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useStripeConnection, useOperatorSettings, useSaveOperatorSettings } from "@/hooks/useSupabaseData";
-import { CheckCircle, AlertTriangle, Loader2, ExternalLink, Eye, EyeOff } from "lucide-react";
+import { CheckCircle, AlertTriangle, Loader2, ExternalLink, Eye, EyeOff, ChevronDown, Mail, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
+
+const DEFAULT_TEMPLATES = {
+  template_upcoming_subject: "Payment Reminder",
+  template_upcoming_body: "Hi {name},\n\nYour payment of ${amount} is due on {due_date}.\n\nPlease ensure your card on file is up to date.\n\n— {business_name}",
+  template_failed_subject: "Payment Failed",
+  template_failed_body: "Hi {name},\n\nYour payment of ${amount} was declined. Please update your payment method to avoid late fees.\n\nOutstanding balance: ${balance}\n\n— {business_name}",
+  template_latefee_subject: "Late Fee Applied",
+  template_latefee_body: "Hi {name},\n\nA late fee of ${late_fee} has been applied to your account. Your payment is {days_late} days overdue.\n\nUpdated balance: ${balance}\n\nPlease update your payment method as soon as possible.\n\n— {business_name}",
+};
 
 export default function SettingsPage() {
   const { data: stripe, isLoading: stripeLoading } = useStripeConnection();
@@ -29,6 +41,15 @@ export default function SettingsPage() {
     reminder_days_before: "3",
   });
 
+  const [emailForm, setEmailForm] = useState({
+    email_reminders_enabled: true,
+    reminder_upcoming_enabled: true,
+    reminder_failed_enabled: true,
+    reminder_latefee_enabled: true,
+    business_name: "LaundryLord",
+    ...DEFAULT_TEMPLATES,
+  });
+
   const [stripeKey, setStripeKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [savingKey, setSavingKey] = useState(false);
@@ -43,10 +64,24 @@ export default function SettingsPage() {
         late_fee_after_days: String(settings.late_fee_after_days),
         reminder_days_before: String(settings.reminder_days_before),
       });
-      // Show masked key if exists
       if ((settings as any).stripe_secret_key) {
         setStripeKey((settings as any).stripe_secret_key);
       }
+      // Hydrate email form from settings
+      const s = settings as any;
+      setEmailForm({
+        email_reminders_enabled: s.email_reminders_enabled ?? true,
+        reminder_upcoming_enabled: s.reminder_upcoming_enabled ?? true,
+        reminder_failed_enabled: s.reminder_failed_enabled ?? true,
+        reminder_latefee_enabled: s.reminder_latefee_enabled ?? true,
+        business_name: s.business_name || "LaundryLord",
+        template_upcoming_subject: s.template_upcoming_subject || DEFAULT_TEMPLATES.template_upcoming_subject,
+        template_upcoming_body: s.template_upcoming_body || DEFAULT_TEMPLATES.template_upcoming_body,
+        template_failed_subject: s.template_failed_subject || DEFAULT_TEMPLATES.template_failed_subject,
+        template_failed_body: s.template_failed_body || DEFAULT_TEMPLATES.template_failed_body,
+        template_latefee_subject: s.template_latefee_subject || DEFAULT_TEMPLATES.template_latefee_subject,
+        template_latefee_body: s.template_latefee_body || DEFAULT_TEMPLATES.template_latefee_body,
+      });
     }
   }, [settings]);
 
@@ -59,6 +94,7 @@ export default function SettingsPage() {
         late_fee_amount: parseFloat(form.late_fee_amount) || 25,
         late_fee_after_days: parseInt(form.late_fee_after_days) || 7,
         reminder_days_before: parseInt(form.reminder_days_before) || 3,
+        ...emailForm,
       });
       toast.success("Settings saved");
     } catch (err: any) {
@@ -94,16 +130,22 @@ export default function SettingsPage() {
     }
   };
 
-  const maskedKey = stripeKey
-    ? showKey
-      ? stripeKey
-      : stripeKey.substring(0, 8) + "••••••••" + stripeKey.substring(stripeKey.length - 4)
-    : "";
+  const resetTemplate = (type: "upcoming" | "failed" | "latefee") => {
+    const subjectKey = `template_${type}_subject` as keyof typeof DEFAULT_TEMPLATES;
+    const bodyKey = `template_${type}_body` as keyof typeof DEFAULT_TEMPLATES;
+    setEmailForm(f => ({
+      ...f,
+      [subjectKey]: DEFAULT_TEMPLATES[subjectKey],
+      [bodyKey]: DEFAULT_TEMPLATES[bodyKey],
+    }));
+    toast.info("Template reset to default");
+  };
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
 
+      {/* Billing Defaults */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Billing Defaults</CardTitle>
@@ -131,6 +173,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Reminder Timing */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Reminder Timing</CardTitle>
@@ -150,8 +193,143 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Email Reminders */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Mail className="h-4 w-4" /> Email Reminders
+          </CardTitle>
+          <CardDescription>Customize the emails your renters receive</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Enable Email Reminders</Label>
+              <p className="text-xs text-muted-foreground">Master switch for all automated emails</p>
+            </div>
+            <Switch
+              checked={emailForm.email_reminders_enabled}
+              onCheckedChange={v => setEmailForm(f => ({ ...f, email_reminders_enabled: v }))}
+            />
+          </div>
+
+          {emailForm.email_reminders_enabled && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="businessName">Business Name</Label>
+                <Input
+                  id="businessName"
+                  value={emailForm.business_name}
+                  onChange={e => setEmailForm(f => ({ ...f, business_name: e.target.value }))}
+                  placeholder="Your Business Name"
+                />
+                <p className="text-xs text-muted-foreground">Used as the sign-off in emails via {"{business_name}"}</p>
+              </div>
+
+              <Separator />
+
+              {/* Upcoming Payment */}
+              <Collapsible>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={emailForm.reminder_upcoming_enabled}
+                      onCheckedChange={v => setEmailForm(f => ({ ...f, reminder_upcoming_enabled: v }))}
+                    />
+                    <Label>Upcoming Payment Reminder</Label>
+                  </div>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm"><ChevronDown className="h-4 w-4" /></Button>
+                  </CollapsibleTrigger>
+                </div>
+                <CollapsibleContent className="space-y-3 pt-3 pl-10">
+                  <div className="space-y-1">
+                    <Label>Subject</Label>
+                    <Input value={emailForm.template_upcoming_subject} onChange={e => setEmailForm(f => ({ ...f, template_upcoming_subject: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Body</Label>
+                    <Textarea rows={5} value={emailForm.template_upcoming_body} onChange={e => setEmailForm(f => ({ ...f, template_upcoming_body: e.target.value }))} />
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => resetTemplate("upcoming")}>
+                    <RotateCcw className="h-3 w-3 mr-1" /> Reset to Default
+                  </Button>
+                </CollapsibleContent>
+              </Collapsible>
+
+              <Separator />
+
+              {/* Failed Payment */}
+              <Collapsible>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={emailForm.reminder_failed_enabled}
+                      onCheckedChange={v => setEmailForm(f => ({ ...f, reminder_failed_enabled: v }))}
+                    />
+                    <Label>Payment Failed Notice</Label>
+                  </div>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm"><ChevronDown className="h-4 w-4" /></Button>
+                  </CollapsibleTrigger>
+                </div>
+                <CollapsibleContent className="space-y-3 pt-3 pl-10">
+                  <div className="space-y-1">
+                    <Label>Subject</Label>
+                    <Input value={emailForm.template_failed_subject} onChange={e => setEmailForm(f => ({ ...f, template_failed_subject: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Body</Label>
+                    <Textarea rows={5} value={emailForm.template_failed_body} onChange={e => setEmailForm(f => ({ ...f, template_failed_body: e.target.value }))} />
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => resetTemplate("failed")}>
+                    <RotateCcw className="h-3 w-3 mr-1" /> Reset to Default
+                  </Button>
+                </CollapsibleContent>
+              </Collapsible>
+
+              <Separator />
+
+              {/* Late Fee */}
+              <Collapsible>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={emailForm.reminder_latefee_enabled}
+                      onCheckedChange={v => setEmailForm(f => ({ ...f, reminder_latefee_enabled: v }))}
+                    />
+                    <Label>Late Fee Notice</Label>
+                  </div>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm"><ChevronDown className="h-4 w-4" /></Button>
+                  </CollapsibleTrigger>
+                </div>
+                <CollapsibleContent className="space-y-3 pt-3 pl-10">
+                  <div className="space-y-1">
+                    <Label>Subject</Label>
+                    <Input value={emailForm.template_latefee_subject} onChange={e => setEmailForm(f => ({ ...f, template_latefee_subject: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Body</Label>
+                    <Textarea rows={6} value={emailForm.template_latefee_body} onChange={e => setEmailForm(f => ({ ...f, template_latefee_body: e.target.value }))} />
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => resetTemplate("latefee")}>
+                    <RotateCcw className="h-3 w-3 mr-1" /> Reset to Default
+                  </Button>
+                </CollapsibleContent>
+              </Collapsible>
+
+              <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
+                <strong>Available variables:</strong> {"{name}"} {"{amount}"} {"{due_date}"} {"{balance}"} {"{late_fee}"} {"{days_late}"} {"{business_name}"}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       <Separator />
 
+      {/* Stripe Connection */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Stripe Connection</CardTitle>
@@ -211,6 +389,32 @@ export default function SettingsPage() {
               </a>
               . Each operator uses their own Stripe account.
             </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Setup Checklist */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Setup Checklist</CardTitle>
+          <CardDescription>What's needed for full pilot operation</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-2">
+            {stripe?.connected ? (
+              <CheckCircle className="h-4 w-4 text-green-600" />
+            ) : (
+              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            )}
+            <span className="text-sm">Stripe key connected</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm">Stripe webhook configured <span className="text-xs text-muted-foreground">(set in Stripe Dashboard → Webhooks)</span></span>
+          </div>
+          <div className="flex items-center gap-2">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <span className="text-sm">Email sending active <span className="text-xs text-muted-foreground">(notify.laundrylord.club)</span></span>
           </div>
         </CardContent>
       </Card>

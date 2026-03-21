@@ -270,6 +270,17 @@ export function useSaveOperatorSettings() {
       late_fee_amount: number;
       late_fee_after_days: number;
       reminder_days_before: number;
+      email_reminders_enabled?: boolean;
+      reminder_upcoming_enabled?: boolean;
+      reminder_failed_enabled?: boolean;
+      reminder_latefee_enabled?: boolean;
+      business_name?: string;
+      template_upcoming_subject?: string;
+      template_upcoming_body?: string;
+      template_failed_subject?: string;
+      template_failed_body?: string;
+      template_latefee_subject?: string;
+      template_latefee_body?: string;
     }) => {
       const { data, error } = await supabase
         .from("operator_settings")

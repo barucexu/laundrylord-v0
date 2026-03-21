@@ -100,7 +100,7 @@ export default function RenterDetail() {
         await updateRenter.mutateAsync({ id, machine_id: null });
       } else {
         await updateRenter.mutateAsync({ id, machine_id: machineId });
-        await updateMachine.mutateAsync({ id: machineId, assigned_renter_id: id, status: "rented" });
+        await updateMachine.mutateAsync({ id: machineId, assigned_renter_id: id, status: "assigned" });
       }
       queryClient.invalidateQueries({ queryKey: ["renters", id] });
       queryClient.invalidateQueries({ queryKey: ["machines"] });

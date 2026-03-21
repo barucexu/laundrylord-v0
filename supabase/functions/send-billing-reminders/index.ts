@@ -7,6 +7,14 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function replaceVars(template: string, vars: Record<string, string>): string {
+  let result = template;
+  for (const [key, val] of Object.entries(vars)) {
+    result = result.replaceAll(`{${key}}`, val);
+  }
+  return result;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -22,7 +30,6 @@ serve(async (req) => {
   const todayStr = today.toISOString().split("T")[0];
 
   try {
-    // Get all active renters with subscriptions
     const { data: renters, error: rErr } = await supabase
       .from("renters")
       .select("id, user_id, name, email, monthly_rate, next_due_date, days_late, balance, late_fee, status, stripe_subscription_id")
@@ -36,8 +43,7 @@ serve(async (req) => {
       });
     }
 
-    // Group renters by user_id to fetch operator settings
-    const userIds = [...new Set(renters.map(r => r.user_id))];
+    const userIds = [...new Set(renters.map((r: any) => r.user_id))];
 
     const { data: allSettings } = await supabase
       .from("operator_settings")
@@ -50,11 +56,14 @@ serve(async (req) => {
     }
 
     for (const renter of renters) {
-      const settings = settingsMap[renter.user_id] || {
-        reminder_days_before: 3,
-        late_fee_after_days: 7,
-        late_fee_amount: 25,
-      };
+      const settings = settingsMap[renter.user_id] || {};
+      const reminderDaysBefore = settings.reminder_days_before ?? 3;
+      const lateFeeAfterDays = settings.late_fee_after_days ?? 7;
+      const lateFeeDefault = settings.late_fee_amount ?? 25;
+      const businessName = settings.business_name || "LaundryLord";
+
+      // Check master email toggle
+      if (settings.email_reminders_enabled === false) continue;
 
       if (!renter.next_due_date) continue;
 
@@ -62,93 +71,70 @@ serve(async (req) => {
       const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       const billingCycle = renter.next_due_date;
 
-      // 1. Payment reminder (N days before due)
-      if (daysUntilDue > 0 && daysUntilDue <= settings.reminder_days_before) {
-        const { error: dupErr } = await supabase.from("billing_reminders").insert({
-          renter_id: renter.id,
-          user_id: renter.user_id,
-          billing_cycle: billingCycle,
-          reminder_type: "payment_reminder",
-        });
+      const vars: Record<string, string> = {
+        name: renter.name,
+        amount: Number(renter.monthly_rate).toFixed(2),
+        due_date: renter.next_due_date,
+        balance: Number(renter.balance).toFixed(2),
+        late_fee: Number(renter.late_fee || lateFeeDefault).toFixed(2),
+        days_late: String(renter.days_late),
+        business_name: businessName,
+      };
 
-        if (!dupErr) {
-          // Send email
-          if (renter.email) {
-            await sendEmail(
-              renter.email,
-              "Payment Reminder - LaundryLord",
-              `Hi ${renter.name},\n\nYour payment of $${Number(renter.monthly_rate).toFixed(2)} is due on ${renter.next_due_date}.\n\nPlease ensure your card on file is up to date.\n\n— LaundryLord`
-            );
+      // 1. Payment reminder
+      if (daysUntilDue > 0 && daysUntilDue <= reminderDaysBefore) {
+        if (settings.reminder_upcoming_enabled !== false) {
+          const { error: dupErr } = await supabase.from("billing_reminders").insert({
+            renter_id: renter.id, user_id: renter.user_id, billing_cycle: billingCycle, reminder_type: "payment_reminder",
+          });
+          if (!dupErr && renter.email) {
+            const subject = replaceVars(settings.template_upcoming_subject || "Payment Reminder", vars);
+            const body = replaceVars(settings.template_upcoming_body || `Hi ${renter.name}, your payment is due.`, vars);
+            await sendEmail(renter.email, subject, body);
+            results.push(`payment_reminder sent to ${renter.name}`);
           }
-          results.push(`payment_reminder sent to ${renter.name}`);
         }
       }
 
-      // 2. Payment failed reminder (days_late >= 1)
+      // 2. Payment failed
       if (renter.days_late >= 1) {
-        const { error: dupErr } = await supabase.from("billing_reminders").insert({
-          renter_id: renter.id,
-          user_id: renter.user_id,
-          billing_cycle: billingCycle,
-          reminder_type: "payment_failed",
-        });
-
-        if (!dupErr) {
-          if (renter.email) {
-            await sendEmail(
-              renter.email,
-              "Payment Failed - LaundryLord",
-              `Hi ${renter.name},\n\nYour payment of $${Number(renter.monthly_rate).toFixed(2)} was declined. Please update your payment method to avoid late fees.\n\nOutstanding balance: $${Number(renter.balance).toFixed(2)}\n\n— LaundryLord`
-            );
+        if (settings.reminder_failed_enabled !== false) {
+          const { error: dupErr } = await supabase.from("billing_reminders").insert({
+            renter_id: renter.id, user_id: renter.user_id, billing_cycle: billingCycle, reminder_type: "payment_failed",
+          });
+          if (!dupErr && renter.email) {
+            const subject = replaceVars(settings.template_failed_subject || "Payment Failed", vars);
+            const body = replaceVars(settings.template_failed_body || `Hi ${renter.name}, your payment was declined.`, vars);
+            await sendEmail(renter.email, subject, body);
+            results.push(`payment_failed sent to ${renter.name}`);
           }
-          results.push(`payment_failed sent to ${renter.name}`);
         }
       }
 
-      // 3. Late fee application (days_late >= late_fee_after_days)
-      if (renter.days_late >= settings.late_fee_after_days) {
-        const lateFeeAmount = Number(renter.late_fee || settings.late_fee_amount || 25);
-
+      // 3. Late fee application
+      if (renter.days_late >= lateFeeAfterDays) {
+        const lateFeeAmount = Number(renter.late_fee || lateFeeDefault);
         const { error: dupErr } = await supabase.from("billing_reminders").insert({
-          renter_id: renter.id,
-          user_id: renter.user_id,
-          billing_cycle: billingCycle,
-          reminder_type: "late_fee_applied",
+          renter_id: renter.id, user_id: renter.user_id, billing_cycle: billingCycle, reminder_type: "late_fee_applied",
         });
 
         if (!dupErr) {
-          // Apply late fee to balance
           const newBalance = Number(renter.balance) + lateFeeAmount;
-          await supabase
-            .from("renters")
-            .update({ balance: newBalance })
-            .eq("id", renter.id);
-
-          // Log timeline event
+          await supabase.from("renters").update({ balance: newBalance }).eq("id", renter.id);
           await supabase.from("timeline_events").insert({
-            renter_id: renter.id,
-            user_id: renter.user_id,
-            type: "late_fee",
+            renter_id: renter.id, user_id: renter.user_id, type: "late_fee",
             description: `Late fee of $${lateFeeAmount.toFixed(2)} applied (${renter.days_late} days overdue)`,
           });
-
-          // Record as payment entry
           await supabase.from("payments").insert({
-            renter_id: renter.id,
-            user_id: renter.user_id,
-            amount: lateFeeAmount,
-            due_date: todayStr,
-            status: "pending",
-            type: "late_fee",
+            renter_id: renter.id, user_id: renter.user_id, amount: lateFeeAmount,
+            due_date: todayStr, status: "pending", type: "late_fee",
           });
 
-          // Send email
-          if (renter.email) {
-            await sendEmail(
-              renter.email,
-              "Late Fee Applied - LaundryLord",
-              `Hi ${renter.name},\n\nA late fee of $${lateFeeAmount.toFixed(2)} has been applied to your account. Your payment is ${renter.days_late} days overdue.\n\nUpdated balance: $${newBalance.toFixed(2)}\n\nPlease update your payment method as soon as possible.\n\n— LaundryLord`
-            );
+          if (settings.reminder_latefee_enabled !== false && renter.email) {
+            vars.balance = newBalance.toFixed(2);
+            const subject = replaceVars(settings.template_latefee_subject || "Late Fee Applied", vars);
+            const body = replaceVars(settings.template_latefee_body || `Late fee applied.`, vars);
+            await sendEmail(renter.email, subject, body);
           }
           results.push(`late_fee_applied for ${renter.name}: $${lateFeeAmount.toFixed(2)}`);
         }
@@ -176,21 +162,11 @@ async function sendEmail(to: string, subject: string, text: string) {
       console.warn("[EMAIL] No LOVABLE_API_KEY configured, skipping email");
       return;
     }
-
     const res = await fetch("https://api.lovable.dev/v1/email/send", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      },
-      body: JSON.stringify({
-        to,
-        subject,
-        text,
-        from: "LaundryLord <notifications@notify.laundrylord.club>",
-      }),
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${LOVABLE_API_KEY}` },
+      body: JSON.stringify({ to, subject, text, from: "LaundryLord <notifications@notify.laundrylord.club>" }),
     });
-
     if (!res.ok) {
       const errBody = await res.text();
       console.error(`[EMAIL] Failed to send to ${to}: ${res.status} ${errBody}`);
