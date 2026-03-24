@@ -2,7 +2,7 @@ import { LayoutDashboard, Users, Box, CreditCard, Wrench, Settings, LogOut } fro
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import logoImg from "@/assets/laundrylord-logo.png";
+import logoImg from "@/assets/laundrylord-logo.webp";
 import {
   Sidebar,
   SidebarContent,
