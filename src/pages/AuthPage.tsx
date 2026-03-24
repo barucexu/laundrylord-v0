@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import logoImg from "@/assets/laundrylord-logo.png";
+import logoImg from "@/assets/laundrylord-logo.webp";
 
 export default function AuthPage() {
   const { user, loading: authLoading } = useAuth();

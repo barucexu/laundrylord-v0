@@ -1,6 +1,6 @@
 import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
-import logoImg from "@/assets/laundrylord-logo.png";
+import logoImg from "@/assets/laundrylord-logo.webp";
 
 const NotFound = () => {
   const location = useLocation();
