@@ -334,6 +334,8 @@ export type Database = {
           due_date: string
           id: string
           paid_date: string | null
+          payment_notes: string | null
+          payment_source: string | null
           renter_id: string
           status: string
           type: string
@@ -346,6 +348,8 @@ export type Database = {
           due_date: string
           id?: string
           paid_date?: string | null
+          payment_notes?: string | null
+          payment_source?: string | null
           renter_id: string
           status?: string
           type?: string
@@ -358,6 +362,8 @@ export type Database = {
           due_date?: string
           id?: string
           paid_date?: string | null
+          payment_notes?: string | null
+          payment_source?: string | null
           renter_id?: string
           status?: string
           type?: string
