@@ -8,6 +8,7 @@ type RenterInsert = Database["public"]["Tables"]["renters"]["Insert"];
 type MachineRow = Database["public"]["Tables"]["machines"]["Row"];
 type MachineInsert = Database["public"]["Tables"]["machines"]["Insert"];
 type PaymentRow = Database["public"]["Tables"]["payments"]["Row"];
+type PaymentInsert = Database["public"]["Tables"]["payments"]["Insert"];
 type MaintenanceRow = Database["public"]["Tables"]["maintenance_logs"]["Row"];
 type TimelineRow = Database["public"]["Tables"]["timeline_events"]["Row"];
 
@@ -150,6 +151,27 @@ export function usePayments() {
   });
 }
 
+export function useCreatePayment() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (payment: Omit<PaymentInsert, "user_id">) => {
+      const { data, error } = await supabase
+        .from("payments")
+        .insert({ ...payment, user_id: user!.id })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["renters"] });
+    },
+  });
+}
+
 export function useMaintenanceLogs() {
   return useQuery({
     queryKey: ["maintenance_logs"],
@@ -228,6 +250,21 @@ export function useMachineForRenter(machineId: string | null | undefined) {
   });
 }
 
+export function useMachinesForRenter(renterId: string | undefined) {
+  return useQuery({
+    queryKey: ["machines", "renter", renterId],
+    enabled: !!renterId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("machines")
+        .select("*")
+        .eq("assigned_renter_id", renterId!);
+      if (error) throw error;
+      return data as MachineRow[];
+    },
+  });
+}
+
 export function useStripeConnection() {
   return useQuery({
     queryKey: ["stripe-connection"],
@@ -299,4 +336,4 @@ export function useSaveOperatorSettings() {
   });
 }
 
-export type { RenterRow, MachineRow, PaymentRow, MaintenanceRow, TimelineRow };
+export type { RenterRow, MachineRow, PaymentRow, PaymentInsert, MaintenanceRow, TimelineRow };
