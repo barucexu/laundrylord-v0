@@ -44,6 +44,7 @@ export default function MachinesList() {
                 <TableHead>Status</TableHead>
                 <TableHead>Assigned To</TableHead>
                 <TableHead>Condition</TableHead>
+                <TableHead className="text-right">Cost</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
@@ -65,6 +66,9 @@ export default function MachinesList() {
                       )}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground capitalize">{m.condition || '—'}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">
+                      {Number((m as any).cost_basis || 0) > 0 ? `$${Number((m as any).cost_basis).toFixed(0)}` : '—'}
+                    </TableCell>
                     <TableCell>
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditMachine(m)}>
                         <Pencil className="h-3.5 w-3.5" />
@@ -75,7 +79,7 @@ export default function MachinesList() {
               })}
               {machines.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-12">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground py-12">
                     No machines yet. Click "Add Machine" to get started.
                   </TableCell>
                 </TableRow>

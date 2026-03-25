@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Box, CreditCard, Wrench, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, Box, CreditCard, Wrench, Settings, LogOut, Upload, Mail } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ const navItems = [
   { title: "Machines", url: "/machines", icon: Box },
   { title: "Payments", url: "/payments", icon: CreditCard },
   { title: "Maintenance", url: "/maintenance", icon: Wrench },
+  { title: "Import", url: "/import", icon: Upload },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
@@ -72,6 +73,10 @@ export function AppSidebar() {
             <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent" onClick={signOut}>
               <LogOut className="h-3.5 w-3.5" /> Sign Out
             </Button>
+            <div className="text-[10px] text-sidebar-foreground/40 px-1">
+              <Mail className="inline h-2.5 w-2.5 mr-0.5" />
+              <a href="mailto:don.brucexu@gmail.com" className="hover:text-sidebar-foreground/60">don.brucexu@gmail.com</a>
+            </div>
           </div>
         ) : (
           <Button variant="ghost" size="icon" className="mx-auto text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent" onClick={signOut}>
