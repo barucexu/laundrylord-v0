@@ -24,6 +24,8 @@ export function EditMachineDialog({ open, onOpenChange, machine }: EditMachineDi
     condition: machine.condition || "",
     notes: machine.notes || "",
     status: machine.status,
+    cost_basis: String((machine as any).cost_basis || 0),
+    sourced_from: (machine as any).sourced_from || "",
   });
 
   useEffect(() => {
@@ -36,6 +38,8 @@ export function EditMachineDialog({ open, onOpenChange, machine }: EditMachineDi
         condition: machine.condition || "",
         notes: machine.notes || "",
         status: machine.status,
+        cost_basis: String((machine as any).cost_basis || 0),
+        sourced_from: (machine as any).sourced_from || "",
       });
     }
   }, [open, machine]);
@@ -56,7 +60,9 @@ export function EditMachineDialog({ open, onOpenChange, machine }: EditMachineDi
         condition: form.condition,
         notes: form.notes,
         status: form.status,
-      });
+        cost_basis: parseFloat(form.cost_basis) || 0,
+        sourced_from: form.sourced_from,
+      } as any);
       toast.success("Machine updated");
       onOpenChange(false);
     } catch (err: any) {
@@ -88,31 +94,33 @@ export function EditMachineDialog({ open, onOpenChange, machine }: EditMachineDi
           </div>
           <div className="space-y-2">
             <Label>Serial</Label>
-            <Input value={form.serial} onChange={e => setForm(f => ({ ...f, serial: e.target.value }))} />
+            <Input value={form.serial} onChange={e => setForm(f => ({ ...f, serial: e.target.value }))} className="font-mono" />
           </div>
-          <div className="space-y-2">
-            <Label>Prong</Label>
-            <Select value={form.prong || "none"} onValueChange={v => setForm(f => ({ ...f, prong: v === "none" ? "" : v }))}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                <SelectItem value="3-prong">3-Prong</SelectItem>
-                <SelectItem value="4-prong">4-Prong</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Condition</Label>
-            <Select value={form.condition || "none"} onValueChange={v => setForm(f => ({ ...f, condition: v === "none" ? "" : v }))}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Not set</SelectItem>
-                <SelectItem value="new">New</SelectItem>
-                <SelectItem value="good">Good</SelectItem>
-                <SelectItem value="fair">Fair</SelectItem>
-                <SelectItem value="poor">Poor</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Prong</Label>
+              <Select value={form.prong || "none"} onValueChange={v => setForm(f => ({ ...f, prong: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="3-prong">3-Prong</SelectItem>
+                  <SelectItem value="4-prong">4-Prong</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Condition</Label>
+              <Select value={form.condition || "none"} onValueChange={v => setForm(f => ({ ...f, condition: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Not set</SelectItem>
+                  <SelectItem value="new">New</SelectItem>
+                  <SelectItem value="good">Good</SelectItem>
+                  <SelectItem value="fair">Fair</SelectItem>
+                  <SelectItem value="poor">Poor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="space-y-2">
             <Label>Status</Label>
@@ -125,6 +133,16 @@ export function EditMachineDialog({ open, onOpenChange, machine }: EditMachineDi
                 <SelectItem value="retired">Retired</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Cost Basis ($)</Label>
+              <Input type="number" step="0.01" value={form.cost_basis} onChange={e => setForm(f => ({ ...f, cost_basis: e.target.value }))} className="font-mono" />
+            </div>
+            <div className="space-y-2">
+              <Label>Sourced From</Label>
+              <Input value={form.sourced_from} onChange={e => setForm(f => ({ ...f, sourced_from: e.target.value }))} />
+            </div>
           </div>
           <div className="space-y-2">
             <Label>Notes</Label>

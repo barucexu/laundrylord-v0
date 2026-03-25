@@ -13,6 +13,7 @@ import MachinesList from "@/pages/MachinesList";
 import PaymentsView from "@/pages/PaymentsView";
 import MaintenanceView from "@/pages/MaintenanceView";
 import SettingsPage from "@/pages/SettingsPage";
+import ImportPage from "@/pages/ImportPage";
 import AuthPage from "@/pages/AuthPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import NotFound from "@/pages/NotFound";
@@ -43,6 +44,7 @@ const App = () => (
               <Route path="/payments" element={<PaymentsView />} />
               <Route path="/maintenance" element={<MaintenanceView />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/import" element={<ImportPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

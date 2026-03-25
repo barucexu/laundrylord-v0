@@ -22,6 +22,8 @@ export function CreateMachineDialog({ open, onOpenChange }: CreateMachineDialogP
     prong: "",
     condition: "good",
     notes: "",
+    cost_basis: "",
+    sourced_from: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -44,9 +46,11 @@ export function CreateMachineDialog({ open, onOpenChange }: CreateMachineDialogP
         condition: form.condition,
         notes: form.notes.trim(),
         status: "available",
-      });
+        cost_basis: parseFloat(form.cost_basis) || 0,
+        sourced_from: form.sourced_from.trim(),
+      } as any);
       toast.success(`Machine ${form.serial} added`);
-      setForm({ type: "washer", model: "", serial: "", prong: "", condition: "good", notes: "" });
+      setForm({ type: "washer", model: "", serial: "", prong: "", condition: "good", notes: "", cost_basis: "", sourced_from: "" });
       onOpenChange(false);
     } catch (err: any) {
       toast.error(err.message || "Failed to add machine");
@@ -95,17 +99,27 @@ export function CreateMachineDialog({ open, onOpenChange }: CreateMachineDialogP
               </Select>
             </div>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Condition</Label>
+              <Select value={form.condition} onValueChange={v => setForm(f => ({ ...f, condition: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="new">New</SelectItem>
+                  <SelectItem value="good">Good</SelectItem>
+                  <SelectItem value="fair">Fair</SelectItem>
+                  <SelectItem value="poor">Poor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="m-cost">Cost Basis ($)</Label>
+              <Input id="m-cost" type="number" step="0.01" value={form.cost_basis} onChange={e => setForm(f => ({ ...f, cost_basis: e.target.value }))} className="font-mono" placeholder="0" />
+            </div>
+          </div>
           <div className="space-y-2">
-            <Label>Condition</Label>
-            <Select value={form.condition} onValueChange={v => setForm(f => ({ ...f, condition: v }))}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="new">New</SelectItem>
-                <SelectItem value="good">Good</SelectItem>
-                <SelectItem value="fair">Fair</SelectItem>
-                <SelectItem value="poor">Poor</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label htmlFor="m-sourced">Sourced From</Label>
+            <Input id="m-sourced" value={form.sourced_from} onChange={e => setForm(f => ({ ...f, sourced_from: e.target.value }))} placeholder="Craigslist, dealer, etc." />
           </div>
           <div className="space-y-2">
             <Label htmlFor="m-notes">Notes</Label>

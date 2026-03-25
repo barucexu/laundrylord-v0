@@ -3,14 +3,16 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
+import { PaymentSourceBadge } from "@/components/PaymentSourceBadge";
 import { supabase } from "@/integrations/supabase/client";
-import { useRenter, useMachineForRenter, useMachines, useUpdateRenter, useUpdateMachine, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection } from "@/hooks/useSupabaseData";
+import { useRenter, useMachinesForRenter, useMachines, useUpdateRenter, useUpdateMachine, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection } from "@/hooks/useSupabaseData";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil, Plus, X, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { EditRenterDialog } from "@/components/EditRenterDialog";
+import { RecordPaymentDialog } from "@/components/RecordPaymentDialog";
 
 const timelineIcons: Record<string, typeof User> = {
   created: User,
@@ -31,7 +33,7 @@ export default function RenterDetail() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { data: renter, isLoading } = useRenter(id);
-  const { data: machine } = useMachineForRenter(renter?.machine_id);
+  const { data: assignedMachines = [] } = useMachinesForRenter(id);
   const { data: allMachines = [] } = useMachines();
   const { data: timeline = [] } = useTimelineEvents(id);
   const { data: maintenance = [] } = useMaintenanceForRenter(id);
@@ -42,6 +44,7 @@ export default function RenterDetail() {
   const [sendingSetup, setSendingSetup] = useState(false);
   const [activating, setActivating] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
 
   // Show toast on setup return
   const setupResult = searchParams.get("setup");
@@ -90,21 +93,23 @@ export default function RenterDetail() {
   const handleAssignMachine = async (machineId: string) => {
     if (!renter || !id) return;
     try {
-      if (renter.machine_id) {
-        await updateMachine.mutateAsync({ id: renter.machine_id, assigned_renter_id: null, status: "available" });
-      }
-
-      if (machineId === "none") {
-        await updateRenter.mutateAsync({ id, machine_id: null });
-      } else {
-        await updateRenter.mutateAsync({ id, machine_id: machineId });
-        await updateMachine.mutateAsync({ id: machineId, assigned_renter_id: id, status: "assigned" });
-      }
-      queryClient.invalidateQueries({ queryKey: ["renters", id] });
+      await updateMachine.mutateAsync({ id: machineId, assigned_renter_id: id, status: "assigned" });
+      queryClient.invalidateQueries({ queryKey: ["machines", "renter", id] });
       queryClient.invalidateQueries({ queryKey: ["machines"] });
-      toast.success(machineId === "none" ? "Machine unassigned" : "Machine assigned");
+      toast.success("Machine assigned");
     } catch (err: any) {
       toast.error(err.message || "Failed to assign machine");
+    }
+  };
+
+  const handleUnassignMachine = async (machineId: string) => {
+    try {
+      await updateMachine.mutateAsync({ id: machineId, assigned_renter_id: null, status: "available" });
+      queryClient.invalidateQueries({ queryKey: ["machines", "renter", id] });
+      queryClient.invalidateQueries({ queryKey: ["machines"] });
+      toast.success("Machine unassigned");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to unassign machine");
     }
   };
 
@@ -144,7 +149,7 @@ export default function RenterDetail() {
   };
 
   const billingState = getBillingState();
-  const availableMachines = allMachines.filter(m => m.status === "available" || m.id === renter.machine_id);
+  const availableMachines = allMachines.filter(m => m.status === "available");
 
   return (
     <div className="space-y-5">
@@ -160,9 +165,14 @@ export default function RenterDetail() {
             {renter.lease_start_date && <span className="text-xs text-muted-foreground font-mono">Since {renter.lease_start_date}</span>}
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-          <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setPaymentOpen(true)}>
+            <DollarSign className="h-3.5 w-3.5 mr-1" /> Record Payment
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+            <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+          </Button>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-[1fr_340px] gap-5">
@@ -312,13 +322,16 @@ export default function RenterDetail() {
                   {renter.days_late} days overdue
                 </div>
               )}
+
+              {/* Payment History */}
               {renterPayments.length > 0 && (
                 <div className="mt-4 pt-4 border-t divide-y">
-                  {renterPayments.slice(0, 5).map(p => (
+                  {renterPayments.slice(0, 8).map(p => (
                     <div key={p.id} className="flex items-center justify-between py-2.5">
-                      <div>
-                        <span className="text-sm capitalize">{p.type === 'rent' ? 'Rent Payment Due' : p.type.replace('_', ' ')}</span>
-                        <span className="text-xs text-muted-foreground font-mono ml-2">{p.due_date}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm capitalize">{p.type === 'rent' ? 'Rent' : p.type.replace('_', ' ')}</span>
+                        <span className="text-xs text-muted-foreground font-mono">{p.due_date}</span>
+                        <PaymentSourceBadge source={(p as any).payment_source} />
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-sm font-mono font-medium">${Number(p.amount).toFixed(2)}</span>
@@ -416,6 +429,19 @@ export default function RenterDetail() {
                   <span className="text-xs">{renter.address}</span>
                 </div>
               )}
+              {(renter as any).secondary_contact && (
+                <div className="flex items-center gap-2.5 text-sm">
+                  <User className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs">{(renter as any).secondary_contact}</span>
+                  <span className="text-[10px] text-muted-foreground">(secondary)</span>
+                </div>
+              )}
+              {(renter as any).language && (renter as any).language !== "English" && (
+                <div className="flex items-center gap-2.5 text-sm">
+                  <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs">{(renter as any).language}</span>
+                </div>
+              )}
               {!renter.phone && !renter.email && !renter.address && (
                 <p className="text-sm text-muted-foreground">No contact info on file.</p>
               )}
@@ -438,53 +464,59 @@ export default function RenterDetail() {
             </CardContent>
           </Card>
 
+          {/* Multi-Machine Assignment */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Box className="h-4 w-4" /> Machine</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Box className="h-4 w-4" /> Machines</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Select
-                value={renter.machine_id || "none"}
-                onValueChange={handleAssignMachine}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Assign a machine" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No machine</SelectItem>
-                  {availableMachines.map(m => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.type} — {m.model} ({m.serial})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {machine && (
-                <div className="space-y-2 pt-3 border-t">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Model</span>
-                    <span>{machine.model}</span>
+              {assignedMachines.length === 0 && (
+                <p className="text-sm text-muted-foreground">No machines assigned.</p>
+              )}
+              {assignedMachines.map(m => (
+                <div key={m.id} className="border rounded-md p-3 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium capitalize">{m.type} — {m.model}</span>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleUnassignMachine(m.id)}>
+                      <X className="h-3 w-3" />
+                    </Button>
                   </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Serial</span>
-                    <span className="font-mono">{machine.serial}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Prong</span>
-                    <span>{machine.prong}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Condition</span>
-                    <span>{machine.condition}</span>
-                  </div>
-                  <div className="flex justify-between text-xs items-center">
-                    <span className="text-muted-foreground">Status</span>
-                    <StatusBadge status={machine.status} />
+                  <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
+                    <span>Serial: <span className="font-mono text-foreground">{m.serial}</span></span>
+                    <span>Prong: <span className="text-foreground">{m.prong || '—'}</span></span>
+                    <span>Condition: <span className="text-foreground capitalize">{m.condition || '—'}</span></span>
+                    <span><StatusBadge status={m.status} /></span>
                   </div>
                 </div>
+              ))}
+              {availableMachines.length > 0 && (
+                <Select onValueChange={handleAssignMachine}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Assign a machine..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableMachines.map(m => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.type} — {m.model} ({m.serial})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
             </CardContent>
           </Card>
+
+          {/* Install Notes */}
+          {(renter as any).install_notes && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Install Notes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground leading-relaxed">{(renter as any).install_notes}</p>
+              </CardContent>
+            </Card>
+          )}
 
           {renter.notes && (
             <Card>
@@ -499,6 +531,7 @@ export default function RenterDetail() {
         </div>
       </div>
       <EditRenterDialog open={editOpen} onOpenChange={setEditOpen} renter={renter} />
+      {paymentOpen && <RecordPaymentDialog open={paymentOpen} onOpenChange={setPaymentOpen} renter={renter} />}
     </div>
   );
 }

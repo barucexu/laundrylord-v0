@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
@@ -37,10 +38,13 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
     deposit_collected: false,
     late_fee: "",
     notes: "",
+    secondary_contact: "",
+    language: "English",
+    install_notes: "",
   });
 
   const getDefault = (field: string, fallback: string) => {
-    if (form[field as keyof typeof form] !== "") return form[field as keyof typeof form] as string;
+    if (form[field as keyof typeof form] !== "" && form[field as keyof typeof form] !== false) return form[field as keyof typeof form] as string;
     if (!opSettings) return fallback;
     const map: Record<string, string> = {
       monthly_rate: String(opSettings.default_monthly_rate),
@@ -74,9 +78,12 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
         lease_start_date: startDate ? format(startDate, "yyyy-MM-dd") : null,
         notes: form.notes.trim(),
         status: "lead",
+        secondary_contact: form.secondary_contact.trim(),
+        language: form.language,
+        install_notes: form.install_notes.trim(),
       } as any);
       toast.success(`${form.name} added as a new lead`);
-      setForm({ name: "", phone: "", email: "", address: "", monthly_rate: "", rent_collected: "0", install_fee: "", install_fee_collected: false, deposit_amount: "", deposit_collected: false, late_fee: "", notes: "" });
+      setForm({ name: "", phone: "", email: "", address: "", monthly_rate: "", rent_collected: "0", install_fee: "", install_fee_collected: false, deposit_amount: "", deposit_collected: false, late_fee: "", notes: "", secondary_contact: "", language: "English", install_notes: "" });
       setStartDate(undefined);
       onOpenChange(false);
     } catch (err: any) {
@@ -109,6 +116,23 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
           <div className="space-y-2">
             <Label htmlFor="r-address">Address</Label>
             <Input id="r-address" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="123 Main St, Atlanta, GA" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="r-secondary">Secondary Contact</Label>
+              <Input id="r-secondary" value={form.secondary_contact} onChange={e => setForm(f => ({ ...f, secondary_contact: e.target.value }))} placeholder="Name or phone" />
+            </div>
+            <div className="space-y-2">
+              <Label>Language</Label>
+              <Select value={form.language} onValueChange={v => setForm(f => ({ ...f, language: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="English">English</SelectItem>
+                  <SelectItem value="Spanish">Spanish</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <Separator />
@@ -177,6 +201,11 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
           </div>
 
           <Separator />
+
+          <div className="space-y-2">
+            <Label htmlFor="r-install-notes">Install Notes</Label>
+            <Textarea id="r-install-notes" value={form.install_notes} onChange={e => setForm(f => ({ ...f, install_notes: e.target.value }))} placeholder="Access instructions, prong type needed, etc." rows={2} />
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="r-notes">Notes</Label>

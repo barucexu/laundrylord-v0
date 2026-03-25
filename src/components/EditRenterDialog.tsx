@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useUpdateRenter, type RenterRow } from "@/hooks/useSupabaseData";
 import { toast } from "sonner";
+import { Separator } from "@/components/ui/separator";
 
 interface EditRenterDialogProps {
   open: boolean;
@@ -47,6 +48,9 @@ export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialo
     status: renter.status,
     install_fee_collected: renter.install_fee_collected,
     deposit_collected: renter.deposit_collected,
+    secondary_contact: (renter as any).secondary_contact || "",
+    language: (renter as any).language || "English",
+    install_notes: (renter as any).install_notes || "",
   });
   const [startDate, setStartDate] = useState<Date | undefined>(
     renter.lease_start_date ? new Date(renter.lease_start_date + "T00:00:00") : undefined
@@ -67,6 +71,9 @@ export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialo
         status: renter.status,
         install_fee_collected: renter.install_fee_collected,
         deposit_collected: renter.deposit_collected,
+        secondary_contact: (renter as any).secondary_contact || "",
+        language: (renter as any).language || "English",
+        install_notes: (renter as any).install_notes || "",
       });
       setStartDate(renter.lease_start_date ? new Date(renter.lease_start_date + "T00:00:00") : undefined);
     }
@@ -94,7 +101,10 @@ export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialo
         install_fee_collected: form.install_fee_collected,
         deposit_collected: form.deposit_collected,
         lease_start_date: startDate ? format(startDate, "yyyy-MM-dd") : null,
-      });
+        secondary_contact: form.secondary_contact,
+        language: form.language,
+        install_notes: form.install_notes,
+      } as any);
       toast.success("Renter updated");
       onOpenChange(false);
     } catch (err: any) {
@@ -126,6 +136,23 @@ export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialo
           <div className="space-y-2">
             <Label>Address</Label>
             <Input value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Secondary Contact</Label>
+              <Input value={form.secondary_contact} onChange={e => setForm(f => ({ ...f, secondary_contact: e.target.value }))} placeholder="Name or phone" />
+            </div>
+            <div className="space-y-2">
+              <Label>Language</Label>
+              <Select value={form.language} onValueChange={v => setForm(f => ({ ...f, language: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="English">English</SelectItem>
+                  <SelectItem value="Spanish">Spanish</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="space-y-2">
             <Label>Status</Label>
@@ -189,6 +216,13 @@ export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialo
               />
               <Label htmlFor="depositCollected" className="text-sm">Deposit Collected</Label>
             </div>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <Label>Install Notes</Label>
+            <Textarea value={form.install_notes} onChange={e => setForm(f => ({ ...f, install_notes: e.target.value }))} placeholder="Access instructions, prong type needed..." rows={2} />
           </div>
           <div className="space-y-2">
             <Label>Notes</Label>

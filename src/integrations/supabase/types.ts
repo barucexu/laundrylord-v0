@@ -140,12 +140,14 @@ export type Database = {
         Row: {
           assigned_renter_id: string | null
           condition: string | null
+          cost_basis: number | null
           created_at: string
           id: string
           model: string
           notes: string | null
           prong: string | null
           serial: string
+          sourced_from: string | null
           status: string
           type: string
           updated_at: string
@@ -154,12 +156,14 @@ export type Database = {
         Insert: {
           assigned_renter_id?: string | null
           condition?: string | null
+          cost_basis?: number | null
           created_at?: string
           id?: string
           model: string
           notes?: string | null
           prong?: string | null
           serial: string
+          sourced_from?: string | null
           status?: string
           type: string
           updated_at?: string
@@ -168,12 +172,14 @@ export type Database = {
         Update: {
           assigned_renter_id?: string | null
           condition?: string | null
+          cost_basis?: number | null
           created_at?: string
           id?: string
           model?: string
           notes?: string | null
           prong?: string | null
           serial?: string
+          sourced_from?: string | null
           status?: string
           type?: string
           updated_at?: string
@@ -334,6 +340,8 @@ export type Database = {
           due_date: string
           id: string
           paid_date: string | null
+          payment_notes: string | null
+          payment_source: string | null
           renter_id: string
           status: string
           type: string
@@ -346,6 +354,8 @@ export type Database = {
           due_date: string
           id?: string
           paid_date?: string | null
+          payment_notes?: string | null
+          payment_source?: string | null
           renter_id: string
           status?: string
           type?: string
@@ -358,6 +368,8 @@ export type Database = {
           due_date?: string
           id?: string
           paid_date?: string | null
+          payment_notes?: string | null
+          payment_source?: string | null
           renter_id?: string
           status?: string
           type?: string
@@ -387,6 +399,8 @@ export type Database = {
           id: string
           install_fee: number
           install_fee_collected: boolean
+          install_notes: string | null
+          language: string | null
           late_fee: number
           lease_start_date: string | null
           machine_id: string | null
@@ -398,6 +412,7 @@ export type Database = {
           paid_through_date: string | null
           phone: string | null
           rent_collected: number
+          secondary_contact: string | null
           status: string
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
@@ -416,6 +431,8 @@ export type Database = {
           id?: string
           install_fee?: number
           install_fee_collected?: boolean
+          install_notes?: string | null
+          language?: string | null
           late_fee?: number
           lease_start_date?: string | null
           machine_id?: string | null
@@ -427,6 +444,7 @@ export type Database = {
           paid_through_date?: string | null
           phone?: string | null
           rent_collected?: number
+          secondary_contact?: string | null
           status?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -445,6 +463,8 @@ export type Database = {
           id?: string
           install_fee?: number
           install_fee_collected?: boolean
+          install_notes?: string | null
+          language?: string | null
           late_fee?: number
           lease_start_date?: string | null
           machine_id?: string | null
@@ -456,6 +476,7 @@ export type Database = {
           paid_through_date?: string | null
           phone?: string | null
           rent_collected?: number
+          secondary_contact?: string | null
           status?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null

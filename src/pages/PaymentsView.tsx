@@ -2,14 +2,19 @@ import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatusBadge } from "@/components/StatusBadge";
+import { PaymentSourceBadge } from "@/components/PaymentSourceBadge";
 import { usePayments } from "@/hooks/useSupabaseData";
-import { Link } from "react-router-dom";
 
 export default function PaymentsView() {
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState("all");
   const { data: payments = [], isLoading } = usePayments();
 
-  const filtered = payments.filter(p => statusFilter === "all" || p.status === statusFilter);
+  const filtered = payments.filter(p => {
+    const matchesStatus = statusFilter === "all" || p.status === statusFilter;
+    const matchesSource = sourceFilter === "all" || (p as any).payment_source === sourceFilter;
+    return matchesStatus && matchesSource;
+  });
 
   return (
     <div className="space-y-5">
@@ -34,6 +39,22 @@ export default function PaymentsView() {
             <SelectItem value="failed">Failed</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={sourceFilter} onValueChange={setSourceFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="All sources" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All sources</SelectItem>
+            <SelectItem value="stripe">Stripe</SelectItem>
+            <SelectItem value="square">Square</SelectItem>
+            <SelectItem value="zelle">Zelle</SelectItem>
+            <SelectItem value="venmo">Venmo</SelectItem>
+            <SelectItem value="cashapp">CashApp</SelectItem>
+            <SelectItem value="apple_pay">Apple Pay</SelectItem>
+            <SelectItem value="cash">Cash</SelectItem>
+            <SelectItem value="other">Other</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {isLoading ? (
@@ -48,6 +69,7 @@ export default function PaymentsView() {
                 <TableHead>Type</TableHead>
                 <TableHead>Due Date</TableHead>
                 <TableHead>Paid Date</TableHead>
+                <TableHead>Source</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
@@ -58,13 +80,14 @@ export default function PaymentsView() {
                   <TableCell className="text-sm capitalize font-medium">{p.type.replace('_', ' ')}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{p.due_date}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{p.paid_date || '—'}</TableCell>
+                  <TableCell><PaymentSourceBadge source={(p as any).payment_source} /></TableCell>
                   <TableCell className="text-right font-mono text-sm font-medium">${Number(p.amount).toFixed(2)}</TableCell>
                   <TableCell><StatusBadge status={p.status} /></TableCell>
                 </TableRow>
               ))}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-12">No payments found.</TableCell>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-12">No payments found.</TableCell>
                 </TableRow>
               )}
             </TableBody>
