@@ -6,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/AppLayout";
+import { DemoProvider } from "@/contexts/DemoContext";
+import { DemoLayout } from "@/components/DemoLayout";
 import Dashboard from "@/pages/Dashboard";
 import RentersList from "@/pages/RentersList";
 import RenterDetail from "@/pages/RenterDetail";
@@ -21,38 +23,74 @@ import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
 
+/** Shared page routes used by both real and demo modes */
+const PAGE_ROUTES = (
+  <>
+    <Route index element={<Dashboard />} />
+    <Route path="renters" element={<RentersList />} />
+    <Route path="renters/:id" element={<RenterDetail />} />
+    <Route path="machines" element={<MachinesList />} />
+    <Route path="machine-map" element={<MachineMapPage />} />
+    <Route path="payments" element={<PaymentsView />} />
+    <Route path="maintenance" element={<MaintenanceView />} />
+    <Route path="settings" element={<SettingsPage />} />
+    <Route path="import" element={<ImportPage />} />
+  </>
+);
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/auth" element={<AuthPage />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
-            <Route
-              element={
-                <ProtectedRoute>
-                  <AppLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/renters" element={<RentersList />} />
-              <Route path="/renters/:id" element={<RenterDetail />} />
-              <Route path="/machines" element={<MachinesList />} />
-              <Route path="/machine-map" element={<MachineMapPage />} />
-              <Route path="/payments" element={<PaymentsView />} />
-              <Route path="/maintenance" element={<MaintenanceView />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/import" element={<ImportPage />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <Routes>
+          {/* Auth routes — no demo context needed */}
+          <Route path="/auth" element={
+            <AuthProvider>
+              <AuthPage />
+            </AuthProvider>
+          } />
+          <Route path="/reset-password" element={
+            <AuthProvider>
+              <ResetPasswordPage />
+            </AuthProvider>
+          } />
+
+          {/* Demo routes — DemoProvider + AuthProvider(isDemo) */}
+          <Route path="/demo" element={
+            <AuthProvider isDemo>
+              <DemoProvider>
+                <DemoLayout />
+              </DemoProvider>
+            </AuthProvider>
+          }>
+            {PAGE_ROUTES}
+          </Route>
+
+          {/* Real authenticated routes */}
+          <Route element={
+            <AuthProvider>
+              <ProtectedRoute>
+                <AppLayout />
+              </ProtectedRoute>
+            </AuthProvider>
+          }>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/renters" element={<RentersList />} />
+            <Route path="/renters/:id" element={<RenterDetail />} />
+            <Route path="/machines" element={<MachinesList />} />
+            <Route path="/machine-map" element={<MachineMapPage />} />
+            <Route path="/payments" element={<PaymentsView />} />
+            <Route path="/maintenance" element={<MaintenanceView />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/import" element={<ImportPage />} />
+          </Route>
+
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </TooltipProvider>
   </QueryClientProvider>
 );
 

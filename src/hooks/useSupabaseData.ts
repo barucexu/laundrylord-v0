@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useDemo } from "@/contexts/DemoContext";
 import type { Database } from "@/integrations/supabase/types";
 
 type RenterRow = Database["public"]["Tables"]["renters"]["Row"];
@@ -12,8 +13,28 @@ type PaymentInsert = Database["public"]["Tables"]["payments"]["Insert"];
 type MaintenanceRow = Database["public"]["Tables"]["maintenance_logs"]["Row"];
 type TimelineRow = Database["public"]["Tables"]["timeline_events"]["Row"];
 
-export function useRenters() {
+/**
+ * DEMO MODE INTEGRATION:
+ * Each hook below checks `useDemo()?.isDemo`. If true, it returns in-memory
+ * demo data instead of querying Supabase. Mutations modify demo context state.
+ * This keeps Demo Mode automatically in sync with UI — same hooks, same components.
+ */
+
+// ─── Helper: static query result for demo mode ───
+function useDemoQuery<T>(key: string[], data: T | undefined, enabled = true) {
   return useQuery({
+    queryKey: ["demo", ...key],
+    queryFn: () => data as T,
+    enabled: enabled && data !== undefined,
+    staleTime: Infinity,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useRenters() {
+  const demo = useDemo();
+  const supaQuery = useQuery({
     queryKey: ["renters"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -23,13 +44,17 @@ export function useRenters() {
       if (error) throw error;
       return data as RenterRow[];
     },
+    enabled: !demo?.isDemo,
   });
+  if (demo?.isDemo) return { ...supaQuery, data: demo.data.renters, isLoading: false, error: null };
+  return supaQuery;
 }
 
 export function useRenter(id: string | undefined) {
-  return useQuery({
+  const demo = useDemo();
+  const supaQuery = useQuery({
     queryKey: ["renters", id],
-    enabled: !!id,
+    enabled: !!id && !demo?.isDemo,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("renters")
@@ -40,14 +65,23 @@ export function useRenter(id: string | undefined) {
       return data as RenterRow;
     },
   });
+  if (demo?.isDemo) {
+    const found = demo.data.renters.find(r => r.id === id);
+    return { ...supaQuery, data: found, isLoading: false, error: null };
+  }
+  return supaQuery;
 }
 
 export function useCreateRenter() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const demo = useDemo();
 
   return useMutation({
     mutationFn: async (renter: Omit<RenterInsert, "user_id">) => {
+      if (demo?.isDemo) {
+        return demo.addRenter(renter as any);
+      }
       const { data, error } = await supabase
         .from("renters")
         .insert({ ...renter, user_id: user!.id })
@@ -57,13 +91,14 @@ export function useCreateRenter() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["renters"] });
+      if (!demo?.isDemo) queryClient.invalidateQueries({ queryKey: ["renters"] });
     },
   });
 }
 
 export function useMachines() {
-  return useQuery({
+  const demo = useDemo();
+  const supaQuery = useQuery({
     queryKey: ["machines"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -73,15 +108,22 @@ export function useMachines() {
       if (error) throw error;
       return data as MachineRow[];
     },
+    enabled: !demo?.isDemo,
   });
+  if (demo?.isDemo) return { ...supaQuery, data: demo.data.machines, isLoading: false, error: null };
+  return supaQuery;
 }
 
 export function useCreateMachine() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const demo = useDemo();
 
   return useMutation({
     mutationFn: async (machine: Omit<MachineInsert, "user_id">) => {
+      if (demo?.isDemo) {
+        return demo.addMachine(machine as any);
+      }
       const { data, error } = await supabase
         .from("machines")
         .insert({ ...machine, user_id: user!.id })
@@ -91,16 +133,20 @@ export function useCreateMachine() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["machines"] });
+      if (!demo?.isDemo) queryClient.invalidateQueries({ queryKey: ["machines"] });
     },
   });
 }
 
 export function useUpdateMachine() {
   const queryClient = useQueryClient();
+  const demo = useDemo();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<MachineRow> & { id: string }) => {
+      if (demo?.isDemo) {
+        return demo.updateMachine(id, updates) as MachineRow;
+      }
       const { data, error } = await supabase
         .from("machines")
         .update(updates)
@@ -111,16 +157,20 @@ export function useUpdateMachine() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["machines"] });
+      if (!demo?.isDemo) queryClient.invalidateQueries({ queryKey: ["machines"] });
     },
   });
 }
 
 export function useUpdateRenter() {
   const queryClient = useQueryClient();
+  const demo = useDemo();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<RenterRow> & { id: string }) => {
+      if (demo?.isDemo) {
+        return demo.updateRenter(id, updates) as RenterRow;
+      }
       const { data, error } = await supabase
         .from("renters")
         .update(updates)
@@ -131,14 +181,17 @@ export function useUpdateRenter() {
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["renters"] });
-      queryClient.invalidateQueries({ queryKey: ["renters", data.id] });
+      if (!demo?.isDemo) {
+        queryClient.invalidateQueries({ queryKey: ["renters"] });
+        queryClient.invalidateQueries({ queryKey: ["renters", data.id] });
+      }
     },
   });
 }
 
 export function usePayments() {
-  return useQuery({
+  const demo = useDemo();
+  const supaQuery = useQuery({
     queryKey: ["payments"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -148,15 +201,22 @@ export function usePayments() {
       if (error) throw error;
       return data as PaymentRow[];
     },
+    enabled: !demo?.isDemo,
   });
+  if (demo?.isDemo) return { ...supaQuery, data: demo.data.payments, isLoading: false, error: null };
+  return supaQuery;
 }
 
 export function useCreatePayment() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const demo = useDemo();
 
   return useMutation({
     mutationFn: async (payment: Omit<PaymentInsert, "user_id">) => {
+      if (demo?.isDemo) {
+        return demo.addPayment(payment as any);
+      }
       const { data, error } = await supabase
         .from("payments")
         .insert({ ...payment, user_id: user!.id })
@@ -166,14 +226,17 @@ export function useCreatePayment() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["payments"] });
-      queryClient.invalidateQueries({ queryKey: ["renters"] });
+      if (!demo?.isDemo) {
+        queryClient.invalidateQueries({ queryKey: ["payments"] });
+        queryClient.invalidateQueries({ queryKey: ["renters"] });
+      }
     },
   });
 }
 
 export function useMaintenanceLogs() {
-  return useQuery({
+  const demo = useDemo();
+  const supaQuery = useQuery({
     queryKey: ["maintenance_logs"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -183,13 +246,17 @@ export function useMaintenanceLogs() {
       if (error) throw error;
       return data as MaintenanceRow[];
     },
+    enabled: !demo?.isDemo,
   });
+  if (demo?.isDemo) return { ...supaQuery, data: demo.data.maintenanceLogs, isLoading: false, error: null };
+  return supaQuery;
 }
 
 export function useTimelineEvents(renterId: string | undefined) {
-  return useQuery({
+  const demo = useDemo();
+  const supaQuery = useQuery({
     queryKey: ["timeline_events", renterId],
-    enabled: !!renterId,
+    enabled: !!renterId && !demo?.isDemo,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("timeline_events")
@@ -200,12 +267,20 @@ export function useTimelineEvents(renterId: string | undefined) {
       return data as TimelineRow[];
     },
   });
+  if (demo?.isDemo) {
+    const filtered = demo.data.timelineEvents
+      .filter(e => e.renter_id === renterId)
+      .sort((a, b) => b.date.localeCompare(a.date));
+    return { ...supaQuery, data: renterId ? filtered : undefined, isLoading: false, error: null };
+  }
+  return supaQuery;
 }
 
 export function usePaymentsForRenter(renterId: string | undefined) {
-  return useQuery({
+  const demo = useDemo();
+  const supaQuery = useQuery({
     queryKey: ["payments", "renter", renterId],
-    enabled: !!renterId,
+    enabled: !!renterId && !demo?.isDemo,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("payments")
@@ -216,12 +291,20 @@ export function usePaymentsForRenter(renterId: string | undefined) {
       return data as PaymentRow[];
     },
   });
+  if (demo?.isDemo) {
+    const filtered = demo.data.payments
+      .filter(p => p.renter_id === renterId)
+      .sort((a, b) => b.due_date.localeCompare(a.due_date));
+    return { ...supaQuery, data: renterId ? filtered : undefined, isLoading: false, error: null };
+  }
+  return supaQuery;
 }
 
 export function useMaintenanceForRenter(renterId: string | undefined) {
-  return useQuery({
+  const demo = useDemo();
+  const supaQuery = useQuery({
     queryKey: ["maintenance_logs", "renter", renterId],
-    enabled: !!renterId,
+    enabled: !!renterId && !demo?.isDemo,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("maintenance_logs")
@@ -232,12 +315,20 @@ export function useMaintenanceForRenter(renterId: string | undefined) {
       return data as MaintenanceRow[];
     },
   });
+  if (demo?.isDemo) {
+    const filtered = demo.data.maintenanceLogs
+      .filter(m => m.renter_id === renterId)
+      .sort((a, b) => b.reported_date.localeCompare(a.reported_date));
+    return { ...supaQuery, data: renterId ? filtered : undefined, isLoading: false, error: null };
+  }
+  return supaQuery;
 }
 
 export function useMachineForRenter(machineId: string | null | undefined) {
-  return useQuery({
+  const demo = useDemo();
+  const supaQuery = useQuery({
     queryKey: ["machines", machineId],
-    enabled: !!machineId,
+    enabled: !!machineId && !demo?.isDemo,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("machines")
@@ -248,12 +339,18 @@ export function useMachineForRenter(machineId: string | null | undefined) {
       return data as MachineRow;
     },
   });
+  if (demo?.isDemo) {
+    const found = demo.data.machines.find(m => m.id === machineId);
+    return { ...supaQuery, data: found, isLoading: false, error: null };
+  }
+  return supaQuery;
 }
 
 export function useMachinesForRenter(renterId: string | undefined) {
-  return useQuery({
+  const demo = useDemo();
+  const supaQuery = useQuery({
     queryKey: ["machines", "renter", renterId],
-    enabled: !!renterId,
+    enabled: !!renterId && !demo?.isDemo,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("machines")
@@ -263,10 +360,16 @@ export function useMachinesForRenter(renterId: string | undefined) {
       return data as MachineRow[];
     },
   });
+  if (demo?.isDemo) {
+    const filtered = demo.data.machines.filter(m => m.assigned_renter_id === renterId);
+    return { ...supaQuery, data: renterId ? filtered : undefined, isLoading: false, error: null };
+  }
+  return supaQuery;
 }
 
 export function useStripeConnection() {
-  return useQuery({
+  const demo = useDemo();
+  const supaQuery = useQuery({
     queryKey: ["stripe-connection"],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("check-stripe-connection");
@@ -274,15 +377,21 @@ export function useStripeConnection() {
       return data as { connected: boolean; reason?: string; account_name?: string; account_id?: string };
     },
     staleTime: 5 * 60 * 1000,
+    enabled: !demo?.isDemo,
   });
+  if (demo?.isDemo) {
+    return { ...supaQuery, data: { connected: true, account_name: "SunBelt Laundry Rentals (Demo)" }, isLoading: false, error: null };
+  }
+  return supaQuery;
 }
 
 // Operator Settings
 export function useOperatorSettings() {
   const { user } = useAuth();
-  return useQuery({
+  const demo = useDemo();
+  const supaQuery = useQuery({
     queryKey: ["operator_settings"],
-    enabled: !!user,
+    enabled: !!user && !demo?.isDemo,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("operator_settings")
@@ -293,11 +402,16 @@ export function useOperatorSettings() {
       return data;
     },
   });
+  if (demo?.isDemo) {
+    return { ...supaQuery, data: demo.data.operatorSettings, isLoading: false, error: null };
+  }
+  return supaQuery;
 }
 
 export function useSaveOperatorSettings() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const demo = useDemo();
 
   return useMutation({
     mutationFn: async (settings: {
@@ -319,6 +433,9 @@ export function useSaveOperatorSettings() {
       template_latefee_subject?: string;
       template_latefee_body?: string;
     }) => {
+      if (demo?.isDemo) {
+        return demo.updateSettings(settings);
+      }
       const { data, error } = await supabase
         .from("operator_settings")
         .upsert(
@@ -331,7 +448,7 @@ export function useSaveOperatorSettings() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["operator_settings"] });
+      if (!demo?.isDemo) queryClient.invalidateQueries({ queryKey: ["operator_settings"] });
     },
   });
 }
