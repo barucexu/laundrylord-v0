@@ -1,44 +1,49 @@
 
 
-# Fix Machine Map Load Speed
+# Fix: Move Stripe Secret Keys Out of Client-Readable Table
 
-## Root Cause
+## Problem
 
-Every renter address is geocoded one-by-one via the Nominatim API with a mandatory 1.1-second delay between requests (to respect rate limits). With ~170 unique addresses in demo mode, that's **over 3 minutes** of sequential geocoding. The geocode cache lives only in React state, so it resets on every page navigation — meaning the map starts from scratch every time you visit it.
+The `operator_settings` table stores `stripe_secret_key` in a column readable by any authenticated user (via their own RLS-scoped row). This means the Stripe secret key is fetched to the browser when the Settings page loads or when operator_settings is queried. A malicious script or browser extension could exfiltrate it.
 
-## Solution (two-pronged)
+## Solution
 
-### 1. Pre-baked coordinates for demo mode (`src/data/demo-seed-data.ts`)
+Create a new edge function `save-stripe-key` that accepts the key from the frontend and stores it in a **separate server-only table** (`stripe_keys`) with RLS that only allows `service_role` access. Remove `stripe_secret_key` from `operator_settings`. All existing edge functions already use `SUPABASE_SERVICE_ROLE_KEY` to query, so they can read from the new table.
 
-Add a hardcoded lat/lng lookup keyed by `"City, State"` market. Instead of geocoding each street address, assign coordinates by adding small deterministic offsets to a market center point. This gives realistic geographic clustering with zero API calls.
+## Changes
 
-For example, Houston center = `[29.76, -95.37]`, then each renter gets a tiny offset based on their index (±0.05°, ~3 miles). This produces a realistic scatter without any network requests.
+### 1. Database migration
 
-New helper: `getMarketCoords(marketIndex, renterIndex)` returns `{ lat, lng }`.
+- Create table `stripe_keys` with columns: `user_id uuid PRIMARY KEY REFERENCES auth.users(id)`, `encrypted_key text NOT NULL`, `created_at`, `updated_at`
+- Enable RLS with **service_role-only** policies (SELECT, INSERT, UPDATE, DELETE)
+- Migrate existing data: `INSERT INTO stripe_keys (user_id, encrypted_key) SELECT user_id, stripe_secret_key FROM operator_settings WHERE stripe_secret_key IS NOT NULL`
+- Drop column: `ALTER TABLE operator_settings DROP COLUMN stripe_secret_key`
 
-### 2. Persistent geocode cache via localStorage (`src/pages/MachineMapPage.tsx`)
+### 2. New edge function: `save-stripe-key`
 
-For real (non-demo) users:
-- On mount, load the geocode cache from `localStorage` key `"ll-geocache"`
-- When new addresses are geocoded, save the updated cache to `localStorage`
-- This means addresses only need to be geocoded once ever, not on every visit
+- Authenticates user via JWT
+- Validates key format (`sk_test_` or `sk_live_`)
+- Upserts into `stripe_keys` using service role client
+- Returns success/error
 
-### 3. Progressive marker rendering
+### 3. Update existing edge functions
 
-Currently, all geocoding must finish before `setGeoCache` is called once. Change to update state after each batch of ~5 addresses so markers appear incrementally as geocoding progresses — the map feels alive immediately instead of blank for 3 minutes.
+Modify `check-stripe-connection`, `create-setup-link`, `create-subscription` to read from `stripe_keys` instead of `operator_settings.stripe_secret_key`. They already use service role, so no RLS issue.
 
-### 4. Skip geocoding in demo mode entirely
+### 4. Update `src/pages/SettingsPage.tsx`
 
-In `MachineMapPage`, detect demo mode. If demo, inject pre-baked coordinates directly into the geo cache on mount — no Nominatim calls at all. The map loads instantly with all ~170 markers.
+- Remove client-side read of `stripe_secret_key` from operator_settings
+- `handleSaveStripeKey` calls `supabase.functions.invoke('save-stripe-key', { body: { key } })` instead of direct upsert
+- Remove pre-population of the key input (never send key back to client — show masked placeholder like `sk_****...` based on connection status from `check-stripe-connection`)
 
-## Files Modified
+### 5. Update `src/data/demo-seed-data.ts`
 
-- **`src/data/demo-seed-data.ts`** — Add market center coordinates and a `DEMO_GEO_CACHE` export mapping each generated address to its pre-computed lat/lng
-- **`src/pages/MachineMapPage.tsx`** — Load `DEMO_GEO_CACHE` when in demo mode; persist real-user geocache in localStorage; progressive batch updates; set initial map view to US overview (`[39.8, -98.5]`, zoom 4) instead of Atlanta
+- Remove `stripe_secret_key` from demo operator settings object
 
-## Result
+## Files
 
-- Demo mode: map loads in under 1 second with all markers
-- Real users: first visit geocodes (progressively, with markers appearing as they resolve); subsequent visits load from localStorage cache instantly
-- Map starts showing a US-wide view that auto-fits to marker bounds once data is ready
+- **Migration**: new `stripe_keys` table, drop column from `operator_settings`
+- **New**: `supabase/functions/save-stripe-key/index.ts`
+- **Modified**: `supabase/functions/check-stripe-connection/index.ts`, `create-setup-link/index.ts`, `create-subscription/index.ts`
+- **Modified**: `src/pages/SettingsPage.tsx`, `src/data/demo-seed-data.ts`
 
