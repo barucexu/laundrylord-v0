@@ -711,7 +711,7 @@ export default function ImportPage() {
         {step === "done" && result && (
           <Card>
             <CardContent className="p-8 text-center space-y-4">
-              <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
+              <CheckCircle className="h-12 w-12 text-primary mx-auto" />
               <div className="space-y-1">
                 {(result.rentersCreated > 0 || result.rentersMatched > 0) && (
                   <div className="text-sm">
