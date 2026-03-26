@@ -64,9 +64,6 @@ export default function SettingsPage() {
         late_fee_after_days: String(settings.late_fee_after_days),
         reminder_days_before: String(settings.reminder_days_before),
       });
-      if ((settings as any).stripe_secret_key) {
-        setStripeKey((settings as any).stripe_secret_key);
-      }
       const s = settings as any;
       setEmailForm({
         email_reminders_enabled: s.email_reminders_enabled ?? true,
@@ -112,16 +109,14 @@ export default function SettingsPage() {
     }
     setSavingKey(true);
     try {
-      const { error } = await supabase
-        .from("operator_settings")
-        .upsert(
-          { user_id: user!.id, stripe_secret_key: stripeKey.trim() } as any,
-          { onConflict: "user_id" }
-        );
+      const { data, error } = await supabase.functions.invoke("save-stripe-key", {
+        body: { key: stripeKey.trim() },
+      });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setStripeKey("");
       toast.success("Stripe key saved! Verifying connection…");
       queryClient.invalidateQueries({ queryKey: ["stripe-connection"] });
-      queryClient.invalidateQueries({ queryKey: ["operator_settings"] });
     } catch (err: any) {
       toast.error(err.message || "Failed to save Stripe key");
     } finally {
@@ -235,7 +230,7 @@ export default function SettingsPage() {
                 <div className="relative flex-1">
                   <Input
                     type={showKey ? "text" : "password"}
-                    placeholder="sk_test_••••••••••••"
+                    placeholder={stripe?.connected ? "sk_****••••••••••••" : "sk_test_••••••••••••"}
                     value={stripeKey}
                     onChange={e => setStripeKey(e.target.value)}
                     className="font-mono pr-8 h-8 text-sm"

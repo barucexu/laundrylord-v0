@@ -439,7 +439,7 @@ function generateOperatorSettings(): OperatorSettingsRow {
     reminder_upcoming_enabled: true,
     reminder_failed_enabled: true,
     reminder_latefee_enabled: true,
-    stripe_secret_key: null,
+    
     template_upcoming_subject: "Upcoming Payment Reminder",
     template_upcoming_body: "Hi {{name}}, your payment of ${{amount}} is due on {{date}}.",
     template_failed_subject: "Payment Failed",

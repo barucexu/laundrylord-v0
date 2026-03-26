@@ -23,14 +23,14 @@ serve(async (req) => {
     const { data: userData, error: userError } = await supabase.auth.getUser(token);
     if (userError || !userData.user) throw new Error("Unauthorized");
 
-    // Read operator's own Stripe key from operator_settings
-    const { data: settings } = await supabase
-      .from("operator_settings")
-      .select("stripe_secret_key")
+    // Read Stripe key from server-only stripe_keys table
+    const { data: keyRow } = await supabase
+      .from("stripe_keys")
+      .select("encrypted_key")
       .eq("user_id", userData.user.id)
       .maybeSingle();
 
-    const stripeKey = settings?.stripe_secret_key;
+    const stripeKey = keyRow?.encrypted_key;
 
     if (!stripeKey || stripeKey.trim() === "") {
       return new Response(JSON.stringify({ connected: false, reason: "no_key" }), {

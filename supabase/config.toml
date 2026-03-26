@@ -15,5 +15,8 @@ verify_jwt = false
 [functions.send-billing-reminders]
 verify_jwt = false
 
+[functions.save-stripe-key]
+verify_jwt = false
+
 [functions.process-email-queue]
 verify_jwt = true
