@@ -51,6 +51,7 @@ export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialo
     secondary_contact: (renter as any).secondary_contact || "",
     language: (renter as any).language || "English",
     install_notes: (renter as any).install_notes || "",
+    dryer_outlet: (renter as any).dryer_outlet || "",
   });
   const [startDate, setStartDate] = useState<Date | undefined>(
     renter.lease_start_date ? new Date(renter.lease_start_date + "T00:00:00") : undefined
@@ -74,6 +75,7 @@ export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialo
         secondary_contact: (renter as any).secondary_contact || "",
         language: (renter as any).language || "English",
         install_notes: (renter as any).install_notes || "",
+        dryer_outlet: (renter as any).dryer_outlet || "",
       });
       setStartDate(renter.lease_start_date ? new Date(renter.lease_start_date + "T00:00:00") : undefined);
     }
@@ -104,6 +106,7 @@ export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialo
         secondary_contact: form.secondary_contact,
         language: form.language,
         install_notes: form.install_notes,
+        dryer_outlet: form.dryer_outlet || null,
       } as any);
       toast.success("Renter updated");
       onOpenChange(false);
@@ -133,9 +136,22 @@ export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialo
               <Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
             </div>
           </div>
-          <div className="space-y-2">
-            <Label>Address</Label>
-            <Input value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-2 col-span-2">
+              <Label>Address</Label>
+              <Input value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Dryer Outlet</Label>
+              <Select value={form.dryer_outlet || "none"} onValueChange={v => setForm(f => ({ ...f, dryer_outlet: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">—</SelectItem>
+                  <SelectItem value="3-prong">3-Prong</SelectItem>
+                  <SelectItem value="4-prong">4-Prong</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">

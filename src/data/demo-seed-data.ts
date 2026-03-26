@@ -207,6 +207,7 @@ function generateRenters(): RenterRow[] {
         stripe_subscription_id: isActive && renterIdx % 4 === 0 ? `sub_demo_${renterIdx}` : null,
         machine_id: isActive ? demoId("mach", renterIdx) : null,
         language: renterIdx % 8 === 0 ? "es" : "en",
+        dryer_outlet: renterIdx % 20 === 0 ? null : renterIdx % 3 === 0 ? "4-prong" : "3-prong",
         notes: renterIdx % 4 === 0 ? "Good tenant, always pays on time." : renterIdx % 7 === 0 ? "Had minor maintenance issue last month." : null,
         secondary_contact: renterIdx % 6 === 0 ? `${FIRST_NAMES[(nameIdx + 3) % FIRST_NAMES.length]} ${lastName} - ${phone}` : null,
         created_at: new Date(new Date(leaseStart).getTime() - 7 * 86400000).toISOString(),

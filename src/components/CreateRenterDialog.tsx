@@ -41,6 +41,7 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
     secondary_contact: "",
     language: "English",
     install_notes: "",
+    dryer_outlet: "",
   });
 
   const getDefault = (field: string, fallback: string) => {
@@ -81,9 +82,10 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
         secondary_contact: form.secondary_contact.trim(),
         language: form.language,
         install_notes: form.install_notes.trim(),
+        dryer_outlet: form.dryer_outlet || null,
       } as any);
       toast.success(`${form.name} added as a new lead`);
-      setForm({ name: "", phone: "", email: "", address: "", monthly_rate: "", rent_collected: "0", install_fee: "", install_fee_collected: false, deposit_amount: "", deposit_collected: false, late_fee: "", notes: "", secondary_contact: "", language: "English", install_notes: "" });
+      setForm({ name: "", phone: "", email: "", address: "", monthly_rate: "", rent_collected: "0", install_fee: "", install_fee_collected: false, deposit_amount: "", deposit_collected: false, late_fee: "", notes: "", secondary_contact: "", language: "English", install_notes: "", dryer_outlet: "" });
       setStartDate(undefined);
       onOpenChange(false);
     } catch (err: any) {
@@ -113,9 +115,22 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
               <Input id="r-email" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="name@email.com" />
             </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="r-address">Address</Label>
-            <Input id="r-address" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="123 Main St, Atlanta, GA" />
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="r-address">Address</Label>
+              <Input id="r-address" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="123 Main St, Atlanta, GA" />
+            </div>
+            <div className="space-y-2">
+              <Label>Dryer Outlet</Label>
+              <Select value={form.dryer_outlet || "none"} onValueChange={v => setForm(f => ({ ...f, dryer_outlet: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">—</SelectItem>
+                  <SelectItem value="3-prong">3-Prong</SelectItem>
+                  <SelectItem value="4-prong">4-Prong</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">

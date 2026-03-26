@@ -7,7 +7,7 @@ import { PaymentSourceBadge } from "@/components/PaymentSourceBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { useRenter, useMachinesForRenter, useMachines, useUpdateRenter, useUpdateMachine, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection } from "@/hooks/useSupabaseData";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil, Plus, X, Globe } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil, Plus, X, Globe, Plug } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -436,6 +436,12 @@ export default function RenterDetail() {
                   <span className="text-[10px] text-muted-foreground">(secondary)</span>
                 </div>
               )}
+              {(renter as any).dryer_outlet && (
+                <div className="flex items-center gap-2.5 text-sm">
+                  <Plug className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs">{(renter as any).dryer_outlet} outlet</span>
+                </div>
+              )}
               {(renter as any).language && (renter as any).language !== "English" && (
                 <div className="flex items-center gap-2.5 text-sm">
                   <Globe className="h-3.5 w-3.5 text-muted-foreground" />
@@ -483,7 +489,7 @@ export default function RenterDetail() {
                   </div>
                   <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
                     <span>Serial: <span className="font-mono text-foreground">{m.serial}</span></span>
-                    <span>Prong: <span className="text-foreground">{m.prong || '—'}</span></span>
+                    <span>Status: <StatusBadge status={m.status} /></span>
                     <span>Condition: <span className="text-foreground capitalize">{m.condition || '—'}</span></span>
                     <span><StatusBadge status={m.status} /></span>
                   </div>
