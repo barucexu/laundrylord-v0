@@ -109,16 +109,14 @@ export default function SettingsPage() {
     }
     setSavingKey(true);
     try {
-      const { error } = await supabase
-        .from("operator_settings")
-        .upsert(
-          { user_id: user!.id, stripe_secret_key: stripeKey.trim() } as any,
-          { onConflict: "user_id" }
-        );
+      const { data, error } = await supabase.functions.invoke("save-stripe-key", {
+        body: { key: stripeKey.trim() },
+      });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setStripeKey("");
       toast.success("Stripe key saved! Verifying connection…");
       queryClient.invalidateQueries({ queryKey: ["stripe-connection"] });
-      queryClient.invalidateQueries({ queryKey: ["operator_settings"] });
     } catch (err: any) {
       toast.error(err.message || "Failed to save Stripe key");
     } finally {
