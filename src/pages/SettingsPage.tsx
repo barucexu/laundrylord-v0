@@ -219,7 +219,7 @@ export default function SettingsPage() {
                   <div className="text-[10px] text-muted-foreground">{stripe.account_name}</div>
                 </div>
               </div>
-            ) : stripe?.reason === "invalid_key" ? (
+            ) : (stripe && "reason" in stripe && stripe.reason === "invalid_key") ? (
               <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-destructive/10 border border-destructive/20">
                 <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
                 <div>
