@@ -1,42 +1,23 @@
 import { useState, useCallback } from "react";
-import Papa from "papaparse";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Upload, FileText, CheckCircle, AlertTriangle, Mail } from "lucide-react";
+import { Upload, CheckCircle, Mail, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { SupportFooter } from "@/components/SupportFooter";
 
-const CUSTOMER_FIELDS = [
-  { key: "name", label: "Name", required: true },
-  { key: "phone", label: "Phone" },
-  { key: "email", label: "Email" },
-  { key: "address", label: "Address" },
-  { key: "monthly_rate", label: "Monthly Rate" },
-  { key: "balance", label: "Balance" },
-  { key: "paid_through_date", label: "Paid Through Date" },
-  { key: "notes", label: "Notes" },
-  { key: "status", label: "Status" },
-  { key: "secondary_contact", label: "Secondary Contact" },
-  { key: "language", label: "Language" },
-  { key: "install_notes", label: "Install Notes" },
-];
-
-const MACHINE_FIELDS = [
-  { key: "type", label: "Type", required: true },
-  { key: "model", label: "Model", required: true },
-  { key: "serial", label: "Serial #", required: true },
-  { key: "prong", label: "Prong" },
-  { key: "condition", label: "Condition" },
-  { key: "cost_basis", label: "Cost Basis ($)" },
-  { key: "sourced_from", label: "Sourced From" },
-  { key: "notes", label: "Notes" },
-];
+import { ParsedData } from "@/utils/import/types";
+import { RENTER_FIELDS, MACHINE_FIELDS } from "@/utils/import/fields";
+import { parseCSV } from "@/utils/import/csv-parser";
+import { parseXLSX } from "@/utils/import/xlsx-parser";
+import { parseImage } from "@/utils/import/image-parser";
+import { autoMap } from "@/utils/import/auto-mapper";
+import { ensureRequiredFields } from "@/utils/import/placeholders";
 
 type Step = "upload" | "map" | "preview" | "done";
 
@@ -51,38 +32,43 @@ export default function ImportPage() {
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<{ imported: number; skipped: number } | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [sourceType, setSourceType] = useState<ParsedData["sourceType"]>("csv");
+  const [parsing, setParsing] = useState(false);
 
-  const fields = tab === "customers" ? CUSTOMER_FIELDS : MACHINE_FIELDS;
+  const fields = tab === "customers" ? RENTER_FIELDS : MACHINE_FIELDS;
+
+  const ACCEPTED_EXTENSIONS = [".csv", ".xlsx", ".png", ".jpg", ".jpeg"];
+  const ACCEPT_STRING = ".csv,.xlsx,.png,.jpg,.jpeg";
 
   const processFile = useCallback(
-    (file: File) => {
-      Papa.parse(file, {
-        complete: (results) => {
-          const data = results.data as string[][];
-          if (data.length < 2) {
-            toast.error("CSV must have at least a header row and one data row");
-            return;
-          }
-          const csvHeaders = data[0].map((h) => h.trim());
-          setHeaders(csvHeaders);
-          setRawData(data.slice(1).filter((row) => row.some((c) => c.trim())));
+    async (file: File) => {
+      const ext = file.name.toLowerCase().substring(file.name.lastIndexOf("."));
+      if (!ACCEPTED_EXTENSIONS.includes(ext)) {
+        toast.error("Unsupported file type. Use CSV, Excel, or image files.");
+        return;
+      }
 
-          const autoMap: Record<string, string> = {};
-          fields.forEach((f) => {
-            const match = csvHeaders.findIndex(
-              (h) =>
-                h.toLowerCase().replace(/[_\s#]/g, "") === f.key.toLowerCase().replace(/_/g, "") ||
-                h.toLowerCase().includes(
-                  f.label.toLowerCase().replace(/[#$()]/g, "").trim(),
-                ),
-            );
-            if (match >= 0) autoMap[f.key] = csvHeaders[match];
-          });
-          setMapping(autoMap);
-          setStep("map");
-        },
-        error: () => toast.error("Failed to parse CSV"),
-      });
+      setParsing(true);
+      try {
+        let parsed: ParsedData;
+        if (ext === ".csv") {
+          parsed = await parseCSV(file);
+        } else if (ext === ".xlsx") {
+          parsed = await parseXLSX(file);
+        } else {
+          parsed = await parseImage(file);
+        }
+
+        setHeaders(parsed.headers);
+        setRawData(parsed.rows);
+        setSourceType(parsed.sourceType);
+        setMapping(autoMap(parsed.headers, fields));
+        setStep("map");
+      } catch (err: any) {
+        toast.error(err.message || "Failed to parse file");
+      } finally {
+        setParsing(false);
+      }
     },
     [fields],
   );
@@ -103,10 +89,6 @@ export default function ImportPage() {
       setDragging(false);
       const file = e.dataTransfer.files?.[0];
       if (!file) return;
-      if (!file.name.toLowerCase().endsWith(".csv")) {
-        toast.error("Please drop a .csv file");
-        return;
-      }
       processFile(file);
     },
     [processFile],
@@ -138,7 +120,7 @@ export default function ImportPage() {
     try {
       for (const row of rawData) {
         const record: Record<string, any> = { user_id: user.id };
-        let valid = true;
+        let hasRealContent = false;
 
         fields.forEach((f) => {
           const csvCol = mapping[f.key];
@@ -146,28 +128,42 @@ export default function ImportPage() {
           const colIdx = headers.indexOf(csvCol);
           if (colIdx < 0) return;
           const val = row[colIdx]?.trim() || "";
-          if (f.required && !val) valid = false;
-          if (val) record[f.key] = val;
+          if (val) {
+            record[f.key] = val;
+            hasRealContent = true;
+          }
         });
 
-        if (!valid) {
+        if (!hasRealContent) {
           skipped++;
           continue;
         }
 
-        // Parse numeric fields
+        // Parse booleans
         if (tab === "customers") {
+          for (const boolKey of ["install_fee_collected", "deposit_collected", "has_payment_method"]) {
+            if (record[boolKey] !== undefined) {
+              const v = String(record[boolKey]).toLowerCase();
+              record[boolKey] = v === "true" || v === "yes" || v === "1";
+            }
+          }
+          // Parse numerics
           if (record.monthly_rate) record.monthly_rate = parseFloat(record.monthly_rate) || 150;
           if (record.balance) record.balance = parseFloat(record.balance) || 0;
-          if (!record.status) record.status = "active";
+          if (record.late_fee) record.late_fee = parseFloat(record.late_fee) || 25;
+          if (record.install_fee) record.install_fee = parseFloat(record.install_fee) || 75;
+          if (record.deposit_amount) record.deposit_amount = parseFloat(record.deposit_amount) || 0;
         } else {
           if (record.cost_basis) record.cost_basis = parseFloat(record.cost_basis) || 0;
-          if (!record.status) record.status = "available";
         }
+
+        // Fill placeholders for required DB fields
+        ensureRequiredFields(tab, record);
 
         const table = tab === "customers" ? "renters" : "machines";
         const { error } = await supabase.from(table).insert(record as any);
         if (error) {
+          console.error("Insert error:", error);
           skipped++;
         } else {
           imported++;
@@ -191,20 +187,23 @@ export default function ImportPage() {
     setHeaders([]);
     setMapping({});
     setResult(null);
+    setSourceType("csv");
   };
 
   const getMappedValue = (row: string[], fieldKey: string) => {
     const csvCol = mapping[fieldKey];
     if (!csvCol) return "";
     const idx = headers.indexOf(csvCol);
-    return idx >= 0 ? row[idx] : "";
+    return idx >= 0 ? row[idx]?.trim() || "" : "";
   };
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Import Data</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Upload a CSV to import customers or machines in bulk</p>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Upload a CSV, Excel, or image file to import customers or machines in bulk
+        </p>
       </div>
 
       <Card className="border-primary/20 bg-primary/[0.02]">
@@ -237,16 +236,27 @@ export default function ImportPage() {
             <Card>
               <CardContent className="p-8">
                 <label
-                  className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-12 cursor-pointer transition-colors ${dragging ? "border-primary bg-primary/5" : "border-border hover:bg-muted/30"}`}
+                  className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-12 cursor-pointer transition-colors ${
+                    dragging ? "border-primary bg-primary/5" : "border-border hover:bg-muted/30"
+                  } ${parsing ? "pointer-events-none opacity-60" : ""}`}
                   onDragOver={handleDragOver}
                   onDragEnter={handleDragEnter}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                 >
                   <Upload className="h-8 w-8 text-muted-foreground mb-3" />
-                  <span className="text-sm font-medium">Drop a CSV file or click to browse</span>
-                  <span className="text-xs text-muted-foreground mt-1">Supports .csv files</span>
-                  <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
+                  <span className="text-sm font-medium">
+                    {parsing ? "Parsing file..." : "Drop a CSV, Excel, or image file — or click to browse"}
+                  </span>
+                  <span className="text-xs text-muted-foreground mt-1">
+                    Supports .csv, .xlsx, .png, .jpg
+                  </span>
+                  <input
+                    type="file"
+                    accept={ACCEPT_STRING}
+                    className="hidden"
+                    onChange={handleFileUpload}
+                  />
                 </label>
               </CardContent>
             </Card>
@@ -257,18 +267,35 @@ export default function ImportPage() {
               <CardHeader>
                 <CardTitle>Map Columns</CardTitle>
                 <CardDescription>
-                  Match your CSV columns to {tab} fields. {rawData.length} rows detected.
+                  Match your file columns to {tab} fields. {rawData.length} rows detected.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
+                {sourceType === "image" && (
+                  <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 border border-amber-200 text-sm text-amber-800 mb-2">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <span>Imported from image — check mappings carefully. OCR may have errors.</span>
+                  </div>
+                )}
+
+                {/* Column headers */}
+                <div className="flex items-center gap-3 pb-2 border-b">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground w-40 shrink-0">
+                    LaundryLord Field
+                  </span>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex-1">
+                    Your File's Column
+                  </span>
+                </div>
+
                 {fields.map((f) => (
                   <div key={f.key} className="flex items-center gap-3">
-                    <span className="text-sm w-40 shrink-0">
-                      {f.label} {f.required ? "*" : ""}
-                    </span>
+                    <span className="text-sm w-40 shrink-0">{f.label}</span>
                     <Select
                       value={mapping[f.key] || "skip"}
-                      onValueChange={(v) => setMapping((m) => ({ ...m, [f.key]: v === "skip" ? "" : v }))}
+                      onValueChange={(v) =>
+                        setMapping((m) => ({ ...m, [f.key]: v === "skip" ? "" : v }))
+                      }
                     >
                       <SelectTrigger className="flex-1">
                         <SelectValue placeholder="Skip" />
@@ -299,7 +326,8 @@ export default function ImportPage() {
               <CardHeader>
                 <CardTitle>Preview</CardTitle>
                 <CardDescription>
-                  Showing first {Math.min(10, rawData.length)} of {rawData.length} rows
+                  Showing first {Math.min(10, rawData.length)} of {rawData.length} rows.
+                  {sourceType === "image" && " OCR results may need manual cleanup after import."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0 overflow-x-auto">
@@ -314,22 +342,25 @@ export default function ImportPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rawData.slice(0, 10).map((row, i) => {
-                      const requiredMissing = fields.some(
-                        (f) => f.required && mapping[f.key] && !getMappedValue(row, f.key),
-                      );
-                      return (
-                        <TableRow key={i} className={requiredMissing ? "bg-destructive/5" : ""}>
-                          {fields
-                            .filter((f) => mapping[f.key])
-                            .map((f) => (
+                    {rawData.slice(0, 10).map((row, i) => (
+                      <TableRow key={i}>
+                        {fields
+                          .filter((f) => mapping[f.key])
+                          .map((f) => {
+                            const val = getMappedValue(row, f.key);
+                            const placeholder = !val && f.placeholder;
+                            return (
                               <TableCell key={f.key} className="text-xs font-mono">
-                                {getMappedValue(row, f.key) || <span className="text-muted-foreground">—</span>}
+                                {val || (
+                                  <span className="text-muted-foreground italic">
+                                    {placeholder || "—"}
+                                  </span>
+                                )}
                               </TableCell>
-                            ))}
-                        </TableRow>
-                      );
-                    })}
+                            );
+                          })}
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -352,7 +383,7 @@ export default function ImportPage() {
                   <div className="text-lg font-semibold">{result.imported} records imported</div>
                   {result.skipped > 0 && (
                     <div className="text-sm text-muted-foreground">
-                      {result.skipped} rows skipped (missing required fields)
+                      {result.skipped} rows skipped (blank or failed to insert)
                     </div>
                   )}
                 </div>
