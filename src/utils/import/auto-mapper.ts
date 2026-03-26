@@ -23,17 +23,14 @@ export function autoMap(
       const normH = normalize(header);
       if (!normH) continue;
 
-      // Exact match on key or label
       if (normH === normKey || normH === normLabel) {
         bestHeader = header;
         break;
       }
-      // Exact match on synonym
       if (normSynonyms.includes(normH)) {
         bestHeader = header;
         break;
       }
-      // Substring: header contains synonym or synonym contains header
       if (!bestHeader) {
         for (const syn of normSynonyms) {
           if (normH.includes(syn) || syn.includes(normH)) {
@@ -51,4 +48,13 @@ export function autoMap(
   }
 
   return mapping;
+}
+
+// Combined auto-mapper that handles both renter and machine fields
+// Uses the same logic but operates on the combined field set with prefixed keys
+export function autoMapCombined(
+  csvHeaders: string[],
+  combinedFields: ImportField[],
+): Record<string, string> {
+  return autoMap(csvHeaders, combinedFields);
 }
