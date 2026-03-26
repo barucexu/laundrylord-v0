@@ -273,7 +273,6 @@ export type Database = {
           reminder_failed_enabled: boolean
           reminder_latefee_enabled: boolean
           reminder_upcoming_enabled: boolean
-          stripe_secret_key: string | null
           template_failed_body: string | null
           template_failed_subject: string | null
           template_latefee_body: string | null
@@ -297,7 +296,6 @@ export type Database = {
           reminder_failed_enabled?: boolean
           reminder_latefee_enabled?: boolean
           reminder_upcoming_enabled?: boolean
-          stripe_secret_key?: string | null
           template_failed_body?: string | null
           template_failed_subject?: string | null
           template_latefee_body?: string | null
@@ -321,7 +319,6 @@ export type Database = {
           reminder_failed_enabled?: boolean
           reminder_latefee_enabled?: boolean
           reminder_upcoming_enabled?: boolean
-          stripe_secret_key?: string | null
           template_failed_body?: string | null
           template_failed_subject?: string | null
           template_latefee_body?: string | null
@@ -492,6 +489,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      stripe_keys: {
+        Row: {
+          created_at: string
+          encrypted_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       suppressed_emails: {
         Row: {
