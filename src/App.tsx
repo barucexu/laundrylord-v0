@@ -10,6 +10,7 @@ import Dashboard from "@/pages/Dashboard";
 import RentersList from "@/pages/RentersList";
 import RenterDetail from "@/pages/RenterDetail";
 import MachinesList from "@/pages/MachinesList";
+import MachineMapPage from "@/pages/MachineMapPage";
 import PaymentsView from "@/pages/PaymentsView";
 import MaintenanceView from "@/pages/MaintenanceView";
 import SettingsPage from "@/pages/SettingsPage";
@@ -41,6 +42,7 @@ const App = () => (
               <Route path="/renters" element={<RentersList />} />
               <Route path="/renters/:id" element={<RenterDetail />} />
               <Route path="/machines" element={<MachinesList />} />
+              <Route path="/machine-map" element={<MachineMapPage />} />
               <Route path="/payments" element={<PaymentsView />} />
               <Route path="/maintenance" element={<MaintenanceView />} />
               <Route path="/settings" element={<SettingsPage />} />
