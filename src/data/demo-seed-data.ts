@@ -74,6 +74,23 @@ const MARKET_ADDRESSES: { state: string; city: string; streets: string[]; zips: 
 // Renter distribution per market (total ~200)
 const MARKET_RENTER_COUNTS = [30, 22, 18, 30, 19, 20, 14, 11, 12, 8, 8, 7, 1];
 
+// ─── Market center coordinates for pre-baked geocoding ───
+const MARKET_CENTERS: Record<string, { lat: number; lng: number }> = {
+  "Houston, TX":      { lat: 29.760, lng: -95.370 },
+  "Dallas, TX":       { lat: 32.780, lng: -96.800 },
+  "San Antonio, TX":  { lat: 29.424, lng: -98.494 },
+  "Atlanta, GA":      { lat: 33.749, lng: -84.388 },
+  "Decatur, GA":      { lat: 33.775, lng: -84.296 },
+  "Orlando, FL":      { lat: 28.538, lng: -81.379 },
+  "Tampa, FL":        { lat: 27.951, lng: -82.458 },
+  "Miami, FL":        { lat: 25.762, lng: -80.192 },
+  "Nashville, TN":    { lat: 36.163, lng: -86.781 },
+  "Memphis, TN":      { lat: 35.150, lng: -90.049 },
+  "Charlotte, NC":    { lat: 35.227, lng: -80.843 },
+  "Raleigh, NC":      { lat: 35.780, lng: -78.639 },
+  "Birmingham, AL":   { lat: 33.521, lng: -86.802 },
+};
+
 const MACHINE_MODELS = [
   { type: "washer", model: "Samsung WF45R6100AW", cost: 450 },
   { type: "washer", model: "LG WM3600HWA", cost: 500 },
