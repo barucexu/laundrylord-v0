@@ -10,6 +10,7 @@ import Dashboard from "@/pages/Dashboard";
 import RentersList from "@/pages/RentersList";
 import RenterDetail from "@/pages/RenterDetail";
 import MachinesList from "@/pages/MachinesList";
+import MachineMapPage from "@/pages/MachineMapPage";
 import PaymentsView from "@/pages/PaymentsView";
 import MaintenanceView from "@/pages/MaintenanceView";
 import SettingsPage from "@/pages/SettingsPage";
