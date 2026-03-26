@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useMachines, useRenters } from "@/hooks/useSupabaseData";
+import { useDemo } from "@/contexts/DemoContext";
+import { buildDemoGeoCache } from "@/data/demo-seed-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Box, MapPin, AlertCircle } from "lucide-react";
@@ -27,71 +29,107 @@ interface GeoCache {
   [address: string]: { lat: number; lng: number } | null;
 }
 
+const LS_KEY = "ll-geocache";
+
+function loadCacheFromStorage(): GeoCache {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return {};
+}
+
+function saveCacheToStorage(cache: GeoCache) {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(cache));
+  } catch { /* ignore quota errors */ }
+}
+
+// Singleton so demo geo cache is only built once
+let _demoGeoCacheSingleton: GeoCache | null = null;
+function getDemoGeoCacheSingleton(): GeoCache {
+  if (!_demoGeoCacheSingleton) _demoGeoCacheSingleton = buildDemoGeoCache();
+  return _demoGeoCacheSingleton;
+}
+
 export default function MachineMapPage() {
   const { data: machines = [], isLoading: loadingMachines } = useMachines();
   const { data: renters = [], isLoading: loadingRenters } = useRenters();
-  const [geoCache, setGeoCache] = useState<GeoCache>({});
+  const demo = useDemo();
+  const isDemo = !!demo?.isDemo;
+
+  // Initialize cache: demo uses pre-baked coords, real users load from localStorage
+  const [geoCache, setGeoCache] = useState<GeoCache>(() =>
+    isDemo ? getDemoGeoCacheSingleton() : loadCacheFromStorage()
+  );
   const [geocoding, setGeocoding] = useState(false);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
 
   const renterMap = useMemo(() => {
-    const mappedRenters: Record<string, typeof renters[number]> = {};
-    renters.forEach((renter) => {
-      mappedRenters[renter.id] = renter;
-    });
-    return mappedRenters;
+    const m: Record<string, typeof renters[number]> = {};
+    renters.forEach((r) => { m[r.id] = r; });
+    return m;
   }, [renters]);
 
   const machineAddresses = useMemo(() => {
     return machines.map((machine) => {
       const renter = machine.assigned_renter_id ? renterMap[machine.assigned_renter_id] : null;
-      const address = renter?.address || null;
-      return { machine, renter, address };
+      return { machine, renter, address: renter?.address || null };
     });
   }, [machines, renterMap]);
 
   const uniqueAddresses = useMemo(() => {
-    const addresses = new Set<string>();
+    const set = new Set<string>();
     machineAddresses.forEach(({ address }) => {
-      if (address?.trim()) addresses.add(address.trim());
+      if (address?.trim()) set.add(address.trim());
     });
-    return Array.from(addresses);
+    return Array.from(set);
   }, [machineAddresses]);
 
+  // Progressive geocoding for real users (batches of 5, updates state between batches)
   const geocodeAddresses = useCallback(async () => {
-    const toGeocode = uniqueAddresses.filter((address) => !(address in geoCache));
+    if (isDemo) return; // demo never geocodes
+
+    const toGeocode = uniqueAddresses.filter((a) => !(a in geoCache));
     if (toGeocode.length === 0) return;
 
     setGeocoding(true);
-    const nextCache: GeoCache = { ...geoCache };
+    const working = { ...geoCache };
+    const BATCH_SIZE = 5;
 
-    for (const address of toGeocode) {
+    for (let i = 0; i < toGeocode.length; i++) {
+      const address = toGeocode[i];
       try {
-        const response = await fetch(
+        const res = await fetch(
           `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`,
           { headers: { "User-Agent": "LaundryLord/1.0" } }
         );
-        const data = await response.json();
+        const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          nextCache[address] = {
-            lat: Number.parseFloat(data[0].lat),
-            lng: Number.parseFloat(data[0].lon),
-          };
+          working[address] = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
         } else {
-          nextCache[address] = null;
+          working[address] = null;
         }
       } catch {
-        nextCache[address] = null;
+        working[address] = null;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 1100));
+      // Flush state every BATCH_SIZE addresses for progressive rendering
+      if ((i + 1) % BATCH_SIZE === 0 || i === toGeocode.length - 1) {
+        const snapshot = { ...working };
+        setGeoCache(snapshot);
+        saveCacheToStorage(snapshot);
+      }
+
+      if (i < toGeocode.length - 1) {
+        await new Promise((r) => setTimeout(r, 1100));
+      }
     }
 
-    setGeoCache(nextCache);
     setGeocoding(false);
-  }, [geoCache, uniqueAddresses]);
+  }, [geoCache, uniqueAddresses, isDemo]);
 
   useEffect(() => {
     if (!loadingMachines && !loadingRenters && uniqueAddresses.length > 0) {
@@ -116,22 +154,14 @@ export default function MachineMapPage() {
     machineAddresses.forEach(({ machine, renter, address }) => {
       if (!address?.trim()) {
         unmatchedMachines.push({
-          machine,
-          renter,
+          machine, renter,
           reason: renter ? "No address on file" : "Not assigned to a renter",
         });
         return;
       }
-
       const geocoded = geoCache[address.trim()];
       if (geocoded) {
-        mappedMachines.push({
-          machine,
-          renter,
-          address: address.trim(),
-          lat: geocoded.lat,
-          lng: geocoded.lng,
-        });
+        mappedMachines.push({ machine, renter, address: address.trim(), lat: geocoded.lat, lng: geocoded.lng });
       } else if (geocoded === null) {
         unmatchedMachines.push({ machine, renter, reason: "Address could not be geocoded" });
       }
@@ -140,12 +170,13 @@ export default function MachineMapPage() {
     return { mapped: mappedMachines, unmatched: unmatchedMachines };
   }, [geoCache, machineAddresses, machines, renters]);
 
+  // Initialize map once
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
     const map = L.map(mapContainerRef.current, {
-      center: [33.749, -84.388],
-      zoom: 10,
+      center: [39.8, -98.5], // US center
+      zoom: 4,
       scrollWheelZoom: true,
     });
 
@@ -164,6 +195,7 @@ export default function MachineMapPage() {
     };
   }, []);
 
+  // Update markers when mapped data changes
   useEffect(() => {
     const map = mapRef.current;
     const markersLayer = markersLayerRef.current;
@@ -171,10 +203,7 @@ export default function MachineMapPage() {
 
     markersLayer.clearLayers();
 
-    if (mapped.length === 0) {
-      map.setView([33.749, -84.388], 10);
-      return;
-    }
+    if (mapped.length === 0) return;
 
     const bounds = L.latLngBounds([]);
 
