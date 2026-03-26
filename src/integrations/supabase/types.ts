@@ -391,6 +391,7 @@ export type Database = {
           days_late: number
           deposit_amount: number
           deposit_collected: boolean
+          dryer_outlet: string | null
           email: string | null
           has_payment_method: boolean
           id: string
@@ -423,6 +424,7 @@ export type Database = {
           days_late?: number
           deposit_amount?: number
           deposit_collected?: boolean
+          dryer_outlet?: string | null
           email?: string | null
           has_payment_method?: boolean
           id?: string
@@ -455,6 +457,7 @@ export type Database = {
           days_late?: number
           deposit_amount?: number
           deposit_collected?: boolean
+          dryer_outlet?: string | null
           email?: string | null
           has_payment_method?: boolean
           id?: string

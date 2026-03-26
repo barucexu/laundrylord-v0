@@ -489,7 +489,7 @@ export default function RenterDetail() {
                   </div>
                   <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
                     <span>Serial: <span className="font-mono text-foreground">{m.serial}</span></span>
-                    <span>Prong: <span className="text-foreground">{m.prong || '—'}</span></span>
+                    <span>Status: <StatusBadge status={m.status} /></span>
                     <span>Condition: <span className="text-foreground capitalize">{m.condition || '—'}</span></span>
                     <span><StatusBadge status={m.status} /></span>
                   </div>

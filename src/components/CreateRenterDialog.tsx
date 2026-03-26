@@ -115,9 +115,22 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
               <Input id="r-email" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="name@email.com" />
             </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="r-address">Address</Label>
-            <Input id="r-address" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="123 Main St, Atlanta, GA" />
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="r-address">Address</Label>
+              <Input id="r-address" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="123 Main St, Atlanta, GA" />
+            </div>
+            <div className="space-y-2">
+              <Label>Dryer Outlet</Label>
+              <Select value={form.dryer_outlet || "none"} onValueChange={v => setForm(f => ({ ...f, dryer_outlet: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">—</SelectItem>
+                  <SelectItem value="3-prong">3-Prong</SelectItem>
+                  <SelectItem value="4-prong">4-Prong</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">

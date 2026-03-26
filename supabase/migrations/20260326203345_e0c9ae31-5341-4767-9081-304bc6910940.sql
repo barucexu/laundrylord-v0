@@ -1,0 +1,1 @@
+ALTER TABLE public.renters ADD COLUMN dryer_outlet text DEFAULT NULL;
