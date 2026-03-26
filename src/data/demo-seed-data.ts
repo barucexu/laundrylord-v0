@@ -482,5 +482,42 @@ export function cloneDemoData() {
   };
 }
 
+/**
+ * Pre-baked geocode cache for demo mode.
+ * Maps each demo renter address to deterministic lat/lng near market centers.
+ * This eliminates all Nominatim API calls in demo mode.
+ */
+export function buildDemoGeoCache(): Record<string, { lat: number; lng: number }> {
+  const cache: Record<string, { lat: number; lng: number }> = {};
+  let renterIdx = 0;
+
+  for (let mktIdx = 0; mktIdx < MARKET_ADDRESSES.length; mktIdx++) {
+    const mkt = MARKET_ADDRESSES[mktIdx];
+    const count = MARKET_RENTER_COUNTS[mktIdx];
+    const center = MARKET_CENTERS[`${mkt.city}, ${mkt.state}`];
+    if (!center) continue;
+
+    for (let i = 0; i < count; i++) {
+      const streetNum = pickRange(100, 9999, renterIdx * 3 + 1);
+      const street = mkt.streets[i % mkt.streets.length];
+      const zip = mkt.zips[i % mkt.zips.length];
+      const address = `${streetNum} ${street}, ${mkt.city}, ${mkt.state} ${zip}`;
+
+      // Deterministic offset: ±0.04° (~2.5 miles) scatter around center
+      const latOff = (seededRandom(renterIdx * 37 + 1) - 0.5) * 0.08;
+      const lngOff = (seededRandom(renterIdx * 41 + 2) - 0.5) * 0.08;
+
+      cache[address] = {
+        lat: center.lat + latOff,
+        lng: center.lng + lngOff,
+      };
+
+      renterIdx++;
+    }
+  }
+
+  return cache;
+}
+
 export { DEMO_USER_ID };
 export type { RenterRow, MachineRow, PaymentRow, MaintenanceRow, TimelineRow, OperatorSettingsRow };
