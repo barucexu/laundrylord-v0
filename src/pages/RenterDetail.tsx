@@ -436,6 +436,12 @@ export default function RenterDetail() {
                   <span className="text-[10px] text-muted-foreground">(secondary)</span>
                 </div>
               )}
+              {(renter as any).dryer_outlet && (
+                <div className="flex items-center gap-2.5 text-sm">
+                  <Plug className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs">{(renter as any).dryer_outlet} outlet</span>
+                </div>
+              )}
               {(renter as any).language && (renter as any).language !== "English" && (
                 <div className="flex items-center gap-2.5 text-sm">
                   <Globe className="h-3.5 w-3.5 text-muted-foreground" />
