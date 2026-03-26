@@ -174,11 +174,11 @@ export default function ImportPage() {
         <CardContent className="p-4 flex items-start gap-3">
           <Mail className="h-4 w-4 text-primary mt-0.5 shrink-0" />
           <div className="text-sm">
-            Importing your data didn't work like magic?{" "}
+            Importing your data didn't fully work?{" "}
             <a href="mailto:don.brucexu@gmail.com" className="text-primary font-medium hover:underline">
               Email don.brucexu@gmail.com
             </a>{" "}
-            for free manual data upload.
+            or text 8455987279 for free manual data upload.
           </div>
         </CardContent>
       </Card>
