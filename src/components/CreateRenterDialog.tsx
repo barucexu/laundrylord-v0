@@ -82,6 +82,7 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
         secondary_contact: form.secondary_contact.trim(),
         language: form.language,
         install_notes: form.install_notes.trim(),
+        dryer_outlet: form.dryer_outlet || null,
       } as any);
       toast.success(`${form.name} added as a new lead`);
       setForm({ name: "", phone: "", email: "", address: "", monthly_rate: "", rent_collected: "0", install_fee: "", install_fee_collected: false, deposit_amount: "", deposit_collected: false, late_fee: "", notes: "", secondary_contact: "", language: "English", install_notes: "" });
