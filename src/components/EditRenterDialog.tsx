@@ -106,6 +106,7 @@ export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialo
         secondary_contact: form.secondary_contact,
         language: form.language,
         install_notes: form.install_notes,
+        dryer_outlet: form.dryer_outlet || null,
       } as any);
       toast.success("Renter updated");
       onOpenChange(false);
