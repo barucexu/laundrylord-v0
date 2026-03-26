@@ -1,40 +1,24 @@
 
 
-# Add Dryer Outlet Type (3-Prong/4-Prong) to Renter Profile
+# Fix: Drag-and-Drop CSV Upload
 
-## Rationale
-The outlet type belongs to the renter's home, not the machine. Swapping a dryer cord is trivial — the outlet is fixed. Move this field to the renter level.
+## Problem
+The upload zone says "Drop a CSV file or click to browse" but only click works. Dragging a file onto it triggers the browser's default behavior (download/open) because there are no drag event handlers.
 
-## Changes
+## Fix — `src/pages/ImportPage.tsx`
 
-### 1. Database migration
-- Add `dryer_outlet` text column (nullable) to `renters` table
-- Keep `prong` on `machines` table for now (no destructive change)
+1. Add `onDragOver` handler on the label element that calls `e.preventDefault()` and `e.stopPropagation()` to suppress browser default behavior.
 
-### 2. `src/components/EditRenterDialog.tsx`
-- Add a "Dryer Outlet" select field (3-Prong / 4-Prong / None) in the contact/property info section, near the address field
+2. Add `onDrop` handler that:
+   - Calls `e.preventDefault()` and `e.stopPropagation()`
+   - Extracts `e.dataTransfer.files[0]`
+   - Validates it's a `.csv` file
+   - Passes it to the same `Papa.parse` logic already in `handleFileUpload`
 
-### 3. `src/components/CreateRenterDialog.tsx`
-- Add the same "Dryer Outlet" select field
+3. Extract the shared CSV parsing logic into a `processFile(file: File)` function so both the `<input onChange>` and the `onDrop` handler can call it.
 
-### 4. `src/pages/RenterDetail.tsx`
-- Display dryer outlet type in the Contact/Lease card area (e.g. near address)
-- Remove the "Prong" line from the machine cards (lines 486) since it's now on the renter
-
-### 5. `src/hooks/useSupabaseData.ts`
-- Include `dryer_outlet` in create/update renter mutations
-
-### 6. `src/data/demo-seed-data.ts`
-- Add `dryer_outlet` to demo renters (realistic distribution: ~60% 3-prong, ~35% 4-prong, ~5% null)
-
-### 7. `src/pages/RentersList.tsx`
-- Optionally show outlet type as a column (low priority, skip if table is already dense)
+4. Add a `dragging` state boolean to show a visual highlight (e.g. `border-primary bg-primary/5`) when a file is dragged over the zone, using `onDragEnter`/`onDragLeave` to toggle it.
 
 ## Files Modified
-- **Migration**: add `dryer_outlet` column to `renters`
-- `src/components/EditRenterDialog.tsx`
-- `src/components/CreateRenterDialog.tsx`
-- `src/pages/RenterDetail.tsx`
-- `src/hooks/useSupabaseData.ts`
-- `src/data/demo-seed-data.ts`
+- `src/pages/ImportPage.tsx`
 
