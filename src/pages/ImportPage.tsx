@@ -50,13 +50,12 @@ export default function ImportPage() {
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<{ imported: number; skipped: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
 
   const fields = tab === "customers" ? CUSTOMER_FIELDS : MACHINE_FIELDS;
 
-  const handleFileUpload = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+  const processFile = useCallback(
+    (file: File) => {
       Papa.parse(file, {
         complete: (results) => {
           const data = results.data as string[][];
@@ -68,17 +67,13 @@ export default function ImportPage() {
           setHeaders(csvHeaders);
           setRawData(data.slice(1).filter((row) => row.some((c) => c.trim())));
 
-          // Auto-map columns
           const autoMap: Record<string, string> = {};
           fields.forEach((f) => {
             const match = csvHeaders.findIndex(
               (h) =>
                 h.toLowerCase().replace(/[_\s#]/g, "") === f.key.toLowerCase().replace(/_/g, "") ||
                 h.toLowerCase().includes(
-                  f.label
-                    .toLowerCase()
-                    .replace(/[#$()]/g, "")
-                    .trim(),
+                  f.label.toLowerCase().replace(/[#$()]/g, "").trim(),
                 ),
             );
             if (match >= 0) autoMap[f.key] = csvHeaders[match];
@@ -91,6 +86,48 @@ export default function ImportPage() {
     },
     [fields],
   );
+
+  const handleFileUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      processFile(file);
+    },
+    [processFile],
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDragging(false);
+      const file = e.dataTransfer.files?.[0];
+      if (!file) return;
+      if (!file.name.toLowerCase().endsWith(".csv")) {
+        toast.error("Please drop a .csv file");
+        return;
+      }
+      processFile(file);
+    },
+    [processFile],
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragging(false);
+  }, []);
 
   const handleImport = async () => {
     if (!user) return;
