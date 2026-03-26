@@ -28,7 +28,6 @@ serve(async (req) => {
     const { renter_id } = await req.json();
     if (!renter_id) throw new Error("renter_id is required");
 
-    // Fetch renter
     const { data: renter, error: renterError } = await supabase
       .from("renters")
       .select("*")
@@ -37,20 +36,19 @@ serve(async (req) => {
       .single();
     if (renterError || !renter) throw new Error("Renter not found");
 
-    // Get operator's Stripe key
-    const { data: settings } = await supabase
-      .from("operator_settings")
-      .select("stripe_secret_key")
+    // Get operator's Stripe key from server-only table
+    const { data: keyRow } = await supabase
+      .from("stripe_keys")
+      .select("encrypted_key")
       .eq("user_id", userData.user.id)
       .maybeSingle();
-    const stripeKey = settings?.stripe_secret_key;
+    const stripeKey = keyRow?.encrypted_key;
     if (!stripeKey) throw new Error("Stripe not connected. Add your Stripe key in Settings.");
 
     const stripe = new Stripe(stripeKey, {
       apiVersion: "2025-08-27.basil",
     });
 
-    // Find or create Stripe customer
     let customerId = renter.stripe_customer_id;
     if (!customerId) {
       const customer = await stripe.customers.create({

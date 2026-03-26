@@ -230,7 +230,7 @@ export default function SettingsPage() {
                 <div className="relative flex-1">
                   <Input
                     type={showKey ? "text" : "password"}
-                    placeholder="sk_test_••••••••••••"
+                    placeholder={stripe?.connected ? "sk_****••••••••••••" : "sk_test_••••••••••••"}
                     value={stripeKey}
                     onChange={e => setStripeKey(e.target.value)}
                     className="font-mono pr-8 h-8 text-sm"

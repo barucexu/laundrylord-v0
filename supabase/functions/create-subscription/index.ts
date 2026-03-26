@@ -37,11 +37,6 @@ serve(async (req) => {
     if (renterError || !renter) throw new Error("Renter not found");
     if (!renter.stripe_customer_id) throw new Error("Renter has no card on file. Send setup link first.");
     if (renter.stripe_subscription_id) {
-      console.log("[CREATE-SUBSCRIPTION] Renter already has subscription", {
-        renter_id,
-        subscription_id: renter.stripe_subscription_id,
-        next_due_date: renter.next_due_date,
-      });
       return new Response(JSON.stringify({
         subscription_id: renter.stripe_subscription_id,
         status: renter.status,
@@ -53,13 +48,13 @@ serve(async (req) => {
       });
     }
 
-    // Get operator's Stripe key
-    const { data: settings } = await supabase
-      .from("operator_settings")
-      .select("stripe_secret_key")
+    // Get operator's Stripe key from server-only table
+    const { data: keyRow } = await supabase
+      .from("stripe_keys")
+      .select("encrypted_key")
       .eq("user_id", userData.user.id)
       .maybeSingle();
-    const stripeKey = settings?.stripe_secret_key;
+    const stripeKey = keyRow?.encrypted_key;
     if (!stripeKey) throw new Error("Stripe not connected. Add your Stripe key in Settings.");
 
     const stripe = new Stripe(stripeKey, {
@@ -127,11 +122,6 @@ serve(async (req) => {
         Math.min(anchorDay, 28)
       ));
       nextDue = fallbackDue.toISOString().split("T")[0];
-      console.log("[CREATE-SUBSCRIPTION] Missing/invalid current_period_end, using fallback", {
-        subscriptionId: subscription.id,
-        current_period_end: subscription.current_period_end,
-        nextDue,
-      });
     }
 
     await supabase
