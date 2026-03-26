@@ -1,5 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useMachines, useRenters } from "@/hooks/useSupabaseData";
@@ -7,26 +6,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Box, MapPin, AlertCircle } from "lucide-react";
 
-// Fix Leaflet default marker icons
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
-});
-
 const statusColors: Record<string, string> = {
-  assigned: "#2563eb",
-  rented: "#2563eb",
-  available: "#6b7280",
-  maintenance: "#d97706",
-  retired: "#9ca3af",
+  assigned: "hsl(215 65% 48%)",
+  rented: "hsl(215 65% 48%)",
+  available: "hsl(0 0% 55%)",
+  maintenance: "hsl(38 88% 50%)",
+  retired: "hsl(0 0% 72%)",
 };
 
 function createIcon(color: string) {
   return L.divIcon({
-    className: "",
-    html: `<div style="width:12px;height:12px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>`,
+    className: "machine-map-marker",
+    html: `<div style="width:12px;height:12px;border-radius:9999px;background:${color};border:2px solid hsl(0 0% 100%);box-shadow:0 1px 3px hsl(0 0% 0% / 0.25);"></div>`,
     iconSize: [12, 12],
     iconAnchor: [6, 6],
   });
@@ -36,32 +27,25 @@ interface GeoCache {
   [address: string]: { lat: number; lng: number } | null;
 }
 
-function FitBounds({ positions }: { positions: [number, number][] }) {
-  const map = useMap();
-  useEffect(() => {
-    if (positions.length > 0) {
-      const bounds = L.latLngBounds(positions.map(p => L.latLng(p[0], p[1])));
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
-    }
-  }, [positions, map]);
-  return null;
-}
-
 export default function MachineMapPage() {
   const { data: machines = [], isLoading: loadingMachines } = useMachines();
   const { data: renters = [], isLoading: loadingRenters } = useRenters();
   const [geoCache, setGeoCache] = useState<GeoCache>({});
   const [geocoding, setGeocoding] = useState(false);
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const markersLayerRef = useRef<L.LayerGroup | null>(null);
 
   const renterMap = useMemo(() => {
-    const m: Record<string, typeof renters[0]> = {};
-    renters.forEach(r => { m[r.id] = r; });
-    return m;
+    const mappedRenters: Record<string, typeof renters[number]> = {};
+    renters.forEach((renter) => {
+      mappedRenters[renter.id] = renter;
+    });
+    return mappedRenters;
   }, [renters]);
 
-  // Build machine-to-address mapping
   const machineAddresses = useMemo(() => {
-    return machines.map(machine => {
+    return machines.map((machine) => {
       const renter = machine.assigned_renter_id ? renterMap[machine.assigned_renter_id] : null;
       const address = renter?.address || null;
       return { machine, renter, address };
@@ -69,82 +53,161 @@ export default function MachineMapPage() {
   }, [machines, renterMap]);
 
   const uniqueAddresses = useMemo(() => {
-    const addrs = new Set<string>();
+    const addresses = new Set<string>();
     machineAddresses.forEach(({ address }) => {
-      if (address && address.trim()) addrs.add(address.trim());
+      if (address?.trim()) addresses.add(address.trim());
     });
-    return Array.from(addrs);
+    return Array.from(addresses);
   }, [machineAddresses]);
 
-  // Geocode addresses with rate limiting
   const geocodeAddresses = useCallback(async () => {
-    const toGeocode = uniqueAddresses.filter(a => !(a in geoCache));
+    const toGeocode = uniqueAddresses.filter((address) => !(address in geoCache));
     if (toGeocode.length === 0) return;
 
     setGeocoding(true);
-    const newCache: GeoCache = { ...geoCache };
+    const nextCache: GeoCache = { ...geoCache };
 
-    for (const addr of toGeocode) {
+    for (const address of toGeocode) {
       try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr)}&format=json&limit=1`,
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`,
           { headers: { "User-Agent": "LaundryLord/1.0" } }
         );
-        const data = await res.json();
-        if (data.length > 0) {
-          newCache[addr] = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+          nextCache[address] = {
+            lat: Number.parseFloat(data[0].lat),
+            lng: Number.parseFloat(data[0].lon),
+          };
         } else {
-          newCache[addr] = null;
+          nextCache[address] = null;
         }
       } catch {
-        newCache[addr] = null;
+        nextCache[address] = null;
       }
-      // Rate limit: 1 req/sec for Nominatim
-      await new Promise(r => setTimeout(r, 1100));
+
+      await new Promise((resolve) => setTimeout(resolve, 1100));
     }
 
-    setGeoCache(newCache);
+    setGeoCache(nextCache);
     setGeocoding(false);
-  }, [uniqueAddresses, geoCache]);
+  }, [geoCache, uniqueAddresses]);
 
   useEffect(() => {
     if (!loadingMachines && !loadingRenters && uniqueAddresses.length > 0) {
-      geocodeAddresses();
+      void geocodeAddresses();
     }
-  }, [loadingMachines, loadingRenters, uniqueAddresses.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loadingMachines, loadingRenters, uniqueAddresses, geocodeAddresses]);
 
-  // Split machines into mapped vs unmatched
   const { mapped, unmatched } = useMemo(() => {
-    const mapped: Array<{ machine: typeof machines[0]; renter: typeof renters[0] | null; address: string; lat: number; lng: number }> = [];
-    const unmatched: Array<{ machine: typeof machines[0]; renter: typeof renters[0] | null; reason: string }> = [];
+    const mappedMachines: Array<{
+      machine: typeof machines[number];
+      renter: typeof renters[number] | null;
+      address: string;
+      lat: number;
+      lng: number;
+    }> = [];
+    const unmatchedMachines: Array<{
+      machine: typeof machines[number];
+      renter: typeof renters[number] | null;
+      reason: string;
+    }> = [];
 
     machineAddresses.forEach(({ machine, renter, address }) => {
-      if (!address || !address.trim()) {
-        unmatched.push({ machine, renter, reason: renter ? "No address on file" : "Not assigned to a renter" });
+      if (!address?.trim()) {
+        unmatchedMachines.push({
+          machine,
+          renter,
+          reason: renter ? "No address on file" : "Not assigned to a renter",
+        });
         return;
       }
-      const geo = geoCache[address.trim()];
-      if (geo) {
-        mapped.push({ machine, renter, address: address.trim(), lat: geo.lat, lng: geo.lng });
-      } else if (geo === null) {
-        unmatched.push({ machine, renter, reason: "Address could not be geocoded" });
+
+      const geocoded = geoCache[address.trim()];
+      if (geocoded) {
+        mappedMachines.push({
+          machine,
+          renter,
+          address: address.trim(),
+          lat: geocoded.lat,
+          lng: geocoded.lng,
+        });
+      } else if (geocoded === null) {
+        unmatchedMachines.push({ machine, renter, reason: "Address could not be geocoded" });
       }
-      // If geo is undefined, still geocoding — don't put in unmatched yet
     });
 
-    return { mapped, unmatched };
-  }, [machineAddresses, geoCache]);
+    return { mapped: mappedMachines, unmatched: unmatchedMachines };
+  }, [geoCache, machineAddresses, machines, renters]);
 
-  const positions: [number, number][] = mapped.map(m => [m.lat, m.lng]);
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    const map = L.map(mapContainerRef.current, {
+      center: [33.749, -84.388],
+      zoom: 10,
+      scrollWheelZoom: true,
+    });
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+
+    markersLayerRef.current = L.layerGroup().addTo(map);
+    mapRef.current = map;
+
+    return () => {
+      markersLayerRef.current?.clearLayers();
+      markersLayerRef.current = null;
+      map.remove();
+      mapRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const markersLayer = markersLayerRef.current;
+    if (!map || !markersLayer) return;
+
+    markersLayer.clearLayers();
+
+    if (mapped.length === 0) {
+      map.setView([33.749, -84.388], 10);
+      return;
+    }
+
+    const bounds = L.latLngBounds([]);
+
+    mapped.forEach((item) => {
+      const marker = L.marker([item.lat, item.lng], {
+        icon: createIcon(statusColors[item.machine.status] || "hsl(0 0% 55%)"),
+      });
+
+      marker.bindPopup(`
+        <div style="font-size:12px;line-height:1.4;min-width:160px;">
+          <div style="font-weight:600;">${item.machine.type} — ${item.machine.model}</div>
+          <div style="color:hsl(0 0% 45%);">SN: ${item.machine.serial}</div>
+          ${item.renter ? `<div>Renter: <strong>${item.renter.name}</strong></div>` : ""}
+          <div style="color:hsl(0 0% 45%);">${item.address}</div>
+          <div style="margin-top:6px;text-transform:capitalize;">${item.machine.status}</div>
+        </div>
+      `);
+
+      marker.addTo(markersLayer);
+      bounds.extend([item.lat, item.lng]);
+    });
+
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+    }
+  }, [mapped]);
+
   const isLoading = loadingMachines || loadingRenters;
-
-  // Default center: Atlanta
-  const defaultCenter: [number, number] = [33.749, -84.388];
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
           <MapPin className="h-4 w-4" /> Machine Map
         </h1>
         {geocoding && (
@@ -160,46 +223,16 @@ export default function MachineMapPage() {
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
       ) : (
-        <div className="grid lg:grid-cols-[1fr_320px] gap-3">
-          {/* Map */}
+        <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
           <Card className="overflow-hidden">
             <CardContent className="p-0">
-              <MapContainer
-                center={defaultCenter}
-                zoom={10}
-                style={{ height: "calc(100vh - 180px)", width: "100%" }}
-                scrollWheelZoom={true}
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                {positions.length > 0 && <FitBounds positions={positions} />}
-                {mapped.map((item, i) => (
-                  <Marker
-                    key={`${item.machine.id}-${i}`}
-                    position={[item.lat, item.lng]}
-                    icon={createIcon(statusColors[item.machine.status] || "#6b7280")}
-                  >
-                    <Popup>
-                      <div className="text-xs space-y-1 min-w-[160px]">
-                        <div className="font-semibold">{item.machine.type} — {item.machine.model}</div>
-                        <div className="text-muted-foreground">SN: {item.machine.serial}</div>
-                        {item.renter && <div>Renter: <strong>{item.renter.name}</strong></div>}
-                        <div className="text-muted-foreground">{item.address}</div>
-                        <Badge variant="outline" className="text-[10px] mt-1">{item.machine.status}</Badge>
-                      </div>
-                    </Popup>
-                  </Marker>
-                ))}
-              </MapContainer>
+              <div ref={mapContainerRef} className="h-[calc(100vh-180px)] w-full min-h-[420px]" />
             </CardContent>
           </Card>
 
-          {/* Unmatched Machines */}
           <Card>
-            <CardHeader className="pb-1 pt-3 px-4">
-              <CardTitle className="text-sm flex items-center gap-1.5">
+            <CardHeader className="px-4 pb-1 pt-3">
+              <CardTitle className="flex items-center gap-1.5 text-sm">
                 <AlertCircle className="h-3.5 w-3.5 text-muted-foreground" />
                 Not on Map ({unmatched.length})
               </CardTitle>
@@ -210,22 +243,24 @@ export default function MachineMapPage() {
                   <p className="text-xs text-muted-foreground">All machines are mapped.</p>
                 </div>
               ) : (
-                <div className="divide-y max-h-[calc(100vh-260px)] overflow-y-auto">
+                <div className="max-h-[calc(100vh-260px)] divide-y overflow-y-auto">
                   {unmatched.map(({ machine, renter, reason }) => (
                     <div key={machine.id} className="px-4 py-2">
                       <div className="flex items-center gap-1.5">
-                        <Box className="h-3 w-3 text-muted-foreground shrink-0" />
-                        <span className="text-xs font-medium truncate">{machine.type} — {machine.model}</span>
+                        <Box className="h-3 w-3 shrink-0 text-muted-foreground" />
+                        <span className="truncate text-xs font-medium">
+                          {machine.type} — {machine.model}
+                        </span>
                       </div>
-                      <div className="text-[10px] text-muted-foreground mt-0.5 ml-[18px]">
+                      <div className="ml-[18px] mt-0.5 text-[10px] text-muted-foreground">
                         SN: {machine.serial}
                       </div>
                       {renter && (
-                        <div className="text-[10px] text-muted-foreground ml-[18px]">
+                        <div className="ml-[18px] text-[10px] text-muted-foreground">
                           Renter: {renter.name}
                         </div>
                       )}
-                      <div className="text-[10px] text-warning ml-[18px]">{reason}</div>
+                      <div className="ml-[18px] text-[10px] text-warning">{reason}</div>
                     </div>
                   ))}
                 </div>
@@ -233,15 +268,30 @@ export default function MachineMapPage() {
             </CardContent>
           </Card>
 
-          {/* Legend */}
-          <div className="lg:col-span-2 flex items-center gap-4 text-[10px] text-muted-foreground px-1">
-            {Object.entries({ assigned: "Assigned/Rented", available: "Available", maintenance: "Maintenance", retired: "Retired" }).map(([status, label]) => (
+          <div className="flex items-center gap-4 px-1 text-[10px] text-muted-foreground lg:col-span-2">
+            {Object.entries({
+              assigned: "Assigned/Rented",
+              available: "Available",
+              maintenance: "Maintenance",
+              retired: "Retired",
+            }).map(([status, label]) => (
               <div key={status} className="flex items-center gap-1">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: statusColors[status] }} />
+                <div
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: statusColors[status] }}
+                />
                 {label}
               </div>
             ))}
           </div>
+
+          {mapped.length > 0 && (
+            <div className="lg:col-span-2 flex flex-wrap gap-2 px-1">
+              <Badge variant="outline" className="text-[10px]">
+                {mapped.length} machine{mapped.length === 1 ? "" : "s"} mapped
+              </Badge>
+            </div>
+          )}
         </div>
       )}
     </div>
