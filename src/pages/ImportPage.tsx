@@ -236,7 +236,13 @@ export default function ImportPage() {
           {step === "upload" && (
             <Card>
               <CardContent className="p-8">
-                <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-lg p-12 cursor-pointer hover:bg-muted/30 transition-colors">
+                <label
+                  className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-12 cursor-pointer transition-colors ${dragging ? "border-primary bg-primary/5" : "border-border hover:bg-muted/30"}`}
+                  onDragOver={handleDragOver}
+                  onDragEnter={handleDragEnter}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
                   <Upload className="h-8 w-8 text-muted-foreground mb-3" />
                   <span className="text-sm font-medium">Drop a CSV file or click to browse</span>
                   <span className="text-xs text-muted-foreground mt-1">Supports .csv files</span>
