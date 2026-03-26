@@ -13,6 +13,7 @@ import {
   SidebarMenuItem,
   SidebarHeader,
   SidebarFooter,
+  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 
@@ -39,9 +40,10 @@ export function AppSidebar() {
           <div className="flex items-center gap-2.5">
             <img src={logoImg} alt="LaundryLord" className="h-8 w-8 rounded-lg object-contain" />
             <span className="font-semibold text-foreground text-base tracking-tight">LaundryLord</span>
+            <SidebarTrigger className="ml-auto h-7 w-7 text-muted-foreground hover:text-foreground" />
           </div>
         ) : (
-          <img src={logoImg} alt="LaundryLord" className="h-8 w-8 rounded-lg object-contain mx-auto" />
+          <SidebarTrigger className="h-7 w-7 mx-auto text-muted-foreground hover:text-foreground" />
         )}
       </SidebarHeader>
       <SidebarContent className="px-2">
