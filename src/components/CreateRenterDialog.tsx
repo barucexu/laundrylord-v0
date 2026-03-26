@@ -85,7 +85,7 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
         dryer_outlet: form.dryer_outlet || null,
       } as any);
       toast.success(`${form.name} added as a new lead`);
-      setForm({ name: "", phone: "", email: "", address: "", monthly_rate: "", rent_collected: "0", install_fee: "", install_fee_collected: false, deposit_amount: "", deposit_collected: false, late_fee: "", notes: "", secondary_contact: "", language: "English", install_notes: "" });
+      setForm({ name: "", phone: "", email: "", address: "", monthly_rate: "", rent_collected: "0", install_fee: "", install_fee_collected: false, deposit_amount: "", deposit_collected: false, late_fee: "", notes: "", secondary_contact: "", language: "English", install_notes: "", dryer_outlet: "" });
       setStartDate(undefined);
       onOpenChange(false);
     } catch (err: any) {
