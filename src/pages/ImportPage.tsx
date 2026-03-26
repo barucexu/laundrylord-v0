@@ -1,41 +1,58 @@
 import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Upload, CheckCircle, Mail, AlertTriangle } from "lucide-react";
+import { Upload, CheckCircle, Mail, AlertTriangle, ChevronDown, Link2, User, Cpu } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { SupportFooter } from "@/components/SupportFooter";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
-import { ParsedData } from "@/utils/import/types";
-import { RENTER_FIELDS, MACHINE_FIELDS } from "@/utils/import/fields";
+import { ParsedData, ImportMode, ImportField } from "@/utils/import/types";
+import { RENTER_FIELDS, MACHINE_FIELDS, getCombinedFields, resolveFieldKey } from "@/utils/import/fields";
 import { parseCSV } from "@/utils/import/csv-parser";
 import { parseXLSX } from "@/utils/import/xlsx-parser";
 import { parseImage } from "@/utils/import/image-parser";
-import { autoMap } from "@/utils/import/auto-mapper";
-import { ensureRequiredFields } from "@/utils/import/placeholders";
+import { autoMap, autoMapCombined } from "@/utils/import/auto-mapper";
+import { ensureRequiredFields, ensureRequiredFieldsForGroup } from "@/utils/import/placeholders";
 
 type Step = "upload" | "map" | "preview" | "done";
+
+interface CombinedResult {
+  rentersCreated: number;
+  rentersMatched: number;
+  machinesCreated: number;
+  machinesMatched: number;
+  machinesLinked: number;
+  skipped: number;
+}
 
 export default function ImportPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<"customers" | "machines">("customers");
+  const [importMode, setImportMode] = useState<ImportMode>("combined");
   const [step, setStep] = useState<Step>("upload");
   const [rawData, setRawData] = useState<string[][]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [importing, setImporting] = useState(false);
-  const [result, setResult] = useState<{ imported: number; skipped: number } | null>(null);
+  const [result, setResult] = useState<CombinedResult | null>(null);
   const [dragging, setDragging] = useState(false);
   const [sourceType, setSourceType] = useState<ParsedData["sourceType"]>("csv");
   const [parsing, setParsing] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
-  const fields = tab === "customers" ? RENTER_FIELDS : MACHINE_FIELDS;
+  const combinedFields = getCombinedFields();
+
+  const getActiveFields = (): ImportField[] => {
+    if (importMode === "customers") return RENTER_FIELDS;
+    if (importMode === "machines") return MACHINE_FIELDS;
+    return combinedFields;
+  };
 
   const ACCEPTED_EXTENSIONS = [".csv", ".xlsx", ".png", ".jpg", ".jpeg"];
   const ACCEPT_STRING = ".csv,.xlsx,.png,.jpg,.jpeg";
@@ -62,7 +79,17 @@ export default function ImportPage() {
         setHeaders(parsed.headers);
         setRawData(parsed.rows);
         setSourceType(parsed.sourceType);
-        setMapping(autoMap(parsed.headers, fields));
+
+        // Auto-map based on current mode
+        const fields = importMode === "customers" ? RENTER_FIELDS
+          : importMode === "machines" ? MACHINE_FIELDS
+          : combinedFields;
+
+        const autoMapping = importMode === "combined"
+          ? autoMapCombined(parsed.headers, combinedFields)
+          : autoMap(parsed.headers, fields);
+
+        setMapping(autoMapping);
         setStep("map");
       } catch (err: any) {
         toast.error(err.message || "Failed to parse file");
@@ -70,7 +97,7 @@ export default function ImportPage() {
         setParsing(false);
       }
     },
-    [fields],
+    [importMode, combinedFields],
   );
 
   const handleFileUpload = useCallback(
@@ -111,69 +138,228 @@ export default function ImportPage() {
     setDragging(false);
   }, []);
 
+  const getMappedValue = (row: string[], fieldKey: string) => {
+    const csvCol = mapping[fieldKey];
+    if (!csvCol) return "";
+    const idx = headers.indexOf(csvCol);
+    return idx >= 0 ? row[idx]?.trim() || "" : "";
+  };
+
+  // Build payload for a group from a single row
+  const buildPayload = (row: string[], fields: ImportField[]): { record: Record<string, any>; hasContent: boolean } => {
+    const record: Record<string, any> = {};
+    let hasContent = false;
+
+    for (const f of fields) {
+      const csvCol = mapping[f.key];
+      if (!csvCol) continue;
+      const colIdx = headers.indexOf(csvCol);
+      if (colIdx < 0) continue;
+      const val = row[colIdx]?.trim() || "";
+      const dbKey = resolveFieldKey(f.key);
+      if (val) {
+        record[dbKey] = val;
+        hasContent = true;
+      }
+    }
+
+    return { record, hasContent };
+  };
+
+  const parseRenterRecord = (record: Record<string, any>) => {
+    for (const boolKey of ["install_fee_collected", "deposit_collected", "has_payment_method"]) {
+      if (record[boolKey] !== undefined) {
+        const v = String(record[boolKey]).toLowerCase();
+        record[boolKey] = v === "true" || v === "yes" || v === "1";
+      }
+    }
+    if (record.monthly_rate) record.monthly_rate = parseFloat(record.monthly_rate) || 150;
+    if (record.balance) record.balance = parseFloat(record.balance) || 0;
+    if (record.late_fee) record.late_fee = parseFloat(record.late_fee) || 25;
+    if (record.install_fee) record.install_fee = parseFloat(record.install_fee) || 75;
+    if (record.deposit_amount) record.deposit_amount = parseFloat(record.deposit_amount) || 0;
+  };
+
+  const parseMachineRecord = (record: Record<string, any>) => {
+    if (record.cost_basis) record.cost_basis = parseFloat(record.cost_basis) || 0;
+  };
+
+  // Dedup: try to find existing renter by email or phone
+  const findExistingRenter = async (record: Record<string, any>): Promise<string | null> => {
+    if (!user) return null;
+    if (record.email) {
+      const { data } = await supabase
+        .from("renters")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("email", record.email)
+        .limit(1);
+      if (data && data.length > 0) return data[0].id;
+    }
+    if (record.phone) {
+      const { data } = await supabase
+        .from("renters")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("phone", record.phone)
+        .limit(1);
+      if (data && data.length > 0) return data[0].id;
+    }
+    return null;
+  };
+
+  // Dedup: try to find existing machine by serial
+  const findExistingMachine = async (record: Record<string, any>): Promise<string | null> => {
+    if (!user) return null;
+    if (record.serial) {
+      const { data } = await supabase
+        .from("machines")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("serial", record.serial)
+        .limit(1);
+      if (data && data.length > 0) return data[0].id;
+    }
+    return null;
+  };
+
   const handleImport = async () => {
     if (!user) return;
     setImporting(true);
-    let imported = 0;
-    let skipped = 0;
+
+    const res: CombinedResult = {
+      rentersCreated: 0,
+      rentersMatched: 0,
+      machinesCreated: 0,
+      machinesMatched: 0,
+      machinesLinked: 0,
+      skipped: 0,
+    };
 
     try {
-      for (const row of rawData) {
-        const record: Record<string, any> = { user_id: user.id };
-        let hasRealContent = false;
+      const activeFields = getActiveFields();
+      const renterFields = activeFields.filter((f) => f.group === "renter");
+      const machineFields = activeFields.filter((f) => f.group === "machine");
 
-        fields.forEach((f) => {
-          const csvCol = mapping[f.key];
-          if (!csvCol) return;
-          const colIdx = headers.indexOf(csvCol);
-          if (colIdx < 0) return;
-          const val = row[colIdx]?.trim() || "";
-          if (val) {
-            record[f.key] = val;
-            hasRealContent = true;
+      if (importMode === "customers") {
+        // Customers-only mode
+        for (const row of rawData) {
+          const { record, hasContent } = buildPayload(row, renterFields);
+          if (!hasContent) { res.skipped++; continue; }
+          record.user_id = user.id;
+          parseRenterRecord(record);
+          ensureRequiredFields("customers", record);
+
+          const existingId = await findExistingRenter(record);
+          if (existingId) {
+            res.rentersMatched++;
+          } else {
+            const { error } = await supabase.from("renters").insert(record as any);
+            if (error) { console.error("Insert error:", error); res.skipped++; }
+            else res.rentersCreated++;
           }
-        });
-
-        if (!hasRealContent) {
-          skipped++;
-          continue;
         }
+      } else if (importMode === "machines") {
+        // Machines-only mode
+        for (const row of rawData) {
+          const { record, hasContent } = buildPayload(row, machineFields);
+          if (!hasContent) { res.skipped++; continue; }
+          record.user_id = user.id;
+          parseMachineRecord(record);
+          ensureRequiredFields("machines", record);
 
-        // Parse booleans
-        if (tab === "customers") {
-          for (const boolKey of ["install_fee_collected", "deposit_collected", "has_payment_method"]) {
-            if (record[boolKey] !== undefined) {
-              const v = String(record[boolKey]).toLowerCase();
-              record[boolKey] = v === "true" || v === "yes" || v === "1";
+          const existingId = await findExistingMachine(record);
+          if (existingId) {
+            res.machinesMatched++;
+          } else {
+            const { error } = await supabase.from("machines").insert(record as any);
+            if (error) { console.error("Insert error:", error); res.skipped++; }
+            else res.machinesCreated++;
+          }
+        }
+      } else {
+        // Combined mode
+        for (const row of rawData) {
+          const renterResult = buildPayload(row, renterFields);
+          const machineResult = buildPayload(row, machineFields);
+
+          if (!renterResult.hasContent && !machineResult.hasContent) {
+            res.skipped++;
+            continue;
+          }
+
+          let renterId: string | null = null;
+
+          // Handle renter side
+          if (renterResult.hasContent) {
+            const rRecord = renterResult.record;
+            rRecord.user_id = user.id;
+            parseRenterRecord(rRecord);
+            ensureRequiredFieldsForGroup("renter", rRecord);
+
+            const existingId = await findExistingRenter(rRecord);
+            if (existingId) {
+              renterId = existingId;
+              res.rentersMatched++;
+            } else {
+              const { data, error } = await supabase.from("renters").insert(rRecord as any).select("id").single();
+              if (error) {
+                console.error("Renter insert error:", error);
+              } else {
+                renterId = data.id;
+                res.rentersCreated++;
+              }
             }
           }
-          // Parse numerics
-          if (record.monthly_rate) record.monthly_rate = parseFloat(record.monthly_rate) || 150;
-          if (record.balance) record.balance = parseFloat(record.balance) || 0;
-          if (record.late_fee) record.late_fee = parseFloat(record.late_fee) || 25;
-          if (record.install_fee) record.install_fee = parseFloat(record.install_fee) || 75;
-          if (record.deposit_amount) record.deposit_amount = parseFloat(record.deposit_amount) || 0;
-        } else {
-          if (record.cost_basis) record.cost_basis = parseFloat(record.cost_basis) || 0;
-        }
 
-        // Fill placeholders for required DB fields
-        ensureRequiredFields(tab, record);
+          // Handle machine side
+          if (machineResult.hasContent) {
+            const mRecord = machineResult.record;
+            mRecord.user_id = user.id;
+            parseMachineRecord(mRecord);
+            ensureRequiredFieldsForGroup("machine", mRecord);
 
-        const table = tab === "customers" ? "renters" : "machines";
-        const { error } = await supabase.from(table).insert(record as any);
-        if (error) {
-          console.error("Insert error:", error);
-          skipped++;
-        } else {
-          imported++;
+            // Link to renter if we have one
+            if (renterId) {
+              mRecord.assigned_renter_id = renterId;
+              mRecord.status = "assigned";
+            }
+
+            const existingId = await findExistingMachine(mRecord);
+            if (existingId) {
+              res.machinesMatched++;
+              // If machine exists and is unassigned, link it
+              if (renterId) {
+                await supabase
+                  .from("machines")
+                  .update({ assigned_renter_id: renterId, status: "assigned" } as any)
+                  .eq("id", existingId)
+                  .is("assigned_renter_id", null);
+                res.machinesLinked++;
+              }
+            } else {
+              const { error } = await supabase.from("machines").insert(mRecord as any);
+              if (error) {
+                console.error("Machine insert error:", error);
+              } else {
+                res.machinesCreated++;
+                if (renterId) res.machinesLinked++;
+              }
+            }
+          }
         }
       }
 
-      setResult({ imported, skipped });
+      setResult(res);
       setStep("done");
-      queryClient.invalidateQueries({ queryKey: [tab === "customers" ? "renters" : "machines"] });
-      toast.success(`Imported ${imported} records${skipped > 0 ? `, ${skipped} skipped` : ""}`);
+      queryClient.invalidateQueries({ queryKey: ["renters"] });
+      queryClient.invalidateQueries({ queryKey: ["machines"] });
+
+      const totalCreated = res.rentersCreated + res.machinesCreated;
+      const totalMatched = res.rentersMatched + res.machinesMatched;
+      toast.success(
+        `Imported ${totalCreated} records${totalMatched > 0 ? `, matched ${totalMatched} existing` : ""}${res.skipped > 0 ? `, ${res.skipped} skipped` : ""}`
+      );
     } catch (err: any) {
       toast.error(err.message || "Import failed");
     } finally {
@@ -190,19 +376,58 @@ export default function ImportPage() {
     setSourceType("csv");
   };
 
-  const getMappedValue = (row: string[], fieldKey: string) => {
-    const csvCol = mapping[fieldKey];
-    if (!csvCol) return "";
-    const idx = headers.indexOf(csvCol);
-    return idx >= 0 ? row[idx]?.trim() || "" : "";
+  // Preview helpers
+  const getPreviewRowInfo = (row: string[]) => {
+    const activeFields = getActiveFields();
+    const renterFields = activeFields.filter((f) => f.group === "renter");
+    const machineFields = activeFields.filter((f) => f.group === "machine");
+
+    const renterData: { label: string; value: string; isPlaceholder: boolean }[] = [];
+    const machineData: { label: string; value: string; isPlaceholder: boolean }[] = [];
+
+    const collectFields = (fields: ImportField[], target: typeof renterData) => {
+      for (const f of fields) {
+        if (!mapping[f.key]) continue;
+        const val = getMappedValue(row, f.key);
+        target.push({
+          label: f.label,
+          value: val || f.placeholder || "—",
+          isPlaceholder: !val,
+        });
+      }
+    };
+
+    if (importMode !== "machines") collectFields(renterFields, renterData);
+    if (importMode !== "customers") collectFields(machineFields, machineData);
+
+    const hasRenter = renterData.some((d) => !d.isPlaceholder);
+    const hasMachine = machineData.some((d) => !d.isPlaceholder);
+
+    let linkResult = "";
+    if (importMode === "combined") {
+      if (hasRenter && hasMachine) linkResult = "Will create renter + machine and link them";
+      else if (hasRenter) linkResult = "Will create renter only";
+      else if (hasMachine) linkResult = "Will create machine only";
+      else linkResult = "Will be skipped (blank row)";
+    } else if (importMode === "customers") {
+      linkResult = hasRenter ? "Will create renter" : "Will be skipped";
+    } else {
+      linkResult = hasMachine ? "Will create machine" : "Will be skipped";
+    }
+
+    return { renterData, machineData, hasRenter, hasMachine, linkResult };
   };
+
+  const activeFields = getActiveFields();
+  const renterFieldsForMapping = activeFields.filter((f) => f.group === "renter");
+  const machineFieldsForMapping = activeFields.filter((f) => f.group === "machine");
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Import Data</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Upload a CSV, Excel, or image file to import customers or machines in bulk
+          Upload a CSV, Excel, or image file to import your data
         </p>
       </div>
 
@@ -219,20 +444,9 @@ export default function ImportPage() {
         </CardContent>
       </Card>
 
-      <Tabs
-        value={tab}
-        onValueChange={(v) => {
-          setTab(v as any);
-          reset();
-        }}
-      >
-        <TabsList>
-          <TabsTrigger value="customers">Customers</TabsTrigger>
-          <TabsTrigger value="machines">Machines</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value={tab} className="space-y-4 mt-4">
-          {step === "upload" && (
+      <div className="space-y-4">
+        {step === "upload" && (
+          <>
             <Card>
               <CardContent className="p-8">
                 <label
@@ -249,7 +463,7 @@ export default function ImportPage() {
                     {parsing ? "Parsing file..." : "Drop a CSV, Excel, or image file — or click to browse"}
                   </span>
                   <span className="text-xs text-muted-foreground mt-1">
-                    Supports .csv, .xlsx, .png, .jpg
+                    Supports .csv, .xlsx, .png, .jpg — renter data, machine data, or both
                   </span>
                   <input
                     type="file"
@@ -260,111 +474,229 @@ export default function ImportPage() {
                 </label>
               </CardContent>
             </Card>
-          )}
 
-          {step === "map" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Map Columns</CardTitle>
-                <CardDescription>
-                  Match your file columns to {tab} fields. {rawData.length} rows detected.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {sourceType === "image" && (
-                  <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 border border-amber-200 text-sm text-amber-800 mb-2">
-                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                    <span>Imported from image — check mappings carefully. OCR may have errors.</span>
-                  </div>
-                )}
+            <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground gap-1">
+                  <ChevronDown className={`h-3 w-3 transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
+                  Advanced options
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <Card className="mt-2">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-3">
+                      By default, the importer handles both customer and machine data. Narrow if needed:
+                    </p>
+                    <div className="flex gap-2">
+                      {(["combined", "customers", "machines"] as ImportMode[]).map((mode) => (
+                        <Button
+                          key={mode}
+                          variant={importMode === mode ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setImportMode(mode)}
+                          className="text-xs"
+                        >
+                          {mode === "combined" ? "Default (Both)" : mode === "customers" ? "Customers only" : "Machines only"}
+                        </Button>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </CollapsibleContent>
+            </Collapsible>
+          </>
+        )}
 
-                {/* Column headers */}
-                <div className="flex items-center gap-3 pb-2 border-b">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground w-40 shrink-0">
-                    LaundryLord Field
-                  </span>
-                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex-1">
-                    Your File's Column
-                  </span>
+        {step === "map" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Map Columns</CardTitle>
+              <CardDescription>
+                Match your file columns to LaundryLord fields. {rawData.length} rows detected.
+                {importMode === "combined" && " Renter and machine fields are shown together."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {sourceType === "image" && (
+                <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 border border-amber-200 text-sm text-amber-800 mb-2">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>Imported from image — check mappings carefully. OCR may have errors.</span>
                 </div>
+              )}
 
-                {fields.map((f) => (
-                  <div key={f.key} className="flex items-center gap-3">
-                    <span className="text-sm w-40 shrink-0">{f.label}</span>
-                    <Select
-                      value={mapping[f.key] || "skip"}
-                      onValueChange={(v) =>
-                        setMapping((m) => ({ ...m, [f.key]: v === "skip" ? "" : v }))
-                      }
-                    >
-                      <SelectTrigger className="flex-1">
-                        <SelectValue placeholder="Skip" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="skip">— Skip —</SelectItem>
-                        {headers.map((h) => (
-                          <SelectItem key={h} value={h}>
-                            {h}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+              {/* Column headers */}
+              <div className="flex items-center gap-3 pb-2 border-b">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground w-44 shrink-0">
+                  LaundryLord's Label
+                </span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex-1">
+                  Your Imported Data's Section Title
+                </span>
+              </div>
+
+              {/* Renter fields section */}
+              {renterFieldsForMapping.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2 pt-2">
+                    <User className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Renter Fields
+                    </span>
+                    <Separator className="flex-1" />
                   </div>
-                ))}
-                <div className="flex gap-2 pt-4">
-                  <Button variant="outline" onClick={reset}>
-                    Back
-                  </Button>
-                  <Button onClick={() => setStep("preview")}>Preview Import</Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                  {renterFieldsForMapping.map((f) => (
+                    <div key={f.key} className="flex items-center gap-3">
+                      <span className="text-sm w-44 shrink-0">{f.label}</span>
+                      <Select
+                        value={mapping[f.key] || "skip"}
+                        onValueChange={(v) =>
+                          setMapping((m) => ({ ...m, [f.key]: v === "skip" ? "" : v }))
+                        }
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Skip" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="skip">— Skip —</SelectItem>
+                          {headers.map((h) => (
+                            <SelectItem key={h} value={h}>
+                              {h}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </>
+              )}
 
-          {step === "preview" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Preview</CardTitle>
-                <CardDescription>
-                  Showing first {Math.min(10, rawData.length)} of {rawData.length} rows.
-                  {sourceType === "image" && " OCR results may need manual cleanup after import."}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0 overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {fields
-                        .filter((f) => mapping[f.key])
-                        .map((f) => (
-                          <TableHead key={f.key}>{f.label}</TableHead>
-                        ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rawData.slice(0, 10).map((row, i) => (
-                      <TableRow key={i}>
-                        {fields
-                          .filter((f) => mapping[f.key])
-                          .map((f) => {
-                            const val = getMappedValue(row, f.key);
-                            const placeholder = !val && f.placeholder;
-                            return (
-                              <TableCell key={f.key} className="text-xs font-mono">
-                                {val || (
-                                  <span className="text-muted-foreground italic">
-                                    {placeholder || "—"}
-                                  </span>
-                                )}
-                              </TableCell>
-                            );
-                          })}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-              <div className="p-4 flex gap-2">
+              {/* Machine fields section */}
+              {machineFieldsForMapping.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2 pt-4">
+                    <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Machine Fields
+                    </span>
+                    <Separator className="flex-1" />
+                  </div>
+                  {machineFieldsForMapping.map((f) => (
+                    <div key={f.key} className="flex items-center gap-3">
+                      <span className="text-sm w-44 shrink-0">{f.label}</span>
+                      <Select
+                        value={mapping[f.key] || "skip"}
+                        onValueChange={(v) =>
+                          setMapping((m) => ({ ...m, [f.key]: v === "skip" ? "" : v }))
+                        }
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Skip" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="skip">— Skip —</SelectItem>
+                          {headers.map((h) => (
+                            <SelectItem key={h} value={h}>
+                              {h}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              <div className="flex gap-2 pt-4">
+                <Button variant="outline" onClick={reset}>
+                  Back
+                </Button>
+                <Button onClick={() => setStep("preview")}>Preview Import</Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {step === "preview" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Preview</CardTitle>
+              <CardDescription>
+                Showing first {Math.min(5, rawData.length)} of {rawData.length} rows.
+                {sourceType === "image" && " OCR results may need manual cleanup after import."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {rawData.slice(0, 5).map((row, i) => {
+                const info = getPreviewRowInfo(row);
+                return (
+                  <Card key={i} className="border-border/50">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">Row {i + 1}</span>
+                        <Badge variant="outline" className="text-xs font-normal">
+                          {info.linkResult}
+                        </Badge>
+                      </div>
+
+                      {info.renterData.length > 0 && info.hasRenter && (
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <User className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                              Renter Record
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                            {info.renterData.map((d) => (
+                              <div key={d.label} className="flex items-baseline gap-1.5 text-xs">
+                                <span className="text-muted-foreground shrink-0">{d.label}:</span>
+                                <span className={d.isPlaceholder ? "text-muted-foreground/50 italic" : ""}>
+                                  {d.value}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {info.machineData.length > 0 && info.hasMachine && (
+                        <div>
+                          {info.hasRenter && <Separator className="my-2" />}
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <Cpu className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                              Machine Record
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                            {info.machineData.map((d) => (
+                              <div key={d.label} className="flex items-baseline gap-1.5 text-xs">
+                                <span className="text-muted-foreground shrink-0">{d.label}:</span>
+                                <span className={d.isPlaceholder ? "text-muted-foreground/50 italic" : ""}>
+                                  {d.value}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {importMode === "combined" && info.hasRenter && info.hasMachine && (
+                        <>
+                          <Separator className="my-1" />
+                          <div className="flex items-center gap-1.5 text-xs text-primary">
+                            <Link2 className="h-3 w-3" />
+                            <span>Machine will be linked to renter</span>
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+
+              <div className="flex gap-2 pt-2">
                 <Button variant="outline" onClick={() => setStep("map")}>
                   Back
                 </Button>
@@ -372,27 +704,48 @@ export default function ImportPage() {
                   {importing ? "Importing..." : `Import ${rawData.length} rows`}
                 </Button>
               </div>
-            </Card>
-          )}
+            </CardContent>
+          </Card>
+        )}
 
-          {step === "done" && result && (
-            <Card>
-              <CardContent className="p-8 text-center space-y-4">
-                <CheckCircle className="h-12 w-12 text-success mx-auto" />
-                <div>
-                  <div className="text-lg font-semibold">{result.imported} records imported</div>
-                  {result.skipped > 0 && (
-                    <div className="text-sm text-muted-foreground">
-                      {result.skipped} rows skipped (blank or failed to insert)
-                    </div>
-                  )}
-                </div>
-                <Button onClick={reset}>Import More</Button>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      </Tabs>
+        {step === "done" && result && (
+          <Card>
+            <CardContent className="p-8 text-center space-y-4">
+              <CheckCircle className="h-12 w-12 text-primary mx-auto" />
+              <div className="space-y-1">
+                {(result.rentersCreated > 0 || result.rentersMatched > 0) && (
+                  <div className="text-sm">
+                    <span className="font-semibold">{result.rentersCreated}</span> renters created
+                    {result.rentersMatched > 0 && (
+                      <span className="text-muted-foreground"> · {result.rentersMatched} matched existing</span>
+                    )}
+                  </div>
+                )}
+                {(result.machinesCreated > 0 || result.machinesMatched > 0) && (
+                  <div className="text-sm">
+                    <span className="font-semibold">{result.machinesCreated}</span> machines created
+                    {result.machinesMatched > 0 && (
+                      <span className="text-muted-foreground"> · {result.machinesMatched} matched existing</span>
+                    )}
+                  </div>
+                )}
+                {result.machinesLinked > 0 && (
+                  <div className="text-sm text-primary">
+                    <Link2 className="h-3 w-3 inline mr-1" />
+                    {result.machinesLinked} machines linked to renters
+                  </div>
+                )}
+                {result.skipped > 0 && (
+                  <div className="text-sm text-muted-foreground">
+                    {result.skipped} rows skipped (blank or failed)
+                  </div>
+                )}
+              </div>
+              <Button onClick={reset}>Import More</Button>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       <SupportFooter />
     </div>

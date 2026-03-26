@@ -40,3 +40,16 @@ export function ensureRequiredFields(
     }
   }
 }
+
+// Ensure required fields for a specific group in combined mode
+export function ensureRequiredFieldsForGroup(
+  group: "renter" | "machine",
+  record: Record<string, any>,
+): void {
+  const map = group === "renter" ? RENTER_PLACEHOLDERS : MACHINE_PLACEHOLDERS;
+  for (const [key, placeholder] of Object.entries(map)) {
+    if (record[key] === undefined || record[key] === null || record[key] === "") {
+      record[key] = placeholder;
+    }
+  }
+}
