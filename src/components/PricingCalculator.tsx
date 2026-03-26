@@ -1,6 +1,6 @@
 /**
  * PricingCalculator — slider-driven pricing display for LaundryLord.
- * 
+ *
  * UPDATING TIERS: Edit the TIERS array below. Revenue and percentages auto-calculate.
  */
 
@@ -31,7 +31,7 @@ function fmt(n: number): string {
 
 function pct(price: number, rev: number): string {
   if (rev <= 0) return "—";
-  return (price / rev * 100).toFixed(1) + "%";
+  return ((price / rev) * 100).toFixed(1) + "%";
 }
 
 export function PricingCalculator() {
@@ -61,7 +61,7 @@ export function PricingCalculator() {
           className="w-full"
         />
         <div className="flex justify-between px-0.5">
-          {TICK_VALUES.map(v => (
+          {TICK_VALUES.map((v) => (
             <button
               key={v}
               onClick={() => setRentPerMachine(v)}
@@ -84,16 +84,23 @@ export function PricingCalculator() {
           const pctLow = !isFree && !isCustom && revMax > 0 ? pct(tier.price, revMax) : null;
 
           return (
-            <Card key={tier.min} className={`relative overflow-hidden ${isFree ? "border-success/30 bg-success/5" : ""}`}>
+            <Card
+              key={tier.min}
+              className={`relative overflow-hidden ${isFree ? "border-success/30 bg-success/5" : ""}`}
+            >
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-xs text-muted-foreground font-medium">
                     {tier.max === Infinity ? `${tier.min.toLocaleString()}+` : `${tier.min}–${tier.max}`} renters
                   </span>
-                  {isFree && <Badge variant="secondary" className="text-[10px]">Free</Badge>}
+                  {isFree && (
+                    <Badge variant="secondary" className="text-[10px]">
+                      Free
+                    </Badge>
+                  )}
                 </div>
                 <div className="text-lg font-bold text-foreground">
-                  {isCustom ? "Let's talk" : isFree ? "$0" : tier.label}
+                  {isCustom ? "Haven't thought that far" : isFree ? "$0" : tier.label}
                 </div>
                 {!isFree && !isCustom && (
                   <div className="space-y-1">
@@ -105,16 +112,8 @@ export function PricingCalculator() {
                     </div>
                   </div>
                 )}
-                {isCustom && (
-                  <div className="text-xs text-muted-foreground">
-                    Concierge onboarding &amp; custom pricing
-                  </div>
-                )}
-                {isFree && (
-                  <div className="text-xs text-muted-foreground">
-                    Get started at no cost
-                  </div>
-                )}
+                {isCustom && <div className="text-xs text-muted-foreground">Is this even possible?</div>}
+                {isFree && <div className="text-xs text-muted-foreground">Get started at no cost</div>}
               </CardContent>
             </Card>
           );
