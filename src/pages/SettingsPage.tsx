@@ -64,9 +64,6 @@ export default function SettingsPage() {
         late_fee_after_days: String(settings.late_fee_after_days),
         reminder_days_before: String(settings.reminder_days_before),
       });
-      if ((settings as any).stripe_secret_key) {
-        setStripeKey((settings as any).stripe_secret_key);
-      }
       const s = settings as any;
       setEmailForm({
         email_reminders_enabled: s.email_reminders_enabled ?? true,
