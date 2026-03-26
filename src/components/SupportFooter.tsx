@@ -8,6 +8,7 @@ export function SupportFooter() {
       <a href="mailto:don.brucexu@gmail.com" className="text-primary hover:underline font-medium">
         don.brucexu@gmail.com
       </a>
+      or text 8455987279.
     </div>
   );
 }
