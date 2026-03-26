@@ -41,6 +41,7 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
     secondary_contact: "",
     language: "English",
     install_notes: "",
+    dryer_outlet: "",
   });
 
   const getDefault = (field: string, fallback: string) => {
