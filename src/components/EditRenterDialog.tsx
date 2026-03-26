@@ -75,6 +75,7 @@ export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialo
         secondary_contact: (renter as any).secondary_contact || "",
         language: (renter as any).language || "English",
         install_notes: (renter as any).install_notes || "",
+        dryer_outlet: (renter as any).dryer_outlet || "",
       });
       setStartDate(renter.lease_start_date ? new Date(renter.lease_start_date + "T00:00:00") : undefined);
     }
