@@ -53,35 +53,44 @@ export default function ImportPage() {
 
   const fields = tab === "customers" ? CUSTOMER_FIELDS : MACHINE_FIELDS;
 
-  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    Papa.parse(file, {
-      complete: (results) => {
-        const data = results.data as string[][];
-        if (data.length < 2) {
-          toast.error("CSV must have at least a header row and one data row");
-          return;
-        }
-        const csvHeaders = data[0].map(h => h.trim());
-        setHeaders(csvHeaders);
-        setRawData(data.slice(1).filter(row => row.some(c => c.trim())));
+  const handleFileUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      Papa.parse(file, {
+        complete: (results) => {
+          const data = results.data as string[][];
+          if (data.length < 2) {
+            toast.error("CSV must have at least a header row and one data row");
+            return;
+          }
+          const csvHeaders = data[0].map((h) => h.trim());
+          setHeaders(csvHeaders);
+          setRawData(data.slice(1).filter((row) => row.some((c) => c.trim())));
 
-        // Auto-map columns
-        const autoMap: Record<string, string> = {};
-        fields.forEach(f => {
-          const match = csvHeaders.findIndex(h =>
-            h.toLowerCase().replace(/[_\s#]/g, "") === f.key.toLowerCase().replace(/_/g, "") ||
-            h.toLowerCase().includes(f.label.toLowerCase().replace(/[#$()]/g, "").trim())
-          );
-          if (match >= 0) autoMap[f.key] = csvHeaders[match];
-        });
-        setMapping(autoMap);
-        setStep("map");
-      },
-      error: () => toast.error("Failed to parse CSV"),
-    });
-  }, [fields]);
+          // Auto-map columns
+          const autoMap: Record<string, string> = {};
+          fields.forEach((f) => {
+            const match = csvHeaders.findIndex(
+              (h) =>
+                h.toLowerCase().replace(/[_\s#]/g, "") === f.key.toLowerCase().replace(/_/g, "") ||
+                h.toLowerCase().includes(
+                  f.label
+                    .toLowerCase()
+                    .replace(/[#$()]/g, "")
+                    .trim(),
+                ),
+            );
+            if (match >= 0) autoMap[f.key] = csvHeaders[match];
+          });
+          setMapping(autoMap);
+          setStep("map");
+        },
+        error: () => toast.error("Failed to parse CSV"),
+      });
+    },
+    [fields],
+  );
 
   const handleImport = async () => {
     if (!user) return;
@@ -94,7 +103,7 @@ export default function ImportPage() {
         const record: Record<string, any> = { user_id: user.id };
         let valid = true;
 
-        fields.forEach(f => {
+        fields.forEach((f) => {
           const csvCol = mapping[f.key];
           if (!csvCol) return;
           const colIdx = headers.indexOf(csvCol);
@@ -104,7 +113,10 @@ export default function ImportPage() {
           if (val) record[f.key] = val;
         });
 
-        if (!valid) { skipped++; continue; }
+        if (!valid) {
+          skipped++;
+          continue;
+        }
 
         // Parse numeric fields
         if (tab === "customers") {
@@ -118,7 +130,11 @@ export default function ImportPage() {
 
         const table = tab === "customers" ? "renters" : "machines";
         const { error } = await supabase.from(table).insert(record as any);
-        if (error) { skipped++; } else { imported++; }
+        if (error) {
+          skipped++;
+        } else {
+          imported++;
+        }
       }
 
       setResult({ imported, skipped });
@@ -158,16 +174,22 @@ export default function ImportPage() {
         <CardContent className="p-4 flex items-start gap-3">
           <Mail className="h-4 w-4 text-primary mt-0.5 shrink-0" />
           <div className="text-sm">
-            Need help importing your data?{" "}
+            Importing your data didn't work like magic?{" "}
             <a href="mailto:don.brucexu@gmail.com" className="text-primary font-medium hover:underline">
               Email don.brucexu@gmail.com
             </a>{" "}
-            for free human-assisted data upload.
+            for free manual data upload.
           </div>
         </CardContent>
       </Card>
 
-      <Tabs value={tab} onValueChange={v => { setTab(v as any); reset(); }}>
+      <Tabs
+        value={tab}
+        onValueChange={(v) => {
+          setTab(v as any);
+          reset();
+        }}
+      >
         <TabsList>
           <TabsTrigger value="customers">Customers</TabsTrigger>
           <TabsTrigger value="machines">Machines</TabsTrigger>
@@ -191,30 +213,38 @@ export default function ImportPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Map Columns</CardTitle>
-                <CardDescription>Match your CSV columns to {tab} fields. {rawData.length} rows detected.</CardDescription>
+                <CardDescription>
+                  Match your CSV columns to {tab} fields. {rawData.length} rows detected.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {fields.map(f => (
+                {fields.map((f) => (
                   <div key={f.key} className="flex items-center gap-3">
-                    <span className="text-sm w-40 shrink-0">{f.label} {f.required ? "*" : ""}</span>
+                    <span className="text-sm w-40 shrink-0">
+                      {f.label} {f.required ? "*" : ""}
+                    </span>
                     <Select
                       value={mapping[f.key] || "skip"}
-                      onValueChange={v => setMapping(m => ({ ...m, [f.key]: v === "skip" ? "" : v }))}
+                      onValueChange={(v) => setMapping((m) => ({ ...m, [f.key]: v === "skip" ? "" : v }))}
                     >
                       <SelectTrigger className="flex-1">
                         <SelectValue placeholder="Skip" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="skip">— Skip —</SelectItem>
-                        {headers.map(h => (
-                          <SelectItem key={h} value={h}>{h}</SelectItem>
+                        {headers.map((h) => (
+                          <SelectItem key={h} value={h}>
+                            {h}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                 ))}
                 <div className="flex gap-2 pt-4">
-                  <Button variant="outline" onClick={reset}>Back</Button>
+                  <Button variant="outline" onClick={reset}>
+                    Back
+                  </Button>
                   <Button onClick={() => setStep("preview")}>Preview Import</Button>
                 </div>
               </CardContent>
@@ -225,27 +255,35 @@ export default function ImportPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Preview</CardTitle>
-                <CardDescription>Showing first {Math.min(10, rawData.length)} of {rawData.length} rows</CardDescription>
+                <CardDescription>
+                  Showing first {Math.min(10, rawData.length)} of {rawData.length} rows
+                </CardDescription>
               </CardHeader>
               <CardContent className="p-0 overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      {fields.filter(f => mapping[f.key]).map(f => (
-                        <TableHead key={f.key}>{f.label}</TableHead>
-                      ))}
+                      {fields
+                        .filter((f) => mapping[f.key])
+                        .map((f) => (
+                          <TableHead key={f.key}>{f.label}</TableHead>
+                        ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {rawData.slice(0, 10).map((row, i) => {
-                      const requiredMissing = fields.some(f => f.required && mapping[f.key] && !getMappedValue(row, f.key));
+                      const requiredMissing = fields.some(
+                        (f) => f.required && mapping[f.key] && !getMappedValue(row, f.key),
+                      );
                       return (
                         <TableRow key={i} className={requiredMissing ? "bg-destructive/5" : ""}>
-                          {fields.filter(f => mapping[f.key]).map(f => (
-                            <TableCell key={f.key} className="text-xs font-mono">
-                              {getMappedValue(row, f.key) || <span className="text-muted-foreground">—</span>}
-                            </TableCell>
-                          ))}
+                          {fields
+                            .filter((f) => mapping[f.key])
+                            .map((f) => (
+                              <TableCell key={f.key} className="text-xs font-mono">
+                                {getMappedValue(row, f.key) || <span className="text-muted-foreground">—</span>}
+                              </TableCell>
+                            ))}
                         </TableRow>
                       );
                     })}
@@ -253,7 +291,9 @@ export default function ImportPage() {
                 </Table>
               </CardContent>
               <div className="p-4 flex gap-2">
-                <Button variant="outline" onClick={() => setStep("map")}>Back</Button>
+                <Button variant="outline" onClick={() => setStep("map")}>
+                  Back
+                </Button>
                 <Button onClick={handleImport} disabled={importing}>
                   {importing ? "Importing..." : `Import ${rawData.length} rows`}
                 </Button>
@@ -268,7 +308,9 @@ export default function ImportPage() {
                 <div>
                   <div className="text-lg font-semibold">{result.imported} records imported</div>
                   {result.skipped > 0 && (
-                    <div className="text-sm text-muted-foreground">{result.skipped} rows skipped (missing required fields)</div>
+                    <div className="text-sm text-muted-foreground">
+                      {result.skipped} rows skipped (missing required fields)
+                    </div>
                   )}
                 </div>
                 <Button onClick={reset}>Import More</Button>
