@@ -19,6 +19,7 @@ import { toast } from "sonner";
 interface CreateRenterDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  canAddRenter?: boolean;
 }
 
 export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogProps) {

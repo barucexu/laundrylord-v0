@@ -11,6 +11,7 @@ import { toast } from "sonner";
 interface CreateMachineDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  canAddRenter?: boolean;
 }
 
 export function CreateMachineDialog({ open, onOpenChange }: CreateMachineDialogProps) {
