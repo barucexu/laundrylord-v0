@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useRenters } from "@/hooks/useSupabaseData";
@@ -6,11 +6,12 @@ import { getTierForCount, type PricingTier } from "@/lib/pricing-tiers";
 
 interface SubscriptionState {
   tier: PricingTier;
-  activeRenters: number;
+  renterCount: number;
   subscribed: boolean;
   loading: boolean;
   subscriptionEnd: string | null;
   productId: string | null;
+  canAddRenter: boolean;
   /** Start checkout for current tier */
   checkout: () => Promise<void>;
   /** Open customer portal */
@@ -26,9 +27,12 @@ export function useSubscription(): SubscriptionState {
   const [loading, setLoading] = useState(true);
   const [subscriptionEnd, setSubscriptionEnd] = useState<string | null>(null);
   const [productId, setProductId] = useState<string | null>(null);
+  const aggressivePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const aggressiveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const activeRenters = renters?.filter((r) => r.status === "active").length ?? 0;
-  const tier = getTierForCount(activeRenters);
+  // Count ALL renters (every status), not just active
+  const renterCount = renters?.length ?? 0;
+  const tier = getTierForCount(renterCount);
 
   const checkSubscription = useCallback(async () => {
     if (authLoading) {
@@ -84,14 +88,40 @@ export function useSubscription(): SubscriptionState {
     return () => clearInterval(interval);
   }, [authLoading, checkSubscription, session?.access_token, user]);
 
+  // Cleanup aggressive polling on unmount
+  useEffect(() => {
+    return () => {
+      if (aggressivePollRef.current) clearInterval(aggressivePollRef.current);
+      if (aggressiveTimeoutRef.current) clearTimeout(aggressiveTimeoutRef.current);
+    };
+  }, []);
+
+  const startAggressivePolling = useCallback(() => {
+    // Poll every 5s for 60s after checkout
+    if (aggressivePollRef.current) clearInterval(aggressivePollRef.current);
+    if (aggressiveTimeoutRef.current) clearTimeout(aggressiveTimeoutRef.current);
+
+    aggressivePollRef.current = setInterval(checkSubscription, 5_000);
+    aggressiveTimeoutRef.current = setTimeout(() => {
+      if (aggressivePollRef.current) {
+        clearInterval(aggressivePollRef.current);
+        aggressivePollRef.current = null;
+      }
+    }, 60_000);
+  }, [checkSubscription]);
+
   const checkout = useCallback(async () => {
     if (!tier.price_id) return;
     const { data, error } = await supabase.functions.invoke("create-checkout", {
       body: { price_id: tier.price_id },
     });
     if (error) throw error;
-    if (data?.url) window.open(data.url, "_blank");
-  }, [tier]);
+    if (data?.url) {
+      window.open(data.url, "_blank");
+      // Start aggressive polling to detect payment quickly
+      startAggressivePolling();
+    }
+  }, [tier, startAggressivePolling]);
 
   const manageSubscription = useCallback(async () => {
     const { data, error } = await supabase.functions.invoke("customer-portal");
@@ -99,13 +129,26 @@ export function useSubscription(): SubscriptionState {
     if (data?.url) window.open(data.url, "_blank");
   }, []);
 
+  // Compute whether the operator can add more renters
+  const canAddRenter = (() => {
+    // While loading, give benefit of the doubt
+    if (loading) return true;
+    // Free tier: can add up to max (10)
+    if (tier.price === 0) return renterCount < tier.max;
+    // Custom tier: must have subscription
+    if (tier.price === -1) return subscribed;
+    // Paid tier: must be subscribed and under the max
+    return subscribed && renterCount < tier.max;
+  })();
+
   return {
     tier,
-    activeRenters,
+    renterCount,
     subscribed,
     loading,
     subscriptionEnd,
     productId,
+    canAddRenter,
     checkout,
     manageSubscription,
     refresh: checkSubscription,
