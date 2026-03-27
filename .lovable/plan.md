@@ -1,48 +1,80 @@
 
 
-# ACH Default + Fee Optimization Analysis
+# Simplified SaaS Pricing — Revised Plan
 
-## What's possible and what's not
+## Pricing Model (6 tiers, down from 10)
 
-### 1. Default to ACH on setup link — trivial fix
-Swap `payment_method_types: ["card", "us_bank_account"]` to `["us_bank_account", "card"]` in `create-setup-link`. Stripe Checkout shows the first type as default. One line change.
+| Tier | Renters | Price |
+|------|---------|-------|
+| Free | 1–10 | $0 |
+| Starter | 11–24 | $29/mo |
+| Growth | 25–49 | $49/mo |
+| Pro | 50–74 | $99/mo |
+| Scale | 75–99 | $129/mo |
+| Custom | 100+ | Contact us |
 
-**Fee savings for operators**: ACH via Stripe costs **0.8% capped at $5** per transaction vs cards at **2.9% + $0.30**. On a $60/mo rental, that's $0.48 ACH vs $2.04 card. Real savings.
+## What Gets Built
 
-### 2. Zelle/Venmo autopay — not technically possible
-Zelle has **no public API**. There is no way to programmatically:
-- Create a Zelle payment
-- Set up Zelle autopay
-- Verify a Zelle payment was received
-- Trigger or schedule Zelle transfers
+### 1. Shared tier logic — `src/lib/pricing-tiers.ts`
+- Extract the simplified 6-tier `TIERS` array into a shared module
+- Export `getTierForCount(activeRenters)` helper
+- Each paid tier includes its Stripe `price_id` (created via Stripe tools)
 
-Zelle autopay exists only within individual banking apps and is fully controlled by the sender's bank. Same limitation applies to Venmo for automated business collection. Cash App has limited business APIs but nothing for automated recurring pulls.
+### 2. Update PricingCalculator
+- Import from shared module, remove local `TIERS`
+- Grid shrinks from 10 cards to 6 — cleaner, less intimidating
+- "Custom" tier copy: "Let's talk" (not "Haven't thought that far")
 
-**The honest answer**: There is no free payment rail with an API that allows you to programmatically collect recurring payments. ACH via Stripe (0.8% capped $5) is the cheapest automated option. The alternatives are:
-- **Stripe ACH** — 0.8% capped at $5 (best automated option)
-- **Stripe cards** — 2.9% + $0.30 (current default)
-- **Zelle/Venmo/Cash** — $0 fees but fully manual, no API, no automation
+### 3. Create 4 Stripe products + prices
+- Starter ($29), Growth ($49), Pro ($99), Scale ($129) — monthly recurring
+- No products needed for Free or Custom tiers
 
-The current manual payment tracking (Record Payment dialog) already handles Zelle/Venmo/Cash as external methods. That's the correct representation — they're tracked, not platform-controlled.
+### 4. Three new edge functions
 
-### 3. LaundryLord SaaS pricing enforcement
-The pricing tiers exist in `PricingCalculator.tsx` but are display-only. To actually charge operators, you'd need:
-- Stripe products/prices for each tier
-- A subscription check system
-- Usage-based tier assignment (count renters → determine tier)
+**`check-subscription`** — Looks up operator's subscription status using platform Stripe key. Free-tier operators (≤10 renters) skip Stripe entirely and return `{ tier: "free" }`.
 
-This is a significant feature (operator billing for the SaaS itself). It's separate from the renter billing system and would be a new workstream. **Not included in this pass** — noting it as a future item.
+**`create-checkout`** — Creates a Stripe Checkout session for the correct tier based on active renter count. Defaults to ACH-first payment method ordering.
 
-## Smallest safe change
+**`customer-portal`** — Returns a Stripe Customer Portal URL so operators can manage billing themselves.
 
-### File: `supabase/functions/create-setup-link/index.ts`
-- Swap `payment_method_types` order to `["us_bank_account", "card"]`
-- Update comment to note ACH is now the default option shown
+### 5. `src/hooks/useSubscription.ts`
+- Calls `check-subscription` on auth change
+- Exposes `{ tier, subscribed, loading }`
+- Counts active renters via existing `useRenters()`
 
-That's it. One line. The Stripe Checkout page (as shown in the uploaded screenshot) will now show "US bank account" selected by default instead of "Card". Renters can still choose card if they prefer.
+### 6. `src/components/PlanBanner.tsx` — the gentle nudge
+A calm, dismissible banner inside `AppLayout` (above `<Outlet />`). Behavior:
 
-## What remains for future passes
-- LaundryLord SaaS subscription enforcement (operator billing by tier)
-- Zelle/Venmo remain manual-only tracking — no API exists to automate them
-- ACH microdeposit verification handling (existing known limitation)
+- **≤10 renters**: No banner. Clean experience.
+- **11+ renters, already subscribed**: Small subtle badge — "Starter plan · 14 active renters"
+- **11+ renters, not subscribed**: Congratulatory milestone message. Example copy: *"Nice — you've grown to 14 renters! Your plan is now Starter ($29/mo). Add a payment method to keep things running smoothly. Bank account is the easiest option."* With a single calm CTA button. Dismissible per session; re-appears if tier changes.
+
+No modals. No lockouts. No blocked features. Just a top banner.
+
+### 7. Settings page — "Your Plan" section
+Add a small card to SettingsPage showing current tier, renter count, and a "Manage billing" link (Stripe Customer Portal).
+
+### 8. `AppLayout.tsx`
+Render `<PlanBanner />` above `<Outlet />`.
+
+## Files Summary
+
+| Action | File |
+|--------|------|
+| Create (Stripe) | 4 products + 4 prices |
+| Create | `src/lib/pricing-tiers.ts` |
+| Create | `src/hooks/useSubscription.ts` |
+| Create | `src/components/PlanBanner.tsx` |
+| Create | `supabase/functions/check-subscription/index.ts` |
+| Create | `supabase/functions/create-checkout/index.ts` |
+| Create | `supabase/functions/customer-portal/index.ts` |
+| Modify | `src/components/PricingCalculator.tsx` |
+| Modify | `src/components/AppLayout.tsx` |
+| Modify | `src/pages/SettingsPage.tsx` |
+
+## What this does NOT do
+- No hard paywall or feature lockout
+- No auto-downgrade logic (keep current tier until next cycle)
+- No database schema changes — subscription state lives in Stripe
+- Existing renter billing flows completely untouched
 
