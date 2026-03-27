@@ -49,22 +49,35 @@ serve(async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
-    let customerId = renter.stripe_customer_id;
-    if (!customerId) {
-      // Filter out placeholder strings that aren't real contact info
-      const isRealEmail = renter.email && !renter.email.toLowerCase().includes("no email");
-      const isRealPhone = renter.phone && !renter.phone.toLowerCase().includes("no phone");
+    const isRealEmail = renter.email && !renter.email.toLowerCase().includes("no email");
+    const isRealPhone = renter.phone && !renter.phone.toLowerCase().includes("no phone");
+
+    const createNewCustomer = async () => {
       const customer = await stripe.customers.create({
         name: renter.name,
         email: isRealEmail ? renter.email : undefined,
         phone: isRealPhone ? renter.phone : undefined,
         metadata: { renter_id: renter.id, user_id: userData.user.id },
       });
-      customerId = customer.id;
       await supabase
         .from("renters")
-        .update({ stripe_customer_id: customerId })
+        .update({ stripe_customer_id: customer.id })
         .eq("id", renter_id);
+      return customer.id;
+    };
+
+    let customerId = renter.stripe_customer_id;
+    if (!customerId) {
+      customerId = await createNewCustomer();
+    } else {
+      // Verify the customer still exists in this Stripe account.
+      // Stale IDs occur when operators switch Stripe keys or environments.
+      try {
+        await stripe.customers.retrieve(customerId);
+      } catch (e) {
+        console.warn(`Stale stripe_customer_id ${customerId}, creating new customer`);
+        customerId = await createNewCustomer();
+      }
     }
 
     const origin = req.headers.get("origin") || "https://laundrylord-v0.lovable.app";
