@@ -16,6 +16,7 @@ export default function RentersList() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: renters = [], isLoading } = useRenters();
+  const { canAddRenter } = useSubscription();
 
   const filtered = renters.filter(r => {
     const matchesSearch = r.name.toLowerCase().includes(search.toLowerCase()) || (r.phone || "").includes(search);
