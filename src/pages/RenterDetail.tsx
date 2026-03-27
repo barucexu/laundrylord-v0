@@ -189,9 +189,9 @@ export default function RenterDetail() {
                 <>
                   <Button size="sm" onClick={() => navigate("/settings")}>
                     <Settings className="h-4 w-4" />
-                    Connect Business Stripe
+                    Connect Stripe
                   </Button>
-                  <p className="text-xs text-muted-foreground">Connect your Stripe account in Settings before you can charge renters.</p>
+                  <p className="text-xs text-muted-foreground">Add your Stripe key in Settings to enable billing.</p>
                 </>
               )}
 
