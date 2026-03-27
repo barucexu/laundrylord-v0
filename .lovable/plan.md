@@ -1,107 +1,82 @@
 
 
-# Smart Combined Import — Default Experience
+# Payment Terminology & ACH Groundwork — Smallest Safe Diff
 
-## Summary
+## ACH Verification
 
-Replace the Customers/Machines tab selector with a default combined import flow. One uploaded file maps against both renter and machine fields simultaneously. Each row creates renter records, machine records, or both — and links them via `assigned_renter_id`. Optional toggles let the operator narrow to customers-only or machines-only.
+**Can Stripe Checkout `mode: "setup"` with `us_bank_account` work here?**
 
-## Key Schema Facts
+Yes for setup — Stripe Checkout in setup mode supports `payment_method_types: ["card", "us_bank_account"]`. The renter sees both options on the Stripe-hosted page and can link a bank account via Plaid or manual entry.
 
-- `machines.assigned_renter_id` (uuid, nullable) — already exists for linking
-- `machines.status` — set to `"assigned"` when linked
-- Both `renters` and `machines` have a `notes` field and a `status` field — need prefixed keys to disambiguate
+**But `create-subscription` has a blocker.** It currently does `paymentMethods.list({ type: "card" })` — it only looks for cards. If a renter set up a bank account, this query returns nothing and throws "No payment method on file." Additionally, `us_bank_account` payment methods require microdeposit verification for manual entry, which can take 1-2 business days. Stripe handles this, but the current flow assumes instant readiness.
+
+**Verdict: ACH is groundwork only, not complete.** The setup-link change is safe. The subscription side needs careful handling of bank account verification state, which is not a one-line fix. This pass will:
+- Enable bank account collection in the setup flow
+- Update `create-subscription` to check both card and bank account types
+- Label this clearly as "groundwork" — bank accounts via Plaid will work, manual-entry bank accounts may need verification delay handling in a future pass
 
 ## Changes
 
-### 1. `src/utils/import/types.ts`
+### 1. `src/pages/RenterDetail.tsx` — Terminology fixes (4 string changes)
 
-Add `ImportMode` type:
-```ts
-export type ImportMode = "combined" | "customers" | "machines";
+- Line 192: `"Connect Business Stripe"` → `"Connect Stripe"`
+- Line 194: `"Connect your Stripe account in Settings before you can charge renters."` → `"Add your Stripe key in Settings to enable billing."`
+- Line 207: `"Send Card Setup Link"` → `"Send Payment Setup Link"`
+- Line 208: `"Send a secure link to collect the renter's card on file"` → `"Send a secure link for the renter to add a payment method"`
+- Line 224: `"Resend Setup Link"` stays (already accurate)
+- Line 228: `"Card on file ✓"` → `"Payment method on file ✓"`
+- Line 241: `"Update Card"` → `"Update Payment Method"`
+
+### 2. `supabase/functions/create-setup-link/index.ts` — Enable bank accounts
+
+- Change `payment_method_types: ["card"]` → `payment_method_types: ["card", "us_bank_account"]`
+- Add a comment: `// ACH groundwork: bank accounts can be collected but verification delays may apply for manual entry`
+
+### 3. `supabase/functions/create-subscription/index.ts` — Check both payment method types
+
+- After the existing card check, also check for `us_bank_account` type
+- Use whichever is found as the default payment method
+- Add comment: `// ACH groundwork: supports bank accounts collected via setup link. Manual-entry bank accounts may need microdeposit verification — full ACH support is not complete in this pass.`
+
+### 4. `supabase/functions/stripe-webhook/index.ts` — Add limitation comment
+
+- Add a block comment near the top:
+```
+// KNOWN LIMITATION: This webhook uses a single STRIPE_WEBHOOK_SECRET env var.
+// Each operator has their own Stripe account, but only one webhook secret can
+// be verified at a time. Customer ID lookups work because Stripe customer IDs
+// are globally unique, but signature verification only validates against one
+// Stripe account's signing secret. Multi-operator webhook routing is not
+// solved in this pass.
 ```
 
-### 2. `src/utils/import/fields.ts`
+### 5. `src/components/RecordPaymentDialog.tsx` — No changes needed
 
-- Add `group: "renter" | "machine"` property to `ImportField` type
-- Create `COMBINED_FIELDS` array that merges both sets with prefixed keys for collisions:
-  - Renter `notes` → key `renter.notes`, label "Renter Notes"
-  - Renter `install_notes` → key `renter.install_notes`, label "Install Notes"
-  - Renter `status` → key `renter.status`, label "Renter Status"
-  - Machine `notes` → key `machine.notes`, label "Machine Notes"
-  - Machine `status` → key `machine.status`, label "Machine Status"
-  - All other non-colliding fields keep their original keys
-- Export a helper `getCombinedFields()` that returns the merged array
-- Keep `RENTER_FIELDS` and `MACHINE_FIELDS` unchanged for single-mode use
-
-### 3. `src/utils/import/auto-mapper.ts`
-
-- Add `autoMapCombined(headers, combinedFields)` that maps against both renter and machine fields using the same normalize+synonym logic
-- Uses the prefixed keys so `status` and `notes` columns can map to the correct side
-- Export alongside existing `autoMap`
-
-### 4. `src/utils/import/placeholders.ts`
-
-- Add `ensureRequiredFieldsCombined(group, record)` that works with unprefixed DB keys after the mapping has been resolved back to real column names
-
-### 5. `src/pages/ImportPage.tsx` — Major Refactor
-
-**Upload step:**
-- Remove the `Tabs` (Customers/Machines) as the primary UI
-- Add an optional "Advanced" collapsible or small segmented control below the upload zone: `Default` | `Customers only` | `Machines only`
-- Default state: combined mode — no selection required from user
-- Store `importMode: ImportMode` state (default `"combined"`)
-
-**Parsing:**
-- On file upload, auto-map against `COMBINED_FIELDS` when mode is combined, or the appropriate single set when narrowed
-- Same `processFile` flow, just picks the right field set
-
-**Mapping step (combined mode):**
-- Show two labeled sections with a visual separator between them:
-  - `── Renter Fields ──` with all 18 renter fields
-  - `── Machine Fields ──` with all 9 machine fields
-- Left header: "LaundryLord's Label"
-- Right header: "Your File's Column"  
-- All dropdowns share the same `headers` list
-- Skip always available
-- When mode is customers-only or machines-only, show only that section (current behavior)
-
-**Preview step (combined mode):**
-- Replace flat table with card-per-row layout (first 5 rows)
-- Each card shows:
-  - **Renter Record** section (if renter fields have content): key-value pairs
-  - **Machine Record** section (if machine fields have content): key-value pairs
-  - **Link Result** line: "Will create renter + machine and link them" / "Renter only" / "Machine only"
-- Muted placeholder styling for blank fields, consistent with current behavior
-
-**Import logic (combined mode):**
-For each row:
-1. Split mapping into renter payload and machine payload using field group
-2. Resolve prefixed keys back to real DB column names (`renter.notes` → `notes`, `machine.status` → `status`)
-3. Check if renter side has real content, check if machine side has real content
-4. If neither → skip
-5. **Renter dedup**: if email present → exact match on `renters` where `user_id = auth.uid()`. Else if phone → same. If matched → reuse id, don't insert.
-6. **Machine dedup**: if serial present → exact match on `machines` where `user_id = auth.uid()`. If matched → reuse id, don't insert.
-7. If renter created/matched AND machine created/matched → set `machine.assigned_renter_id` = renter id, `machine.status` = `"assigned"`
-8. If only one side → create/match just that side
-9. Parse booleans and numerics same as current logic
-10. Apply `ensureRequiredFields` per side
-
-**Done step (combined mode):**
-- Show: renters created / matched, machines created / matched, machines linked, rows skipped
-- Single-mode summaries stay as-is
+Payment sources are already truthfully labeled as manual tracking methods. "Stripe" in the source list means "I'm recording a Stripe payment manually" — this is fine.
 
 ## Files Modified
 
-- `src/utils/import/types.ts` — add `ImportMode`, add `group` to `ImportField`
-- `src/utils/import/fields.ts` — add `COMBINED_FIELDS`, group property, disambiguation
-- `src/utils/import/auto-mapper.ts` — add `autoMapCombined`
-- `src/utils/import/placeholders.ts` — minor helper for combined mode
-- `src/pages/ImportPage.tsx` — full refactor of UI and import logic
+- `src/pages/RenterDetail.tsx` — string fixes
+- `supabase/functions/create-setup-link/index.ts` — add `us_bank_account`
+- `supabase/functions/create-subscription/index.ts` — check both card and bank account
+- `supabase/functions/stripe-webhook/index.ts` — add limitation comment
 
-## Files Unchanged
+## What This Does NOT Do
 
-- CSV/XLSX/image parsers — already output `ParsedData`
-- Edge function for OCR — unchanged
-- No database changes needed
+- Does not handle microdeposit verification polling for manual-entry bank accounts
+- Does not solve multi-operator webhook secret architecture
+- Does not add ACH as a visible UI option — it works transparently through Stripe's hosted page
+- Does not change any database schema
+
+## Verification Checklist
+
+- [ ] "Connect Stripe" button text on renter detail
+- [ ] "Add your Stripe key" description text
+- [ ] "Send Payment Setup Link" button text
+- [ ] "Payment method on file" description text
+- [ ] Setup link Stripe Checkout page shows both card and bank account options
+- [ ] Activating autopay works when renter has a card (existing flow preserved)
+- [ ] Activating autopay works when renter has a bank account (via Plaid — groundwork)
+- [ ] Manual payment recording unchanged
+- [ ] Webhook limitation comment present in code
 
