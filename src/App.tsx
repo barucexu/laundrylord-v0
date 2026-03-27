@@ -17,6 +17,7 @@ import PaymentsView from "@/pages/PaymentsView";
 import MaintenanceView from "@/pages/MaintenanceView";
 import SettingsPage from "@/pages/SettingsPage";
 import ImportPage from "@/pages/ImportPage";
+import RenterArchive from "@/pages/RenterArchive";
 import AuthPage from "@/pages/AuthPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import NotFound from "@/pages/NotFound";
@@ -28,6 +29,7 @@ const PAGE_ROUTES = (
   <>
     <Route index element={<Dashboard />} />
     <Route path="renters" element={<RentersList />} />
+    <Route path="renters/archive" element={<RenterArchive />} />
     <Route path="renters/:id" element={<RenterDetail />} />
     <Route path="machines" element={<MachinesList />} />
     <Route path="machine-map" element={<MachineMapPage />} />
@@ -78,6 +80,7 @@ const App = () => (
           }>
             <Route path="/" element={<Dashboard />} />
             <Route path="/renters" element={<RentersList />} />
+            <Route path="/renters/archive" element={<RenterArchive />} />
             <Route path="/renters/:id" element={<RenterDetail />} />
             <Route path="/machines" element={<MachinesList />} />
             <Route path="/machine-map" element={<MachineMapPage />} />

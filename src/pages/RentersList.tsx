@@ -29,7 +29,12 @@ export default function RentersList() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Renters</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{filtered.length} renters</p>
+          <div className="flex items-center gap-3 mt-0.5">
+            <p className="text-sm text-muted-foreground">{filtered.length} renters</p>
+            <Link to="/renters/archive" className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2">
+              View Archive
+            </Link>
+          </div>
         </div>
         <Tooltip>
           <TooltipTrigger asChild>

@@ -7,7 +7,7 @@ import { PaymentSourceBadge } from "@/components/PaymentSourceBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { useRenter, useMachinesForRenter, useMachines, useUpdateRenter, useUpdateMachine, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection } from "@/hooks/useSupabaseData";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil, Plus, X, Globe, Plug } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil, Plus, X, Globe, Plug, Archive, ArchiveRestore } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -172,6 +172,42 @@ export default function RenterDetail() {
           <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
             <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
           </Button>
+          {renter.status === "archived" ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  await updateRenter.mutateAsync({ id: renter.id, status: "closed" });
+                  queryClient.invalidateQueries({ queryKey: ["renters"] });
+                  queryClient.invalidateQueries({ queryKey: ["renters", "archived"] });
+                  toast.success("Renter unarchived");
+                } catch (err: any) {
+                  toast.error(err.message || "Failed to unarchive");
+                }
+              }}
+            >
+              <ArchiveRestore className="h-3.5 w-3.5 mr-1" /> Unarchive
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  await updateRenter.mutateAsync({ id: renter.id, status: "archived" });
+                  queryClient.invalidateQueries({ queryKey: ["renters"] });
+                  queryClient.invalidateQueries({ queryKey: ["renters", "archived"] });
+                  toast.success("Renter archived");
+                  navigate("/renters");
+                } catch (err: any) {
+                  toast.error(err.message || "Failed to archive");
+                }
+              }}
+            >
+              <Archive className="h-3.5 w-3.5 mr-1" /> Archive
+            </Button>
+          )}
         </div>
       </div>
 
