@@ -37,7 +37,7 @@ export function PlanBanner() {
         <Sparkles className="h-5 w-5 text-primary mt-0.5 shrink-0" />
         <div className="space-y-1 text-sm">
           <p className="font-medium text-foreground">
-            Wow — {activeRenters} renters! You've outgrown our standard plans.
+            Wow — {renterCount} renters! You've outgrown our standard plans.
           </p>
           <p className="text-muted-foreground">
             We'd love to set up a custom plan for your operation. Reach out and we'll take care of you.
