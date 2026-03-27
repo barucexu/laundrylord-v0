@@ -12,17 +12,18 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-  );
-
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header");
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !userData.user) throw new Error("Unauthorized");
+
+    // User client: authenticates via forwarded JWT
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    if (userError || !user) throw new Error("Unauthorized");
 
     const { key } = await req.json();
     if (!key || typeof key !== "string") throw new Error("key is required");
@@ -32,11 +33,17 @@ serve(async (req) => {
       throw new Error("Key must start with sk_test_ or sk_live_");
     }
 
-    const { error } = await supabase
+    // Admin client: bypasses RLS for stripe_keys table
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
+
+    const { error } = await adminClient
       .from("stripe_keys")
       .upsert(
         {
-          user_id: userData.user.id,
+          user_id: user.id,
           encrypted_key: trimmed,
           updated_at: new Date().toISOString(),
         },

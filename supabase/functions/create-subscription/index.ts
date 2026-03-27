@@ -13,26 +13,33 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-  );
-
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header");
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !userData.user) throw new Error("Unauthorized");
+
+    // User client: authenticates via forwarded JWT
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    if (userError || !user) throw new Error("Unauthorized");
+
+    // Admin client: bypasses RLS for stripe_keys and renter updates
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
 
     const { renter_id, billing_anchor_day } = await req.json();
     if (!renter_id) throw new Error("renter_id is required");
 
-    const { data: renter, error: renterError } = await supabase
+    const { data: renter, error: renterError } = await adminClient
       .from("renters")
       .select("*")
       .eq("id", renter_id)
-      .eq("user_id", userData.user.id)
+      .eq("user_id", user.id)
       .single();
     if (renterError || !renter) throw new Error("Renter not found");
     if (!renter.stripe_customer_id) throw new Error("Renter has no card on file. Send setup link first.");
@@ -48,22 +55,16 @@ serve(async (req) => {
       });
     }
 
-    // Get operator's Stripe key from server-only table
-    const { data: keyRow } = await supabase
+    const { data: keyRow } = await adminClient
       .from("stripe_keys")
       .select("encrypted_key")
-      .eq("user_id", userData.user.id)
+      .eq("user_id", user.id)
       .maybeSingle();
     const stripeKey = keyRow?.encrypted_key;
     if (!stripeKey) throw new Error("Stripe not connected. Add your Stripe key in Settings.");
 
-    const stripe = new Stripe(stripeKey, {
-      apiVersion: "2025-08-27.basil",
-    });
+    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
-    // ACH groundwork: check both card and bank account payment methods.
-    // Manual-entry bank accounts may need microdeposit verification before they
-    // can be charged — full ACH support is not complete in this pass.
     const cardMethods = await stripe.paymentMethods.list({
       customer: renter.stripe_customer_id,
       type: "card",
@@ -109,7 +110,7 @@ serve(async (req) => {
         day_of_month: Math.min(anchorDay, 28),
       },
       proration_behavior: "none",
-      metadata: { renter_id: renter.id, user_id: userData.user.id },
+      metadata: { renter_id: renter.id, user_id: user.id },
     });
 
     const subscriptionPeriodEnd = typeof subscription.current_period_end === "number"
@@ -132,7 +133,7 @@ serve(async (req) => {
       nextDue = fallbackDue.toISOString().split("T")[0];
     }
 
-    await supabase
+    await adminClient
       .from("renters")
       .update({
         stripe_subscription_id: subscription.id,
