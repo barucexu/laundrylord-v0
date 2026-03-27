@@ -8,12 +8,13 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useStripeConnection, useOperatorSettings, useSaveOperatorSettings } from "@/hooks/useSupabaseData";
-import { CheckCircle, AlertTriangle, Loader2, ExternalLink, Eye, EyeOff, ChevronDown, Mail, RotateCcw } from "lucide-react";
+import { CheckCircle, AlertTriangle, Loader2, ExternalLink, Eye, EyeOff, ChevronDown, Mail, RotateCcw, Sparkles, CreditCard } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
+import { useSubscription } from "@/hooks/useSubscription";
 
 const DEFAULT_TEMPLATES = {
   template_upcoming_subject: "Payment Reminder",
