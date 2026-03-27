@@ -22,8 +22,8 @@ export function PlanBanner() {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-4 py-2 mb-4 text-xs text-muted-foreground">
         <Sparkles className="h-3.5 w-3.5 text-primary" />
-        <span>
-          {tier.name} plan · {activeRenters} active renter{activeRenters !== 1 ? "s" : ""}
+         <span>
+          {tier.name} plan · {renterCount} renter{renterCount !== 1 ? "s" : ""}
         </span>
       </div>
     );
