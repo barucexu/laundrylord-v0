@@ -8,7 +8,6 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useRenters } from "@/hooks/useSupabaseData";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Search, Plus } from "lucide-react";
-import { useSubscription } from "@/hooks/useSubscription";
 import { CreateRenterDialog } from "@/components/CreateRenterDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 

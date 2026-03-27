@@ -104,7 +104,7 @@ export default function MachinesList() {
         </div>
       )}
 
-      <CreateMachineDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      <CreateMachineDialog open={dialogOpen} onOpenChange={setDialogOpen} canAddRenter={canAddRenter} />
       {editMachine && (
         <EditMachineDialog open={!!editMachine} onOpenChange={(o) => { if (!o) setEditMachine(null); }} machine={editMachine} />
       )}
