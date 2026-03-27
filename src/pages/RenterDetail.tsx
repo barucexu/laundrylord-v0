@@ -238,7 +238,7 @@ export default function RenterDetail() {
                     </span>
                     <Button size="sm" variant="ghost" onClick={handleSendSetupLink} disabled={sendingSetup}>
                       <Send className="h-4 w-4" />
-                      Update Card
+                      Update Payment Method
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">Auto-billing ${Number(renter.monthly_rate).toFixed(2)}/mo • Next due: {renter.next_due_date || "—"}</p>
