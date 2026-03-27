@@ -50,6 +50,7 @@ const statusLabels: Record<string, string> = {
   reported: "Reported",
   in_progress: "In Progress",
   resolved: "Resolved",
+  archived: "Archived",
 };
 
 export function StatusBadge({ status, className }: { status: string; className?: string }) {

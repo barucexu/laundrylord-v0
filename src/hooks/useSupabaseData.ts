@@ -40,13 +40,39 @@ export function useRenters() {
       const { data, error } = await supabase
         .from("renters")
         .select("*")
+        .neq("status", "archived")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as RenterRow[];
     },
     enabled: !demo?.isDemo,
   });
-  if (demo?.isDemo) return { ...supaQuery, data: demo.data.renters, isLoading: false, error: null };
+  if (demo?.isDemo) {
+    const nonArchived = demo.data.renters.filter(r => r.status !== "archived");
+    return { ...supaQuery, data: nonArchived, isLoading: false, error: null };
+  }
+  return supaQuery;
+}
+
+export function useArchivedRenters() {
+  const demo = useDemo();
+  const supaQuery = useQuery({
+    queryKey: ["renters", "archived"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("renters")
+        .select("*")
+        .eq("status", "archived")
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      return data as RenterRow[];
+    },
+    enabled: !demo?.isDemo,
+  });
+  if (demo?.isDemo) {
+    const archived = demo.data.renters.filter(r => r.status === "archived");
+    return { ...supaQuery, data: archived, isLoading: false, error: null };
+  }
   return supaQuery;
 }
 

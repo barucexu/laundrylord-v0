@@ -31,6 +31,7 @@ const ALL_STATUSES = [
   { value: "pickup_scheduled", label: "Pickup Scheduled" },
   { value: "closed", label: "Closed" },
   { value: "defaulted", label: "Defaulted" },
+  { value: "archived", label: "Archived" },
 ];
 
 export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialogProps) {

@@ -172,6 +172,42 @@ export default function RenterDetail() {
           <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
             <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
           </Button>
+          {renter.status === "archived" ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  await updateRenter.mutateAsync({ id: renter.id, status: "closed" });
+                  queryClient.invalidateQueries({ queryKey: ["renters"] });
+                  queryClient.invalidateQueries({ queryKey: ["renters", "archived"] });
+                  toast.success("Renter unarchived");
+                } catch (err: any) {
+                  toast.error(err.message || "Failed to unarchive");
+                }
+              }}
+            >
+              <ArchiveRestore className="h-3.5 w-3.5 mr-1" /> Unarchive
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  await updateRenter.mutateAsync({ id: renter.id, status: "archived" });
+                  queryClient.invalidateQueries({ queryKey: ["renters"] });
+                  queryClient.invalidateQueries({ queryKey: ["renters", "archived"] });
+                  toast.success("Renter archived");
+                  navigate("/renters");
+                } catch (err: any) {
+                  toast.error(err.message || "Failed to archive");
+                }
+              }}
+            >
+              <Archive className="h-3.5 w-3.5 mr-1" /> Archive
+            </Button>
+          )}
         </div>
       </div>
 
