@@ -13,41 +13,45 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-  );
-
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header");
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !userData.user) throw new Error("Unauthorized");
+
+    // User client: authenticates via forwarded JWT
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    if (userError || !user) throw new Error("Unauthorized");
+
+    // Admin client: bypasses RLS for stripe_keys and renter updates
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
 
     const { renter_id } = await req.json();
     if (!renter_id) throw new Error("renter_id is required");
 
-    const { data: renter, error: renterError } = await supabase
+    const { data: renter, error: renterError } = await adminClient
       .from("renters")
       .select("*")
       .eq("id", renter_id)
-      .eq("user_id", userData.user.id)
+      .eq("user_id", user.id)
       .single();
     if (renterError || !renter) throw new Error("Renter not found");
 
-    // Get operator's Stripe key from server-only table
-    const { data: keyRow } = await supabase
+    const { data: keyRow } = await adminClient
       .from("stripe_keys")
       .select("encrypted_key")
-      .eq("user_id", userData.user.id)
+      .eq("user_id", user.id)
       .maybeSingle();
     const stripeKey = keyRow?.encrypted_key;
     if (!stripeKey) throw new Error("Stripe not connected. Add your Stripe key in Settings.");
 
-    const stripe = new Stripe(stripeKey, {
-      apiVersion: "2025-08-27.basil",
-    });
+    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
     const isRealEmail = renter.email && !renter.email.toLowerCase().includes("no email");
     const isRealPhone = renter.phone && !renter.phone.toLowerCase().includes("no phone");
@@ -57,9 +61,9 @@ serve(async (req) => {
         name: renter.name,
         email: isRealEmail ? renter.email : undefined,
         phone: isRealPhone ? renter.phone : undefined,
-        metadata: { renter_id: renter.id, user_id: userData.user.id },
+        metadata: { renter_id: renter.id, user_id: user.id },
       });
-      await supabase
+      await adminClient
         .from("renters")
         .update({ stripe_customer_id: customer.id })
         .eq("id", renter_id);
@@ -70,8 +74,6 @@ serve(async (req) => {
     if (!customerId) {
       customerId = await createNewCustomer();
     } else {
-      // Verify the customer still exists in this Stripe account.
-      // Stale IDs occur when operators switch Stripe keys or environments.
       try {
         await stripe.customers.retrieve(customerId);
       } catch (e) {
@@ -81,11 +83,6 @@ serve(async (req) => {
     }
 
     const origin = req.headers.get("origin") || "https://laundrylord-v0.lovable.app";
-    // ACH is listed first so Stripe Checkout defaults to bank account (0.8% capped $5)
-    // instead of card (2.9% + $0.30). Renters can still choose card if they prefer.
-    // Groundwork: bank accounts can be collected but microdeposit verification
-    // delays may apply for manual entry. Plaid-linked accounts work immediately.
-    // Full ACH subscription support is not complete in this pass.
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "setup",
