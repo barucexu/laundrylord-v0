@@ -8,7 +8,7 @@ import { Link } from "react-router-dom";
 import { Plus, Pencil } from "lucide-react";
 import { CreateMachineDialog } from "@/components/CreateMachineDialog";
 import { EditMachineDialog } from "@/components/EditMachineDialog";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export default function MachinesList() {
   const { data: machines = [], isLoading } = useMachines();
