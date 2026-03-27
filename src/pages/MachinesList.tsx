@@ -37,7 +37,11 @@ export default function MachinesList() {
           {!canAddRenter && (
             <TooltipContent className="max-w-xs">
               <p className="font-medium">You've grown to {renterCount} renter{renterCount !== 1 ? "s" : ""}!</p>
-              <p className="text-xs mt-1">Your plan is now {tier.name} ({tier.label}). Add a payment method to keep adding machines.</p>
+              <p className="text-xs mt-1">
+                {tier.price === 0
+                  ? "You've reached 10 renters. Upgrade to Starter ($29/mo) to keep growing."
+                  : `Upgrade to ${tier.name} (${tier.label}) to add more machines.`}
+              </p>
             </TooltipContent>
           )}
         </Tooltip>

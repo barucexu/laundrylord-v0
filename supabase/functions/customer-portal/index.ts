@@ -13,6 +13,11 @@ const SAAS_PRODUCT_IDS = [
   "prod_UEAECHZpkSnOYA", // Growth
   "prod_UEAE1m4EwoT4Vo", // Pro
   "prod_UEAFvf9fkWycsF", // Scale
+  "prod_UEBHQWS6FJCqgh", // Business
+  "prod_UEBHhj7U5YUIgu", // Enterprise
+  "prod_UEBH5iiJU3wfyh", // Portfolio
+  "prod_UEBH682irBzWNb", // Empire
+  "prod_UEBHUQixo5jPWU", // Ultimate
 ];
 
 const logStep = (step: string, details?: unknown) => {
@@ -54,54 +59,10 @@ serve(async (req) => {
     const customerId = customers.data[0].id;
     const origin = req.headers.get("origin") || "https://laundrylord-v0.lovable.app";
 
-    // Find the SaaS subscription (not operator-to-renter subscriptions)
-    const subscriptions = await stripe.subscriptions.list({
-      customer: customerId,
-      status: "active",
-      limit: 20,
-    });
-
-    const saasSubscription = subscriptions.data.find((sub) =>
-      sub.items.data.some((item) => {
-        const productId = typeof item.price.product === "string"
-          ? item.price.product
-          : item.price.product?.id;
-        return SAAS_PRODUCT_IDS.includes(productId as string);
-      })
-    );
-
-    logStep("SaaS subscription lookup", {
-      found: !!saasSubscription,
-      totalSubs: subscriptions.data.length,
-    });
-
-    // If we found the SaaS subscription, scope the portal to it
-    const portalOptions: Stripe.BillingPortal.SessionCreateParams = {
+    const portalSession = await stripe.billingPortal.sessions.create({
       customer: customerId,
       return_url: `${origin}/settings`,
-    };
-
-    if (saasSubscription) {
-      portalOptions.flow_data = {
-        type: "subscription_update_confirm" as any,
-        subscription_update_confirm: {
-          subscription: saasSubscription.id,
-          items: saasSubscription.items.data.map((item) => ({
-            id: item.id,
-            price: item.price.id,
-            quantity: item.quantity ?? 1,
-          })),
-        },
-      };
-      // Actually, flow_data subscription_update_confirm requires a new price.
-      // Instead, just use subscription_cancel flow or default portal.
-      // The simplest fix: don't use flow_data, just open portal normally.
-      // The real fix is to NOT share Stripe accounts in production.
-      // For now, open portal without flow_data — it will show all subs.
-      delete portalOptions.flow_data;
-    }
-
-    const portalSession = await stripe.billingPortal.sessions.create(portalOptions);
+    });
 
     logStep("Portal session created", { url: portalSession.url });
     return new Response(JSON.stringify({ url: portalSession.url }), {
