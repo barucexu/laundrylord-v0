@@ -225,7 +225,7 @@ export default function RenterDetail() {
                       Resend Setup Link
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">→ Card on file ✓ — Start auto-charging ${Number(renter.monthly_rate).toFixed(2)}/mo</p>
+                  <p className="text-xs text-muted-foreground">→ Payment method on file ✓ — Start auto-charging ${Number(renter.monthly_rate).toFixed(2)}/mo</p>
                 </>
               )}
 
