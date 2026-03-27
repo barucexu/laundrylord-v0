@@ -24,18 +24,36 @@ serve(async (req) => {
     if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("No authorization header");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Auth header missing" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
+
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+    if (!token) {
+      return new Response(JSON.stringify({ error: "Invalid authorization header" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
 
     // Use anon key + forwarded auth header so getUser works correctly
-    const supabase = createClient(
+    const userClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
       { global: { headers: { Authorization: authHeader } } },
     );
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError) throw new Error(`Auth error: ${userError.message}`);
-    if (!user?.email) throw new Error("User not authenticated or email not available");
+    const { data: { user }, error: userError } = await userClient.auth.getUser(token);
+    if (userError || !user?.email) {
+      const authMessage = userError?.message ?? "User not authenticated or email not available";
+      return new Response(JSON.stringify({ error: `Auth error: ${authMessage}` }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
     logStep("User authenticated", { userId: user.id, email: user.email });
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
