@@ -189,9 +189,9 @@ export default function RenterDetail() {
                 <>
                   <Button size="sm" onClick={() => navigate("/settings")}>
                     <Settings className="h-4 w-4" />
-                    Connect Business Stripe
+                    Connect Stripe
                   </Button>
-                  <p className="text-xs text-muted-foreground">Connect your Stripe account in Settings before you can charge renters.</p>
+                  <p className="text-xs text-muted-foreground">Add your Stripe key in Settings to enable billing.</p>
                 </>
               )}
 
@@ -203,9 +203,9 @@ export default function RenterDetail() {
                     ) : (
                       <Send className="h-4 w-4" />
                     )}
-                    Send Card Setup Link
+                    Send Payment Setup Link
                   </Button>
-                  <p className="text-xs text-muted-foreground">→ Send a secure link to collect the renter's card on file</p>
+                  <p className="text-xs text-muted-foreground">→ Send a secure link for the renter to add a payment method</p>
                 </>
               )}
 
@@ -225,7 +225,7 @@ export default function RenterDetail() {
                       Resend Setup Link
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">→ Card on file ✓ — Start auto-charging ${Number(renter.monthly_rate).toFixed(2)}/mo</p>
+                  <p className="text-xs text-muted-foreground">→ Payment method on file ✓ — Start auto-charging ${Number(renter.monthly_rate).toFixed(2)}/mo</p>
                 </>
               )}
 
@@ -238,7 +238,7 @@ export default function RenterDetail() {
                     </span>
                     <Button size="sm" variant="ghost" onClick={handleSendSetupLink} disabled={sendingSetup}>
                       <Send className="h-4 w-4" />
-                      Update Card
+                      Update Payment Method
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">Auto-billing ${Number(renter.monthly_rate).toFixed(2)}/mo • Next due: {renter.next_due_date || "—"}</p>

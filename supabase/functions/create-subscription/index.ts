@@ -61,17 +61,25 @@ serve(async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
-    const paymentMethods = await stripe.paymentMethods.list({
+    // ACH groundwork: check both card and bank account payment methods.
+    // Manual-entry bank accounts may need microdeposit verification before they
+    // can be charged — full ACH support is not complete in this pass.
+    const cardMethods = await stripe.paymentMethods.list({
       customer: renter.stripe_customer_id,
       type: "card",
     });
-    if (paymentMethods.data.length === 0) {
+    const bankMethods = await stripe.paymentMethods.list({
+      customer: renter.stripe_customer_id,
+      type: "us_bank_account",
+    });
+    const defaultMethod = cardMethods.data[0] || bankMethods.data[0];
+    if (!defaultMethod) {
       throw new Error("No payment method on file. Send setup link first.");
     }
 
     await stripe.customers.update(renter.stripe_customer_id, {
       invoice_settings: {
-        default_payment_method: paymentMethods.data[0].id,
+        default_payment_method: defaultMethod.id,
       },
     });
 
