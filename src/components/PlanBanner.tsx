@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 
 export function PlanBanner() {
-  const { tier, activeRenters, subscribed, loading } = useSubscription();
+  const { tier, renterCount, subscribed, loading, canAddRenter } = useSubscription();
   const [dismissed, setDismissed] = useState<string | null>(null);
 
   if (loading) return null;
