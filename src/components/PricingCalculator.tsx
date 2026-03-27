@@ -1,27 +1,14 @@
 /**
  * PricingCalculator — slider-driven pricing display for LaundryLord.
  *
- * UPDATING TIERS: Edit the TIERS array below. Revenue and percentages auto-calculate.
+ * UPDATING TIERS: Edit the TIERS array in src/lib/pricing-tiers.ts.
  */
 
 import { useState } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
-// ─── Pricing tiers (easy to edit) ───
-const TIERS = [
-  { min: 1, max: 10, price: 0, label: "Free" },
-  { min: 11, max: 24, price: 29, label: "$29/mo" },
-  { min: 25, max: 49, price: 49, label: "$49/mo" },
-  { min: 50, max: 74, price: 99, label: "$99/mo" },
-  { min: 75, max: 99, price: 129, label: "$129/mo" },
-  { min: 100, max: 199, price: 199, label: "$199/mo" },
-  { min: 200, max: 399, price: 299, label: "$299/mo" },
-  { min: 400, max: 699, price: 499, label: "$499/mo" },
-  { min: 700, max: 1000, price: 799, label: "$799/mo" },
-  { min: 1001, max: Infinity, price: -1, label: "Custom" },
-];
+import { TIERS } from "@/lib/pricing-tiers";
 
 const TICK_VALUES = [40, 50, 60, 70, 80, 100, 120];
 
@@ -100,7 +87,7 @@ export function PricingCalculator() {
                   )}
                 </div>
                 <div className="text-lg font-bold text-foreground">
-                  {isCustom ? "Haven't thought that far" : isFree ? "$0" : tier.label}
+                  {isCustom ? "Let's talk" : isFree ? "$0" : tier.label}
                 </div>
                 {!isFree && !isCustom && (
                   <div className="space-y-1">
@@ -112,7 +99,7 @@ export function PricingCalculator() {
                     </div>
                   </div>
                 )}
-                {isCustom && <div className="text-xs text-muted-foreground">Is this even possible?</div>}
+                {isCustom && <div className="text-xs text-muted-foreground">Reach out — we'll build a plan together</div>}
                 {isFree && <div className="text-xs text-muted-foreground">Get started at no cost</div>}
               </CardContent>
             </Card>

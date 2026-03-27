@@ -8,12 +8,13 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useStripeConnection, useOperatorSettings, useSaveOperatorSettings } from "@/hooks/useSupabaseData";
-import { CheckCircle, AlertTriangle, Loader2, ExternalLink, Eye, EyeOff, ChevronDown, Mail, RotateCcw } from "lucide-react";
+import { CheckCircle, AlertTriangle, Loader2, ExternalLink, Eye, EyeOff, ChevronDown, Mail, RotateCcw, Sparkles, CreditCard } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
+import { useSubscription } from "@/hooks/useSubscription";
 
 const DEFAULT_TEMPLATES = {
   template_upcoming_subject: "Payment Reminder",
@@ -135,6 +136,8 @@ export default function SettingsPage() {
     toast.info("Template reset to default");
   };
 
+  const subscription = useSubscription();
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -146,6 +149,48 @@ export default function SettingsPage() {
           {saveSettings.isPending ? "Saving..." : "Save Settings"}
         </Button>
       </div>
+
+      {/* Your Plan */}
+      <Card>
+        <CardHeader className="p-3 pb-2">
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            Your Plan
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-3 pt-0">
+          {subscription.loading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking plan…
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium">
+                  {subscription.tier.name} {subscription.tier.price > 0 ? `— ${subscription.tier.label}` : ""}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {subscription.activeRenters} active renter{subscription.activeRenters !== 1 ? "s" : ""}
+                  {subscription.subscriptionEnd && ` · Renews ${new Date(subscription.subscriptionEnd).toLocaleDateString()}`}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                {subscription.subscribed ? (
+                  <Button size="sm" variant="outline" onClick={subscription.manageSubscription} className="gap-1.5">
+                    <CreditCard className="h-3.5 w-3.5" />
+                    Manage billing
+                  </Button>
+                ) : subscription.tier.price > 0 ? (
+                  <Button size="sm" onClick={subscription.checkout} className="gap-1.5">
+                    <CreditCard className="h-3.5 w-3.5" />
+                    Add payment method
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Row 1: Billing Defaults + Reminder Timing */}
       <div className="grid md:grid-cols-2 gap-3">
