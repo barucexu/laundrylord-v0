@@ -3,10 +3,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useMachines, useRenters, type MachineRow } from "@/hooks/useSupabaseData";
+import { useSubscription } from "@/hooks/useSubscription";
 import { Link } from "react-router-dom";
 import { Plus, Pencil } from "lucide-react";
 import { CreateMachineDialog } from "@/components/CreateMachineDialog";
 import { EditMachineDialog } from "@/components/EditMachineDialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function MachinesList() {
   const { data: machines = [], isLoading } = useMachines();
