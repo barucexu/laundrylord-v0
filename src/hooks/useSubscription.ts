@@ -30,7 +30,7 @@ export function useSubscription(): SubscriptionState {
   const aggressivePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const aggressiveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Count ALL renters (every status), not just active
+  // Count non-archived renters (useRenters excludes archived)
   const renterCount = renters?.length ?? 0;
   const tier = getTierForCount(renterCount);
 

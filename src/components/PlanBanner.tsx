@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { needsSubscription } from "@/lib/pricing-tiers";
-import { X, Sparkles, CreditCard, ArrowUpCircle } from "lucide-react";
+import { X, Sparkles, ArrowUpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 
 export function PlanBanner() {
-  const { tier, renterCount, subscribed, loading, canAddRenter } = useSubscription();
+  const { tier, renterCount, subscribed, loading, checkout } = useSubscription();
   const [dismissed, setDismissed] = useState<string | null>(null);
 
   if (loading) return null;
@@ -33,12 +33,7 @@ export function PlanBanner() {
 
   const handleCheckout = async () => {
     try {
-      const { supabase } = await import("@/integrations/supabase/client");
-      const { data, error } = await supabase.functions.invoke("create-checkout", {
-        body: { price_id: tier.price_id },
-      });
-      if (error) throw error;
-      if (data?.url) window.open(data.url, "_blank");
+      await checkout();
     } catch (e) {
       toast({
         title: "Couldn't start checkout",
