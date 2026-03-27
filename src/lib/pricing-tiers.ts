@@ -22,12 +22,12 @@ export const TIERS: PricingTier[] = [
   { name: "Custom",  min: 100, max: Infinity, price: -1,   label: "Let's talk" },
 ];
 
-/** Returns the tier matching a given active renter count. */
-export function getTierForCount(activeRenters: number): PricingTier {
-  return TIERS.find((t) => activeRenters >= t.min && activeRenters <= t.max) ?? TIERS[0];
+/** Returns the tier matching a given total renter count (all statuses). */
+export function getTierForCount(totalRenters: number): PricingTier {
+  return TIERS.find((t) => totalRenters >= t.min && totalRenters <= t.max) ?? TIERS[0];
 }
 
 /** Whether the operator is in a paid tier but may not be subscribed yet. */
-export function needsSubscription(activeRenters: number): boolean {
-  return activeRenters > 10 && activeRenters < 100;
+export function needsSubscription(totalRenters: number): boolean {
+  return totalRenters > 10 && totalRenters < 100;
 }

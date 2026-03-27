@@ -170,7 +170,7 @@ export default function SettingsPage() {
                   {subscription.tier.name} {subscription.tier.price > 0 ? `— ${subscription.tier.label}` : ""}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {subscription.activeRenters} active renter{subscription.activeRenters !== 1 ? "s" : ""}
+                  {subscription.renterCount} renter{subscription.renterCount !== 1 ? "s" : ""}
                   {subscription.subscriptionEnd && ` · Renews ${new Date(subscription.subscriptionEnd).toLocaleDateString()}`}
                 </p>
               </div>

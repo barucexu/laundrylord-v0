@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 
 export function PlanBanner() {
-  const { tier, activeRenters, subscribed, loading } = useSubscription();
+  const { tier, renterCount, subscribed, loading, canAddRenter } = useSubscription();
   const [dismissed, setDismissed] = useState<string | null>(null);
 
   if (loading) return null;
 
-  const isPaid = needsSubscription(activeRenters);
-  const isCustom = activeRenters >= 100;
+  const isPaid = needsSubscription(renterCount);
+  const isCustom = renterCount >= 100;
 
   // Nothing to show for free tier
   if (!isPaid && !isCustom) return null;
@@ -22,8 +22,8 @@ export function PlanBanner() {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-4 py-2 mb-4 text-xs text-muted-foreground">
         <Sparkles className="h-3.5 w-3.5 text-primary" />
-        <span>
-          {tier.name} plan · {activeRenters} active renter{activeRenters !== 1 ? "s" : ""}
+         <span>
+          {tier.name} plan · {renterCount} renter{renterCount !== 1 ? "s" : ""}
         </span>
       </div>
     );
@@ -37,7 +37,7 @@ export function PlanBanner() {
         <Sparkles className="h-5 w-5 text-primary mt-0.5 shrink-0" />
         <div className="space-y-1 text-sm">
           <p className="font-medium text-foreground">
-            Wow — {activeRenters} renters! You've outgrown our standard plans.
+            Wow — {renterCount} renters! You've outgrown our standard plans.
           </p>
           <p className="text-muted-foreground">
             We'd love to set up a custom plan for your operation. Reach out and we'll take care of you.
@@ -88,7 +88,7 @@ export function PlanBanner() {
       <div className="space-y-2">
         <div className="space-y-1 text-sm">
           <p className="font-medium text-foreground">
-            Nice — you've grown to {activeRenters} renter{activeRenters !== 1 ? "s" : ""}!
+            Nice — you've grown to {renterCount} renter{renterCount !== 1 ? "s" : ""}!
           </p>
           <p className="text-muted-foreground">
             Your plan is now <span className="font-medium text-foreground">{tier.name}</span> ({tier.label}).

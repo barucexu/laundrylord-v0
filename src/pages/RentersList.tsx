@@ -6,14 +6,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useRenters } from "@/hooks/useSupabaseData";
+import { useSubscription } from "@/hooks/useSubscription";
 import { Search, Plus } from "lucide-react";
 import { CreateRenterDialog } from "@/components/CreateRenterDialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function RentersList() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: renters = [], isLoading } = useRenters();
+  const { canAddRenter } = useSubscription();
 
   const filtered = renters.filter(r => {
     const matchesSearch = r.name.toLowerCase().includes(search.toLowerCase()) || (r.phone || "").includes(search);
@@ -28,9 +31,20 @@ export default function RentersList() {
           <h1 className="text-xl font-semibold tracking-tight">Renters</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{filtered.length} renters</p>
         </div>
-        <Button size="sm" onClick={() => setDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Add Renter
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span tabIndex={0}>
+              <Button size="sm" onClick={() => setDialogOpen(true)} disabled={!canAddRenter}>
+                <Plus className="h-4 w-4 mr-1" /> Add Renter
+              </Button>
+            </span>
+          </TooltipTrigger>
+          {!canAddRenter && (
+            <TooltipContent>
+              <p>Upgrade your plan to add more renters</p>
+            </TooltipContent>
+          )}
+        </Tooltip>
       </div>
 
       <div className="flex gap-3">

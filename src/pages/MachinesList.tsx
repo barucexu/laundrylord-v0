@@ -3,16 +3,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useMachines, useRenters, type MachineRow } from "@/hooks/useSupabaseData";
+import { useSubscription } from "@/hooks/useSubscription";
 import { Link } from "react-router-dom";
 import { Plus, Pencil } from "lucide-react";
 import { CreateMachineDialog } from "@/components/CreateMachineDialog";
 import { EditMachineDialog } from "@/components/EditMachineDialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function MachinesList() {
   const { data: machines = [], isLoading } = useMachines();
   const { data: renters = [] } = useRenters();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editMachine, setEditMachine] = useState<MachineRow | null>(null);
+  const { canAddRenter } = useSubscription();
 
   const getRenterForMachine = (machineId: string) => renters.find(r => r.machine_id === machineId);
 
@@ -23,9 +26,20 @@ export default function MachinesList() {
           <h1 className="text-xl font-semibold tracking-tight">Machines</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{machines.length} machines</p>
         </div>
-        <Button size="sm" onClick={() => setDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Add Machine
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span tabIndex={0}>
+              <Button size="sm" onClick={() => setDialogOpen(true)} disabled={!canAddRenter}>
+                <Plus className="h-4 w-4 mr-1" /> Add Machine
+              </Button>
+            </span>
+          </TooltipTrigger>
+          {!canAddRenter && (
+            <TooltipContent>
+              <p>Upgrade your plan to add more renters</p>
+            </TooltipContent>
+          )}
+        </Tooltip>
       </div>
 
       {isLoading ? (
