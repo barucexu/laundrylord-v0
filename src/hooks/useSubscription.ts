@@ -130,9 +130,9 @@ export function useSubscription(): SubscriptionState {
   }, []);
 
   // Compute whether the operator can add more renters
+  // HARD STOP: while loading, block additions to prevent race condition
   const canAddRenter = (() => {
-    // While loading, give benefit of the doubt
-    if (loading) return true;
+    if (loading) return false;
     // Free tier: can add up to max (10)
     if (tier.price === 0) return renterCount < tier.max;
     // Custom tier: must have subscription

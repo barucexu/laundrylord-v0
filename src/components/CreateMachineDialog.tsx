@@ -11,9 +11,10 @@ import { toast } from "sonner";
 interface CreateMachineDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  canAddRenter?: boolean;
 }
 
-export function CreateMachineDialog({ open, onOpenChange }: CreateMachineDialogProps) {
+export function CreateMachineDialog({ open, onOpenChange, canAddRenter = true }: CreateMachineDialogProps) {
   const createMachine = useCreateMachine();
   const [form, setForm] = useState({
     type: "washer",
@@ -28,6 +29,10 @@ export function CreateMachineDialog({ open, onOpenChange }: CreateMachineDialogP
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canAddRenter) {
+      toast.error("You've reached your plan limit. Upgrade to add more renters.");
+      return;
+    }
     if (!form.serial.trim()) {
       toast.error("Serial number is required");
       return;

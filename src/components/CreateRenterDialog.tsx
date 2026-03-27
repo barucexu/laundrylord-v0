@@ -19,9 +19,10 @@ import { toast } from "sonner";
 interface CreateRenterDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  canAddRenter?: boolean;
 }
 
-export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogProps) {
+export function CreateRenterDialog({ open, onOpenChange, canAddRenter = true }: CreateRenterDialogProps) {
   const createRenter = useCreateRenter();
   const { data: opSettings } = useOperatorSettings();
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
@@ -58,6 +59,10 @@ export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogPro
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canAddRenter) {
+      toast.error("You've reached your plan limit. Upgrade to add more renters.");
+      return;
+    }
     if (!form.name.trim()) {
       toast.error("Name is required");
       return;
