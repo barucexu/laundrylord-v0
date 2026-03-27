@@ -9,7 +9,7 @@ import { useRenters } from "@/hooks/useSupabaseData";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Search, Plus } from "lucide-react";
 import { CreateRenterDialog } from "@/components/CreateRenterDialog";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export default function RentersList() {
   const [search, setSearch] = useState("");
