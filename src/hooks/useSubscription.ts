@@ -135,9 +135,7 @@ export function useSubscription(): SubscriptionState {
     if (loading) return false;
     // Free tier: can add up to max (10)
     if (tier.price === 0) return renterCount < tier.max;
-    // Custom tier: must have subscription
-    if (tier.price === -1) return subscribed;
-    // Paid tier: must be subscribed and under the max
+    // All paid tiers: must be subscribed and under the max
     return subscribed && renterCount < tier.max;
   })();
 
