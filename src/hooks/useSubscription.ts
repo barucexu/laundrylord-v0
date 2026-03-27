@@ -20,7 +20,7 @@ interface SubscriptionState {
 }
 
 export function useSubscription(): SubscriptionState {
-  const { user } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
   const { data: renters } = useRenters();
   const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -31,11 +31,31 @@ export function useSubscription(): SubscriptionState {
   const tier = getTierForCount(activeRenters);
 
   const checkSubscription = useCallback(async () => {
-    if (!user) {
+    if (authLoading) {
+      return;
+    }
+
+    if (!user || !session?.access_token) {
+      setSubscribed(false);
+      setProductId(null);
+      setSubscriptionEnd(null);
       setLoading(false);
       return;
     }
+
+    setLoading(true);
+
     try {
+      const { data: authData, error: authError } = await supabase.auth.getUser(session.access_token);
+
+      if (authError || !authData.user) {
+        await supabase.auth.signOut({ scope: "local" });
+        setSubscribed(false);
+        setProductId(null);
+        setSubscriptionEnd(null);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke("check-subscription");
       if (error) throw error;
       setSubscribed(data?.subscribed ?? false);
@@ -47,13 +67,22 @@ export function useSubscription(): SubscriptionState {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [authLoading, session?.access_token, user]);
 
   useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
     checkSubscription();
+
+    if (!user || !session?.access_token) {
+      return;
+    }
+
     const interval = setInterval(checkSubscription, 60_000);
     return () => clearInterval(interval);
-  }, [checkSubscription]);
+  }, [authLoading, checkSubscription, session?.access_token, user]);
 
   const checkout = useCallback(async () => {
     if (!tier.price_id) return;
