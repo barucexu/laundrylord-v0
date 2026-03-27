@@ -17,12 +17,6 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    { auth: { persistSession: false } },
-  );
-
   try {
     logStep("Function started");
 
@@ -32,10 +26,15 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header");
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    // Use anon key + forwarded auth header so getUser works correctly
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } },
+    );
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError) throw new Error(`Auth error: ${userError.message}`);
-    const user = userData.user;
     if (!user?.email) throw new Error("User not authenticated or email not available");
     logStep("User authenticated", { userId: user.id, email: user.email });
 
@@ -67,7 +66,20 @@ serve(async (req) => {
 
     const sub = subscriptions.data[0];
     const productId = sub.items.data[0]?.price?.product ?? null;
-    const subscriptionEnd = new Date(sub.current_period_end * 1000).toISOString();
+
+    // Defensive: current_period_end could be number (unix) or string
+    let subscriptionEnd: string | null = null;
+    try {
+      const endVal = sub.current_period_end;
+      if (typeof endVal === "number" && endVal > 0) {
+        subscriptionEnd = new Date(endVal * 1000).toISOString();
+      } else if (typeof endVal === "string") {
+        subscriptionEnd = endVal;
+      }
+    } catch {
+      logStep("Could not parse current_period_end", { raw: sub.current_period_end });
+    }
+
     logStep("Active subscription found", { subscriptionId: sub.id, productId, subscriptionEnd });
 
     return new Response(
