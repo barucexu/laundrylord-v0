@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { needsSubscription } from "@/lib/pricing-tiers";
-import { X, Sparkles, CreditCard } from "lucide-react";
+import { X, Sparkles, CreditCard, ArrowUpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 
@@ -12,10 +12,9 @@ export function PlanBanner() {
   if (loading) return null;
 
   const isPaid = needsSubscription(renterCount);
-  const isCustom = renterCount >= 100;
 
-  // Nothing to show for free tier
-  if (!isPaid && !isCustom) return null;
+  // Nothing to show for free tier under limit
+  if (!isPaid) return null;
 
   // Already subscribed — show a small status line
   if (subscribed) {
@@ -29,44 +28,11 @@ export function PlanBanner() {
     );
   }
 
-  // Custom tier — contact us
-  if (isCustom) {
-    if (dismissed === "custom") return null;
-    return (
-      <div className="relative flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 px-5 py-4 mb-4">
-        <Sparkles className="h-5 w-5 text-primary mt-0.5 shrink-0" />
-        <div className="space-y-1 text-sm">
-          <p className="font-medium text-foreground">
-            Wow — {renterCount} renters! You've outgrown our standard plans.
-          </p>
-          <p className="text-muted-foreground">
-            We'd love to set up a custom plan for your operation. Reach out and we'll take care of you.
-          </p>
-          <a
-            href="mailto:support@laundrylord.com?subject=Custom%20plan%20inquiry"
-            className="inline-block mt-1 text-primary font-medium hover:underline"
-          >
-            Get in touch →
-          </a>
-        </div>
-        <button
-          onClick={() => setDismissed("custom")}
-          className="absolute top-3 right-3 text-muted-foreground hover:text-foreground transition-colors"
-          aria-label="Dismiss"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-    );
-  }
-
-  // Paid tier, not subscribed — gentle nudge
+  // Paid tier, not subscribed — upgrade nudge
   if (dismissed === tier.name) return null;
 
   const handleCheckout = async () => {
     try {
-      const { useSubscription } = await import("@/hooks/useSubscription");
-      // We already have the hook data — call checkout directly via supabase
       const { supabase } = await import("@/integrations/supabase/client");
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         body: { price_id: tier.price_id },
@@ -82,6 +48,9 @@ export function PlanBanner() {
     }
   };
 
+  // Determine if this is the first paid tier (Free → Starter)
+  const isFirstUpgrade = tier.name === "Starter";
+
   return (
     <div className="relative flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 px-5 py-4 mb-4">
       <Sparkles className="h-5 w-5 text-primary mt-0.5 shrink-0" />
@@ -91,13 +60,15 @@ export function PlanBanner() {
             Nice — you've grown to {renterCount} renter{renterCount !== 1 ? "s" : ""}!
           </p>
           <p className="text-muted-foreground">
-            Your plan is now <span className="font-medium text-foreground">{tier.name}</span> ({tier.label}).
-            Add a payment method to keep things running smoothly. Bank account is the easiest option.
+            {isFirstUpgrade
+              ? <>Upgrade to <span className="font-medium text-foreground">{tier.name}</span> ({tier.label}) to keep growing. Adding a bank account is the easiest option.</>
+              : <>Time to upgrade to <span className="font-medium text-foreground">{tier.name}</span> ({tier.label}) to keep things running smoothly.</>
+            }
           </p>
         </div>
         <Button size="sm" onClick={handleCheckout} className="gap-1.5">
-          <CreditCard className="h-3.5 w-3.5" />
-          Add payment method
+          <ArrowUpCircle className="h-3.5 w-3.5" />
+          Upgrade to {tier.name}
         </Button>
       </div>
       <button
