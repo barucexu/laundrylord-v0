@@ -124,7 +124,7 @@ export default function RentersList() {
         </div>
       )}
 
-      <CreateRenterDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      <CreateRenterDialog open={dialogOpen} onOpenChange={setDialogOpen} canAddRenter={canAddRenter} />
     </div>
   );
 }
