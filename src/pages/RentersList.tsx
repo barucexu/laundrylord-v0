@@ -31,9 +31,20 @@ export default function RentersList() {
           <h1 className="text-xl font-semibold tracking-tight">Renters</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{filtered.length} renters</p>
         </div>
-        <Button size="sm" onClick={() => setDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Add Renter
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span tabIndex={0}>
+              <Button size="sm" onClick={() => setDialogOpen(true)} disabled={!canAddRenter}>
+                <Plus className="h-4 w-4 mr-1" /> Add Renter
+              </Button>
+            </span>
+          </TooltipTrigger>
+          {!canAddRenter && (
+            <TooltipContent>
+              <p>Upgrade your plan to add more renters</p>
+            </TooltipContent>
+          )}
+        </Tooltip>
       </div>
 
       <div className="flex gap-3">

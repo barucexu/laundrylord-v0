@@ -26,9 +26,20 @@ export default function MachinesList() {
           <h1 className="text-xl font-semibold tracking-tight">Machines</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{machines.length} machines</p>
         </div>
-        <Button size="sm" onClick={() => setDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Add Machine
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span tabIndex={0}>
+              <Button size="sm" onClick={() => setDialogOpen(true)} disabled={!canAddRenter}>
+                <Plus className="h-4 w-4 mr-1" /> Add Machine
+              </Button>
+            </span>
+          </TooltipTrigger>
+          {!canAddRenter && (
+            <TooltipContent>
+              <p>Upgrade your plan to add more renters</p>
+            </TooltipContent>
+          )}
+        </Tooltip>
       </div>
 
       {isLoading ? (

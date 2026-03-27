@@ -88,7 +88,7 @@ export function PlanBanner() {
       <div className="space-y-2">
         <div className="space-y-1 text-sm">
           <p className="font-medium text-foreground">
-            Nice — you've grown to {activeRenters} renter{activeRenters !== 1 ? "s" : ""}!
+            Nice — you've grown to {renterCount} renter{renterCount !== 1 ? "s" : ""}!
           </p>
           <p className="text-muted-foreground">
             Your plan is now <span className="font-medium text-foreground">{tier.name}</span> ({tier.label}).
