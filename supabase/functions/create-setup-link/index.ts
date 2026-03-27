@@ -68,13 +68,15 @@ serve(async (req) => {
     }
 
     const origin = req.headers.get("origin") || "https://laundrylord-v0.lovable.app";
-    // ACH groundwork: bank accounts can be collected but microdeposit verification
+    // ACH is listed first so Stripe Checkout defaults to bank account (0.8% capped $5)
+    // instead of card (2.9% + $0.30). Renters can still choose card if they prefer.
+    // Groundwork: bank accounts can be collected but microdeposit verification
     // delays may apply for manual entry. Plaid-linked accounts work immediately.
     // Full ACH subscription support is not complete in this pass.
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "setup",
-      payment_method_types: ["card", "us_bank_account"],
+      payment_method_types: ["us_bank_account", "card"],
       success_url: `${origin}/renters/${renter_id}?setup=success`,
       cancel_url: `${origin}/renters/${renter_id}?setup=canceled`,
       metadata: { renter_id: renter.id },
