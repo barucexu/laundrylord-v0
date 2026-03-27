@@ -29,14 +29,15 @@ export default function MachinesList() {
         <Tooltip>
           <TooltipTrigger asChild>
             <span tabIndex={0}>
-              <Button size="sm" onClick={() => setDialogOpen(true)} disabled={!canAddRenter}>
+              <Button size="sm" onClick={() => { if (canAddRenter) setDialogOpen(true); }} disabled={!canAddRenter}>
                 <Plus className="h-4 w-4 mr-1" /> Add Machine
               </Button>
             </span>
           </TooltipTrigger>
           {!canAddRenter && (
-            <TooltipContent>
-              <p>Upgrade your plan to add more renters</p>
+            <TooltipContent className="max-w-xs">
+              <p className="font-medium">You've grown to {renterCount} renter{renterCount !== 1 ? "s" : ""}!</p>
+              <p className="text-xs mt-1">Your plan is now {tier.name} ({tier.label}). Add a payment method to keep adding machines.</p>
             </TooltipContent>
           )}
         </Tooltip>
