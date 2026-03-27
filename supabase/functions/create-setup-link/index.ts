@@ -51,10 +51,13 @@ serve(async (req) => {
 
     let customerId = renter.stripe_customer_id;
     if (!customerId) {
+      // Filter out placeholder strings that aren't real contact info
+      const isRealEmail = renter.email && !renter.email.toLowerCase().includes("no email");
+      const isRealPhone = renter.phone && !renter.phone.toLowerCase().includes("no phone");
       const customer = await stripe.customers.create({
         name: renter.name,
-        email: renter.email || undefined,
-        phone: renter.phone || undefined,
+        email: isRealEmail ? renter.email : undefined,
+        phone: isRealPhone ? renter.phone : undefined,
         metadata: { renter_id: renter.id, user_id: userData.user.id },
       });
       customerId = customer.id;
