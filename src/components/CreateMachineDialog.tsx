@@ -29,6 +29,10 @@ export function CreateMachineDialog({ open, onOpenChange, canAddRenter = true }:
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canAddRenter) {
+      toast.error("You've reached your plan limit. Upgrade to add more renters.");
+      return;
+    }
     if (!form.serial.trim()) {
       toast.error("Serial number is required");
       return;

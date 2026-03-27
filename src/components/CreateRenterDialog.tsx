@@ -59,6 +59,10 @@ export function CreateRenterDialog({ open, onOpenChange, canAddRenter = true }: 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canAddRenter) {
+      toast.error("You've reached your plan limit. Upgrade to add more renters.");
+      return;
+    }
     if (!form.name.trim()) {
       toast.error("Name is required");
       return;
