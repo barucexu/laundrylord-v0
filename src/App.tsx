@@ -17,6 +17,7 @@ import PaymentsView from "@/pages/PaymentsView";
 import MaintenanceView from "@/pages/MaintenanceView";
 import SettingsPage from "@/pages/SettingsPage";
 import ImportPage from "@/pages/ImportPage";
+import RenterArchive from "@/pages/RenterArchive";
 import AuthPage from "@/pages/AuthPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import NotFound from "@/pages/NotFound";
