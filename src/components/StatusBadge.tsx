@@ -25,6 +25,8 @@ const statusStyles: Record<string, string> = {
   reported: "bg-warning/10 text-warning",
   in_progress: "bg-primary/10 text-primary",
   resolved: "bg-success/10 text-success",
+  // Archive status
+  archived: "bg-muted text-muted-foreground",
 };
 
 const statusLabels: Record<string, string> = {
