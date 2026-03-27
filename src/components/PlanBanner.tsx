@@ -33,12 +33,7 @@ export function PlanBanner() {
 
   const handleCheckout = async () => {
     try {
-      const { supabase } = await import("@/integrations/supabase/client");
-      const { data, error } = await supabase.functions.invoke("create-checkout", {
-        body: { price_id: tier.price_id },
-      });
-      if (error) throw error;
-      if (data?.url) window.open(data.url, "_blank");
+      await checkout();
     } catch (e) {
       toast({
         title: "Couldn't start checkout",
