@@ -203,9 +203,9 @@ export default function RenterDetail() {
                     ) : (
                       <Send className="h-4 w-4" />
                     )}
-                    Send Card Setup Link
+                    Send Payment Setup Link
                   </Button>
-                  <p className="text-xs text-muted-foreground">→ Send a secure link to collect the renter's card on file</p>
+                  <p className="text-xs text-muted-foreground">→ Send a secure link for the renter to add a payment method</p>
                 </>
               )}
 
