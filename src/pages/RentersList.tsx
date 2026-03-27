@@ -9,14 +9,14 @@ import { useRenters } from "@/hooks/useSupabaseData";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Search, Plus } from "lucide-react";
 import { CreateRenterDialog } from "@/components/CreateRenterDialog";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export default function RentersList() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: renters = [], isLoading } = useRenters();
-  const { canAddRenter, tier, renterCount } = useSubscription();
+  const { canAddRenter, tier, renterCount, checkout } = useSubscription();
 
   const filtered = renters.filter(r => {
     const matchesSearch = r.name.toLowerCase().includes(search.toLowerCase()) || (r.phone || "").includes(search);
@@ -36,25 +36,32 @@ export default function RentersList() {
             </Link>
           </div>
         </div>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span tabIndex={0}>
-              <Button size="sm" onClick={() => { if (canAddRenter) setDialogOpen(true); }} disabled={!canAddRenter}>
+        {canAddRenter ? (
+          <Button size="sm" onClick={() => setDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Add Renter
+          </Button>
+        ) : (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button size="sm" variant="secondary" className="opacity-70">
                 <Plus className="h-4 w-4 mr-1" /> Add Renter
               </Button>
-            </span>
-          </TooltipTrigger>
-          {!canAddRenter && (
-            <TooltipContent className="max-w-xs">
-              <p className="font-medium">You've grown to {renterCount} renter{renterCount !== 1 ? "s" : ""}!</p>
-              <p className="text-xs mt-1">
+            </PopoverTrigger>
+            <PopoverContent className="max-w-xs">
+              <p className="font-medium text-sm">You've grown to {renterCount} renter{renterCount !== 1 ? "s" : ""}!</p>
+              <p className="text-xs text-muted-foreground mt-1">
                 {tier.price === 0
                   ? "You've reached 10 renters. Upgrade to Starter ($29/mo) to keep growing."
                   : `Upgrade to ${tier.name} (${tier.label}) to add more renters.`}
               </p>
-            </TooltipContent>
-          )}
-        </Tooltip>
+              {tier.price_id && (
+                <Button size="sm" className="w-full mt-3" onClick={() => checkout()}>
+                  Upgrade to {tier.name}
+                </Button>
+              )}
+            </PopoverContent>
+          </Popover>
+        )}
       </div>
 
       <div className="flex gap-3">
