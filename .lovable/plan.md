@@ -1,80 +1,45 @@
 
 
-# Simplified SaaS Pricing — Revised Plan
+# Enforce SaaS Tier Limits on Add Renter / Add Machine
 
-## Pricing Model (6 tiers, down from 10)
+## Summary
 
-| Tier | Renters | Price |
-|------|---------|-------|
-| Free | 1–10 | $0 |
-| Starter | 11–24 | $29/mo |
-| Growth | 25–49 | $49/mo |
-| Pro | 50–74 | $99/mo |
-| Scale | 75–99 | $129/mo |
-| Custom | 100+ | Contact us |
+Switch renter counting from "active only" to **total renters** (all statuses), and disable the "Add Renter" and "Add Machine" buttons when the operator exceeds their paid tier's max. Grant immediate access after checkout but re-check subscription status to catch failed payments.
 
-## What Gets Built
+## Stripe Key Clarification
 
-### 1. Shared tier logic — `src/lib/pricing-tiers.ts`
-- Extract the simplified 6-tier `TIERS` array into a shared module
-- Export `getTierForCount(activeRenters)` helper
-- Each paid tier includes its Stripe `price_id` (created via Stripe tools)
+The SaaS billing (`check-subscription`, `create-checkout`, `customer-portal`) correctly uses the **platform STRIPE_SECRET_KEY** (Bruce's key set as an env var). The operator's own Stripe key (stored in `stripe_keys` table) is only used for renter billing. These are separate — confirmed working as designed.
 
-### 2. Update PricingCalculator
-- Import from shared module, remove local `TIERS`
-- Grid shrinks from 10 cards to 6 — cleaner, less intimidating
-- "Custom" tier copy: "Let's talk" (not "Haven't thought that far")
+## Changes
 
-### 3. Create 4 Stripe products + prices
-- Starter ($29), Growth ($49), Pro ($99), Scale ($129) — monthly recurring
-- No products needed for Free or Custom tiers
+### 1. Count ALL renters, not just active — `src/lib/pricing-tiers.ts`
+- Update `getTierForCount` comment to say "total renters"
+- `needsSubscription` threshold stays the same (>10 total renters)
 
-### 4. Three new edge functions
+### 2. Update `useSubscription.ts`
+- Change `activeRenters` to count **all** renters (`renters?.length ?? 0`) instead of filtering by `status === "active"`
+- Rename the field to `renterCount` for clarity
+- Expose a new computed boolean: `canAddRenter` — true when:
+  - Tier is Free and count < 10, OR
+  - Tier is paid and `subscribed === true` and count < tier max, OR
+  - Still `loading` (give benefit of the doubt during load)
+- After checkout completes, trigger an aggressive re-check (poll every 5s for 60s) to detect payment confirmation quickly, then fall back to normal 60s polling
 
-**`check-subscription`** — Looks up operator's subscription status using platform Stripe key. Free-tier operators (≤10 renters) skip Stripe entirely and return `{ tier: "free" }`.
+### 3. Disable buttons — `src/pages/RentersList.tsx` and `src/pages/MachinesList.tsx`
+- Import `useSubscription` hook
+- Disable "Add Renter" / "Add Machine" button when `canAddRenter === false`
+- Show a tooltip or small helper text: "Upgrade your plan to add more renters"
 
-**`create-checkout`** — Creates a Stripe Checkout session for the correct tier based on active renter count. Defaults to ACH-first payment method ordering.
+### 4. Update `PlanBanner.tsx`
+- Use `renterCount` (total) instead of `activeRenters`
+- Update copy from "active renters" to "renters"
 
-**`customer-portal`** — Returns a Stripe Customer Portal URL so operators can manage billing themselves.
+### 5. Update `SettingsPage.tsx`
+- Same rename: display total renter count, not active-only
 
-### 5. `src/hooks/useSubscription.ts`
-- Calls `check-subscription` on auth change
-- Exposes `{ tier, subscribed, loading }`
-- Counts active renters via existing `useRenters()`
-
-### 6. `src/components/PlanBanner.tsx` — the gentle nudge
-A calm, dismissible banner inside `AppLayout` (above `<Outlet />`). Behavior:
-
-- **≤10 renters**: No banner. Clean experience.
-- **11+ renters, already subscribed**: Small subtle badge — "Starter plan · 14 active renters"
-- **11+ renters, not subscribed**: Congratulatory milestone message. Example copy: *"Nice — you've grown to 14 renters! Your plan is now Starter ($29/mo). Add a payment method to keep things running smoothly. Bank account is the easiest option."* With a single calm CTA button. Dismissible per session; re-appears if tier changes.
-
-No modals. No lockouts. No blocked features. Just a top banner.
-
-### 7. Settings page — "Your Plan" section
-Add a small card to SettingsPage showing current tier, renter count, and a "Manage billing" link (Stripe Customer Portal).
-
-### 8. `AppLayout.tsx`
-Render `<PlanBanner />` above `<Outlet />`.
-
-## Files Summary
-
-| Action | File |
-|--------|------|
-| Create (Stripe) | 4 products + 4 prices |
-| Create | `src/lib/pricing-tiers.ts` |
-| Create | `src/hooks/useSubscription.ts` |
-| Create | `src/components/PlanBanner.tsx` |
-| Create | `supabase/functions/check-subscription/index.ts` |
-| Create | `supabase/functions/create-checkout/index.ts` |
-| Create | `supabase/functions/customer-portal/index.ts` |
-| Modify | `src/components/PricingCalculator.tsx` |
-| Modify | `src/components/AppLayout.tsx` |
-| Modify | `src/pages/SettingsPage.tsx` |
-
-## What this does NOT do
-- No hard paywall or feature lockout
-- No auto-downgrade logic (keep current tier until next cycle)
-- No database schema changes — subscription state lives in Stripe
-- Existing renter billing flows completely untouched
+## What this does NOT change
+- No database or schema changes
+- No hard paywall — existing renters/machines remain accessible
+- Operator's renter billing flows untouched
+- Edge functions unchanged (they don't enforce limits)
 
