@@ -11,8 +11,8 @@ export function PlanBanner() {
 
   if (loading) return null;
 
-  const isPaid = needsSubscription(activeRenters);
-  const isCustom = activeRenters >= 100;
+  const isPaid = needsSubscription(renterCount);
+  const isCustom = renterCount >= 100;
 
   // Nothing to show for free tier
   if (!isPaid && !isCustom) return null;
