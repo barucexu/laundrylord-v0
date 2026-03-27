@@ -26,25 +26,32 @@ export default function MachinesList() {
           <h1 className="text-xl font-semibold tracking-tight">Machines</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{machines.length} machines</p>
         </div>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span tabIndex={0}>
-              <Button size="sm" onClick={() => { if (canAddRenter) setDialogOpen(true); }} disabled={!canAddRenter}>
+        {canAddRenter ? (
+          <Button size="sm" onClick={() => setDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Add Machine
+          </Button>
+        ) : (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button size="sm" variant="secondary" className="opacity-70">
                 <Plus className="h-4 w-4 mr-1" /> Add Machine
               </Button>
-            </span>
-          </TooltipTrigger>
-          {!canAddRenter && (
-            <TooltipContent className="max-w-xs">
-              <p className="font-medium">You've grown to {renterCount} renter{renterCount !== 1 ? "s" : ""}!</p>
-              <p className="text-xs mt-1">
+            </PopoverTrigger>
+            <PopoverContent className="max-w-xs">
+              <p className="font-medium text-sm">You've grown to {renterCount} renter{renterCount !== 1 ? "s" : ""}!</p>
+              <p className="text-xs text-muted-foreground mt-1">
                 {tier.price === 0
                   ? "You've reached 10 renters. Upgrade to Starter ($29/mo) to keep growing."
                   : `Upgrade to ${tier.name} (${tier.label}) to add more machines.`}
               </p>
-            </TooltipContent>
-          )}
-        </Tooltip>
+              {tier.price_id && (
+                <Button size="sm" className="w-full mt-3" onClick={() => checkout()}>
+                  Upgrade to {tier.name}
+                </Button>
+              )}
+            </PopoverContent>
+          </Popover>
+        )}
       </div>
 
       {isLoading ? (
