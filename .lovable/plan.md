@@ -1,42 +1,81 @@
+these bruce's human-added notes first, override the plan below in parts where it directly conflicts.
 
+add payment method is from free plan to starter, and make it smart to check if there is a payment method at all. This shouldn't show up from tier starter to tier growth and so on because their payment method should already be saved.
 
-# Three Fixes: Hard-stop Add Renter, Better Tooltip, Archive Status Constraint
+lovable's original plan:
 
-## Issues
+# Standardize SaaS Tier System: Expand to 10 Tiers with Consistent Upgrade UX
 
-1. **Race condition**: `canAddRenter` starts as `true` while `loading`, so clicking "Add Renter" before the subscription check completes bypasses the limit.
-2. **Tooltip message**: When the button is grayed out, the tooltip should show the same upgrade CTA from PlanBanner (tier name, renter count, payment method prompt).
-3. **Archive fails**: The `renters` table has a CHECK constraint that only allows `('lead','scheduled','active','late','maintenance','termination_requested','pickup_scheduled','closed','defaulted')`. "archived" is not in the list.
+## Overview
 
-## Plan
+Expand from 6 tiers to 10, create new Stripe products, and standardize all upgrade messaging to say "Upgrade to {tier}" instead of "Add payment method."
 
-### 1. Database migration — add "archived" to status CHECK constraint
-Drop and re-add the constraint to include `'archived'`.
+## New Tier Structure
 
-```sql
-ALTER TABLE public.renters DROP CONSTRAINT IF EXISTS renters_status_check;
-ALTER TABLE public.renters ADD CONSTRAINT renters_status_check
-  CHECK (status IN ('lead','scheduled','active','late','maintenance','termination_requested','pickup_scheduled','closed','defaulted','archived'));
+```text
+Free:       1–10     $0
+Starter:    11–24    $29/mo   (exists)
+Growth:     25–49    $49/mo   (exists)
+Pro:        50–74    $99/mo   (exists)
+Scale:      75–99    $129/mo  (exists)
+Business:   100–199  $199/mo  (NEW)
+Enterprise: 200–399  $299/mo  (NEW)
+Portfolio:  400–699  $499/mo  (NEW)
+Empire:     700–999  $799/mo  (NEW)
+Custom:     1000+    $999/mo  (NEW — was "Let's talk", now a real product)
 ```
 
-### 2. Hard-stop in CreateRenterDialog — block submission server-side-style
+## Step 1: Create 5 New Stripe Products + Prices
 
-The real fix is two layers:
-- **CreateRenterDialog**: Check `canAddRenter` at submission time (not just button disabled state). If `!canAddRenter`, show a toast error and refuse to submit. Also pass `canAddRenter` to disable the dialog's own submit button.
-- **CreateRenterDialog `open` prop**: In `RentersList.tsx`, prevent `setDialogOpen(true)` when `!canAddRenter` (belt-and-suspenders with the disabled button).
+Use `stripe--create_stripe_product_and_price` tool to create:
 
-This makes it impossible to add a renter even if the user clicks fast before the subscription state loads, because the dialog submit itself re-checks.
+- LaundryLord Business — $199/mo recurring
+- LaundryLord Enterprise — $299/mo recurring  
+- LaundryLord Portfolio — $499/mo recurring
+- LaundryLord Empire — $799/mo recurring
+- LaundryLord Ultimate — $999/mo recurring
 
-### 3. Better tooltip and disabled-state messaging
+## Step 2: Update `src/lib/pricing-tiers.ts`
 
-When the button is disabled on both RentersList and MachinesList, show a richer tooltip that mirrors PlanBanner:
-- "You've grown to X renters! Your plan is now [Tier Name] ([label]). Add a payment method to keep adding renters."
-- For free tier at limit: "You've reached 10 renters. Upgrade to Starter to keep growing."
+- Replace the 6-tier array with 10 tiers using the new product/price IDs
+- Remove `Custom` with `price: -1` — the $999 "Ultimate" tier is now a real purchasable tier
+- Add a true "Custom" for 1000+ that says "Let's talk"
+- Update `needsSubscription()` to cover `totalRenters > 10` (no upper cap since all paid tiers are real now)
 
-### Files to change
-- **Migration**: Add `archived` to renters status CHECK
-- **`src/components/CreateRenterDialog.tsx`**: Add `canAddRenter` prop check at submit time
-- **`src/pages/RentersList.tsx`**: Pass subscription info, prevent dialog open when not allowed, update tooltip content
-- **`src/pages/MachinesList.tsx`**: Same tooltip update
-- **`src/components/CreateMachineDialog.tsx`**: Same submit-time guard
+## Step 3: Standardize upgrade messaging — `PlanBanner.tsx`
 
+Replace "Add a payment method to keep things running smoothly" with:
+
+- **Free → paid**: "Upgrade to {tier.name} ({tier.label}) to keep growing."
+- **Already subscribed, wrong tier (grew past current tier)**: "Time to upgrade to {tier.name} ({tier.label})."
+- Button text: **"Upgrade to {tier.name}"** instead of "Add payment method"
+- Keep the "already subscribed" status line and "Custom/Let's talk" contact CTA for 1000+
+
+## Step 4: Update tooltips — `RentersList.tsx` and `MachinesList.tsx`
+
+Match the PlanBanner messaging: "Upgrade to {tier.name} ({tier.label}) to add more renters/machines."
+
+## Step 5: Update `SettingsPage.tsx`
+
+Change button from "Add payment method" to "Upgrade to {tier.name}" for consistency.
+
+## Step 6: Update edge functions
+
+- `**customer-portal/index.ts**`: Add all new product IDs to `SAAS_PRODUCT_IDS`
+- `**check-subscription/index.ts**`: No changes needed (it just checks for any active subscription)
+
+## Step 7: Update `PricingCalculator.tsx`
+
+Automatically picks up new tiers from the shared `TIERS` array — no changes needed.
+
+## Files to change
+
+
+| File                                          | Change                                 |
+| --------------------------------------------- | -------------------------------------- |
+| `src/lib/pricing-tiers.ts`                    | Expand to 10 tiers with new Stripe IDs |
+| `src/components/PlanBanner.tsx`               | "Upgrade to X" messaging + button      |
+| `src/pages/RentersList.tsx`                   | Tooltip text update                    |
+| `src/pages/MachinesList.tsx`                  | Tooltip text update                    |
+| `src/pages/SettingsPage.tsx`                  | Button text update                     |
+| `supabase/functions/customer-portal/index.ts` | Add new product IDs                    |
