@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { needsSubscription } from "@/lib/pricing-tiers";
-import { X, Sparkles, CreditCard, ArrowUpCircle } from "lucide-react";
+import { X, Sparkles, ArrowUpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 
 export function PlanBanner() {
-  const { tier, renterCount, subscribed, loading, canAddRenter } = useSubscription();
+  const { tier, renterCount, subscribed, loading, checkout } = useSubscription();
   const [dismissed, setDismissed] = useState<string | null>(null);
 
   if (loading) return null;
