@@ -14,7 +14,7 @@ interface CreateMachineDialogProps {
   canAddRenter?: boolean;
 }
 
-export function CreateMachineDialog({ open, onOpenChange }: CreateMachineDialogProps) {
+export function CreateMachineDialog({ open, onOpenChange, canAddRenter = true }: CreateMachineDialogProps) {
   const createMachine = useCreateMachine();
   const [form, setForm] = useState({
     type: "washer",

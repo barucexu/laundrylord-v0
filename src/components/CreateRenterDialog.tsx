@@ -22,7 +22,7 @@ interface CreateRenterDialogProps {
   canAddRenter?: boolean;
 }
 
-export function CreateRenterDialog({ open, onOpenChange }: CreateRenterDialogProps) {
+export function CreateRenterDialog({ open, onOpenChange, canAddRenter = true }: CreateRenterDialogProps) {
   const createRenter = useCreateRenter();
   const { data: opSettings } = useOperatorSettings();
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
