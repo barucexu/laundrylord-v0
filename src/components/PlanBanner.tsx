@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSubscription } from "@/hooks/useSubscription";
-import { needsSubscription } from "@/lib/pricing-tiers";
+import { needsSubscription, tierUpgradeLabel } from "@/lib/pricing-tiers";
 import { X, Sparkles, ArrowUpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
@@ -56,14 +56,14 @@ export function PlanBanner() {
           </p>
           <p className="text-muted-foreground">
             {isFirstUpgrade
-              ? <>Upgrade to <span className="font-medium text-foreground">{tier.name}</span> ({tier.label}) to keep growing. Adding a bank account is the easiest option.</>
-              : <>Time to upgrade to <span className="font-medium text-foreground">{tier.name}</span> ({tier.label}) to keep things running smoothly.</>
+              ? <>{tierUpgradeLabel(tier)} to keep growing. Adding a bank account is the easiest option.</>
+              : <>{tierUpgradeLabel(tier)} to keep things running smoothly.</>
             }
           </p>
         </div>
         <Button size="sm" onClick={handleCheckout} className="gap-1.5">
           <ArrowUpCircle className="h-3.5 w-3.5" />
-          Upgrade to {tier.name}
+          {tierUpgradeLabel(tier)}
         </Button>
       </div>
       <button

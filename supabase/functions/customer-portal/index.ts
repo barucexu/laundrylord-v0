@@ -9,15 +9,15 @@ const corsHeaders = {
 
 // SaaS product IDs — only these should appear in the billing portal
 const SAAS_PRODUCT_IDS = [
-  "prod_UEADMxrVTge3fL", // Starter
-  "prod_UEAECHZpkSnOYA", // Growth
-  "prod_UEAE1m4EwoT4Vo", // Pro
-  "prod_UEAFvf9fkWycsF", // Scale
-  "prod_UEBHQWS6FJCqgh", // Business
-  "prod_UEBHhj7U5YUIgu", // Enterprise
-  "prod_UEBH5iiJU3wfyh", // Portfolio
-  "prod_UEBH682irBzWNb", // Empire
-  "prod_UEBHUQixo5jPWU", // Ultimate
+  "prod_UEEy3RgIQPQOGZ", // Starter
+  "prod_UEEyoVnhxLF3vy", // Growth
+  "prod_UEEyKtssPt0430", // Pro
+  "prod_UEEygRRU9opKwW", // Scale
+  "prod_UEEyrzDO6LUlgl", // Business
+  "prod_UEEyuMGKTuzhYF", // Enterprise
+  "prod_UEEyc2En1L0HBs", // Portfolio
+  "prod_UEEyriCh6VhS2S", // Empire
+  "prod_UEEyMlX4QNETsG", // Ultimate
 ];
 
 const logStep = (step: string, details?: unknown) => {
