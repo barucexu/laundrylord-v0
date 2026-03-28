@@ -260,10 +260,12 @@ export default function ImportPage() {
           const existingId = await findExistingRenter(record);
           if (existingId) {
             res.rentersMatched++;
+          } else if (rentersCreatedSoFar >= slotsAvailable) {
+            res.blockedByPlan++;
           } else {
             const { error } = await supabase.from("renters").insert(record as any);
             if (error) { console.error("Insert error:", error); res.skipped++; }
-            else res.rentersCreated++;
+            else { res.rentersCreated++; rentersCreatedSoFar++; }
           }
         }
       } else if (importMode === "machines") {
