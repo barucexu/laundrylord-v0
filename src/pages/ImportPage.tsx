@@ -11,6 +11,7 @@ import { SupportFooter } from "@/components/SupportFooter";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { useSubscription } from "@/hooks/useSubscription";
 
 import { ParsedData, ImportMode, ImportField } from "@/utils/import/types";
 import { RENTER_FIELDS, MACHINE_FIELDS, getCombinedFields, resolveFieldKey } from "@/utils/import/fields";
