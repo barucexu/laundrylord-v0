@@ -18,7 +18,10 @@ export default function MachinesList() {
   const [editMachine, setEditMachine] = useState<MachineRow | null>(null);
   const { canAddRenter, tier, renterCount, checkout, loading: planLoading } = useSubscription();
 
-  const getRenterForMachine = (machineId: string) => renters.find(r => r.machine_id === machineId);
+  const getRenterForMachine = (machine: MachineRow) => {
+    if (!machine.assigned_renter_id) return undefined;
+    return renters.find(r => r.id === machine.assigned_renter_id);
+  };
 
   return (
     <div className="space-y-5">
@@ -79,7 +82,7 @@ export default function MachinesList() {
             </TableHeader>
             <TableBody>
               {machines.map(m => {
-                const renter = getRenterForMachine(m.id);
+                const renter = getRenterForMachine(m);
                 return (
                   <TableRow key={m.id}>
                     <TableCell className="capitalize text-sm font-medium">{m.type}</TableCell>

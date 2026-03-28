@@ -78,16 +78,7 @@ const App = () => (
               </ProtectedRoute>
             </AuthProvider>
           }>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/renters" element={<RentersList />} />
-            <Route path="/renters/archive" element={<RenterArchive />} />
-            <Route path="/renters/:id" element={<RenterDetail />} />
-            <Route path="/machines" element={<MachinesList />} />
-            <Route path="/machine-map" element={<MachineMapPage />} />
-            <Route path="/payments" element={<PaymentsView />} />
-            <Route path="/maintenance" element={<MaintenanceView />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/import" element={<ImportPage />} />
+            {PAGE_ROUTES}
           </Route>
 
           <Route path="*" element={<NotFound />} />
