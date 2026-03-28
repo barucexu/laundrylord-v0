@@ -82,7 +82,7 @@ export default function MachinesList() {
             </TableHeader>
             <TableBody>
               {machines.map(m => {
-                const renter = getRenterForMachine(m.id);
+                const renter = getRenterForMachine(m);
                 return (
                   <TableRow key={m.id}>
                     <TableCell className="capitalize text-sm font-medium">{m.type}</TableCell>
