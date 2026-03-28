@@ -19,6 +19,7 @@ const timelineIcons: Record<string, typeof User> = {
   machine_assigned: Box,
   payment_succeeded: CheckCircle,
   payment_failed: AlertTriangle,
+  payment_method_saved: CreditCard,
   late_fee: DollarSign,
   maintenance_opened: Wrench,
   maintenance_resolved: CheckCircle,

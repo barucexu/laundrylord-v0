@@ -137,7 +137,7 @@ serve(async (req) => {
           });
           await supabase.from("payments").insert({
             renter_id: renter.id, user_id: renter.user_id, amount: lateFeeAmount,
-            due_date: todayStr, status: "pending", type: "late_fee",
+            due_date: todayStr, status: "overdue", type: "late_fee",
           });
 
           if (settings.reminder_latefee_enabled !== false && renter.email) {
