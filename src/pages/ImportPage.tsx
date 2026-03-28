@@ -30,6 +30,7 @@ interface CombinedResult {
   machinesMatched: number;
   machinesLinked: number;
   skipped: number;
+  blockedByPlan: number;
 }
 
 export default function ImportPage() {
