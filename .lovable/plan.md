@@ -1,106 +1,93 @@
+# Stabilization Pass: Schema-Contract & Auth Fixes
+
+## Diagnosis
+
+### 1. Machine type — NO drift found
+
+DB `machines.type` is `text` with no enum constraint. UI offers `washer`, `dryer`, `set` in both Create and Edit dialogs. Import fields map to the same values. No mismatch — these are consistent.
+
+### 2. Payment type — NO drift found
+
+DB `payments.type` is `text` with default `'rent'`. RecordPaymentDialog offers: `rent`, `install_fee`, `deposit`, `late_fee`, `other`. Webhook writes `rent`. Send-billing-reminders writes `late_fee`. All are valid free-text values with no enum constraint blocking them.
+
+### 3. Payment status — **MISMATCH FOUND**
+
+DB `payments.status` is `text` with default `'upcoming'`. The recognized set across UI (StatusBadge, PaymentsView filters) is: `upcoming`, `due_soon`, `overdue`, `failed`, `paid`.
+
+`**send-billing-reminders` writes `status: "pending"` (line 130)** — this value is not in the recognized set. It will render as raw text "pending" in the UI with no styling. Should be `"overdue"` (it's a late fee applied after days_late threshold).
+
+### 4. Timeline event type — **MISMATCH FOUND**
+
+The `timelineIcons` map in RenterDetail recognizes: `created`, `machine_assigned`, `payment_succeeded`, `payment_failed`, `late_fee`, `maintenance_opened`, `maintenance_resolved`, `pickup_scheduled`, `pickup_completed`, `note`.
+
+`**stripe-webhook` writes `type: "payment_method_saved"` (line 82)** — not in the icon map. It will render without an icon but won't crash. Should use a recognized value or be added to the icon map.
+
+**Decision**: Add `payment_method_saved` to the `timelineIcons` map (it's a legitimate distinct event). This is the smallest fix — the webhook is correct in concept, the UI just doesn't have the icon mapping.
+
+### 5. send-billing-reminders auth — **NO AUTH GUARD**
+
+The function accepts any caller. It uses `SUPABASE_SERVICE_ROLE_KEY` internally to bypass RLS, but any unauthenticated HTTP request can trigger it. Should reject non-service-role callers explicitly.
+
+## Plan
+
+### ### File 1: `supabase/functions/send-billing-reminders/index.ts`
+
+- **Line 130**: Change `status: "pending"` → `status: "overdue"` since the late fee is being applied after the renter is already overdue.
+
+- **After the OPTIONS check**: Add an explicit service-role-only auth guard.
+
+  - Do **not** use substring matching like `authHeader.includes(serviceKey)`.
+
+  - Mirror the strictest existing service-role-only edge-function auth pattern already present elsewhere in this repo.
+
+  - Prefer exact Authorization header validation for the expected `Bearer <service_role_key>` format.
+
+  - Return 403 for any missing or invalid authorization.
+
+  - Preserve valid scheduled / pg_cron invocation behavior if it already uses the service role key.
+
+### File 2: `src/pages/RenterDetail.tsx`
+
+- **Line 17-28**: Add `payment_method_saved: CreditCard` to the `timelineIcons` map (CreditCard is already imported)
+
+### Files NOT changed
+
+- CreateMachineDialog, EditMachineDialog — no drift found
+- RecordPaymentDialog — no drift found
+- stripe-webhook — timeline types `payment_succeeded`, `payment_failed`, `note` are all in the icon map; `payment_method_saved` fix is on the UI side
+- No unrelated refactors
+
+## Canonical persisted values after fix
 
 
-# Create New Stripe Products + Fix Enforcement Gaps
+| Domain               | Allowed values                                                                                                                                                                                         |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| machine.type         | `washer`, `dryer`, `set` (free text, no DB constraint)                                                                                                                                                 |
+| payment.type         | `rent`, `install_fee`, `deposit`, `late_fee`, `other` (free text)                                                                                                                                      |
+| payment.status       | `upcoming`, `due_soon`, `overdue`, `failed`, `paid` (free text)                                                                                                                                        |
+| timeline_events.type | `created`, `machine_assigned`, `payment_succeeded`, `payment_failed`, `payment_method_saved`, `late_fee`, `maintenance_opened`, `maintenance_resolved`, `pickup_scheduled`, `pickup_completed`, `note` |
 
-## Part 1: Create 9 SaaS products on the new Stripe sandbox
-
-Use the `stripe--create_stripe_product_and_price` tool to create all 9 paid tiers as monthly recurring subscriptions:
-
-| Tier | Price |
-|------|-------|
-| Starter | $29/mo |
-| Growth | $49/mo |
-| Pro | $99/mo |
-| Scale | $129/mo |
-| Business | $199/mo |
-| Enterprise | $299/mo |
-| Portfolio | $499/mo |
-| Empire | $799/mo |
-| Ultimate | $999/mo |
-
-Then update all three places that reference old Stripe IDs:
-- `src/lib/pricing-tiers.ts` — replace all `product_id` and `price_id` values
-- `supabase/functions/create-checkout/index.ts` — replace `SAAS_PRODUCT_IDS` set
-- `supabase/functions/customer-portal/index.ts` — replace `SAAS_PRODUCT_IDS` array
-
-## Part 2: Close import loophole
-
-**File: `src/pages/ImportPage.tsx`**
-
-- Import `useSubscription` hook
-- Before starting the import loop, compute `slotsAvailable = tier.max - renterCount` (using current non-archived count)
-- Track `rentersCreatedSoFar` during the loop
-- When inserting a new renter, check `rentersCreatedSoFar < slotsAvailable` — if exceeded, increment a new `blockedByPlan` counter instead of inserting
-- Show `blockedByPlan` count in the results summary with a message like "X rows blocked by plan limit"
-- Machines-only mode is unaffected (machines aren't counted for tier limits)
-
-Add `blockedByPlan` to the `CombinedResult` interface.
-
-## Part 3: Fix loading-state upgrade messaging
-
-**Files: `src/pages/RentersList.tsx`, `src/pages/MachinesList.tsx`**
-
-Currently when `canAddRenter` is false during loading, the popover shows "Upgrade to Starter ($29/mo)" even if the operator is on a higher tier. Fix:
-
-- Destructure `loading` from `useSubscription()`
-- When `loading` is true, show a neutral disabled button (no popover, no tier text) — just a spinner or disabled state
-- Only render the popover with tier-specific messaging after loading is complete
-
-## Part 4: Consistent tier formatting helper
-
-**File: `src/lib/pricing-tiers.ts`**
-
-Add a small helper:
-```ts
-export function tierUpgradeLabel(tier: PricingTier): string {
-  return `Upgrade to ${tier.name} (${tier.label})`;
-}
-```
-
-Use it in `RentersList`, `MachinesList`, and `PlanBanner` to avoid copy/paste of formatting logic.
-
-## Files changed
-
-| File | Change |
-|------|--------|
-| `src/lib/pricing-tiers.ts` | New Stripe IDs + `tierUpgradeLabel` helper |
-| `supabase/functions/create-checkout/index.ts` | New `SAAS_PRODUCT_IDS` |
-| `supabase/functions/customer-portal/index.ts` | New `SAAS_PRODUCT_IDS` |
-| `src/pages/ImportPage.tsx` | Plan limit enforcement + `blockedByPlan` result |
-| `src/pages/RentersList.tsx` | Loading-state handling, use `tierUpgradeLabel` |
-| `src/pages/MachinesList.tsx` | Loading-state handling, use `tierUpgradeLabel` |
-| `src/components/PlanBanner.tsx` | Use `tierUpgradeLabel` |
 
 ## QA Checklist
 
 ```text
-IMPORT ENFORCEMENT
-[ ] At 9 renters (Free tier), import file with 3 new renters
-    → 1 created, 2 blocked by plan limit
-[ ] At 9 renters, import file with machines only → all succeed (no renter limit)
-[ ] At 24 renters (Starter, subscribed), import 2 new renters → both blocked
-[ ] Results screen shows "X blocked by plan limit" message
+PAYMENT STATUS FIX
+[ ] Trigger send-billing-reminders for a renter with days_late >= late_fee_after_days
+[ ] Verify the resulting payment row has status "overdue" not "pending"
+[ ] Verify the payment renders correctly in PaymentsView with proper badge
 
-LOADING-STATE MESSAGING
-[ ] Navigate to /renters — during loading, Add Renter shows disabled (no tier text)
-[ ] After load at 10 renters, popover says "Upgrade to Starter ($29/mo)"
-[ ] After load at 25 renters, popover says "Upgrade to Growth ($49/mo)"
-[ ] Never shows Starter text when tier is actually Growth
+TIMELINE ICON FIX
+[ ] View a renter who completed Stripe setup (has payment_method_saved event)
+[ ] Verify the CreditCard icon appears next to the event in timeline
 
-ADD RENTER/MACHINE BOUNDARIES
-[ ] Free tier: add works at 9, blocked at 10
-[ ] Starter subscribed: add works at 23, blocked at 24
-[ ] After successful checkout: button re-enables
+AUTH GUARD
+[ ] Call send-billing-reminders with anon key → expect 403
+[ ] Call send-billing-reminders with service role key → expect 200
+[ ] Scheduled cron invocation still works (uses service role)
 
-UPGRADE FLOW
-[ ] Popover "Upgrade" button calls checkout()
-[ ] PlanBanner "Upgrade" button calls checkout()
-[ ] Settings "Upgrade" button calls checkout()
-[ ] Already-subscribed operator gets portal redirect (not new checkout)
-
-RENTER BILLING (no regressions)
-[ ] Connect Stripe key in Settings still works
-[ ] Setup link flow unchanged
-[ ] Billing activation unchanged
+NO REGRESSIONS
+[ ] Create machine (washer/dryer/set) — all succeed
+[ ] Edit machine — all types persist correctly
+[ ] Record payment — all types persist correctly
+[ ] Stripe webhook events still process (payment_succeeded, payment_failed, subscription.deleted, checkout.session.completed)
 ```
-
