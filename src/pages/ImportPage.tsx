@@ -310,6 +310,8 @@ export default function ImportPage() {
             if (existingId) {
               renterId = existingId;
               res.rentersMatched++;
+            } else if (rentersCreatedSoFar >= slotsAvailable) {
+              res.blockedByPlan++;
             } else {
               const { data, error } = await supabase.from("renters").insert(rRecord as any).select("id").single();
               if (error) {
@@ -317,6 +319,7 @@ export default function ImportPage() {
               } else {
                 renterId = data.id;
                 res.rentersCreated++;
+                rentersCreatedSoFar++;
               }
             }
           }
