@@ -11,6 +11,7 @@ import { SupportFooter } from "@/components/SupportFooter";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { useSubscription } from "@/hooks/useSubscription";
 
 import { ParsedData, ImportMode, ImportField } from "@/utils/import/types";
 import { RENTER_FIELDS, MACHINE_FIELDS, getCombinedFields, resolveFieldKey } from "@/utils/import/fields";
@@ -29,10 +30,12 @@ interface CombinedResult {
   machinesMatched: number;
   machinesLinked: number;
   skipped: number;
+  blockedByPlan: number;
 }
 
 export default function ImportPage() {
   const { user } = useAuth();
+  const { tier, renterCount } = useSubscription();
   const queryClient = useQueryClient();
   const [importMode, setImportMode] = useState<ImportMode>("combined");
   const [step, setStep] = useState<Step>("upload");
@@ -227,6 +230,9 @@ export default function ImportPage() {
     if (!user) return;
     setImporting(true);
 
+    const slotsAvailable = tier.max - renterCount;
+    let rentersCreatedSoFar = 0;
+
     const res: CombinedResult = {
       rentersCreated: 0,
       rentersMatched: 0,
@@ -234,6 +240,7 @@ export default function ImportPage() {
       machinesMatched: 0,
       machinesLinked: 0,
       skipped: 0,
+      blockedByPlan: 0,
     };
 
     try {
@@ -253,10 +260,12 @@ export default function ImportPage() {
           const existingId = await findExistingRenter(record);
           if (existingId) {
             res.rentersMatched++;
+          } else if (rentersCreatedSoFar >= slotsAvailable) {
+            res.blockedByPlan++;
           } else {
             const { error } = await supabase.from("renters").insert(record as any);
             if (error) { console.error("Insert error:", error); res.skipped++; }
-            else res.rentersCreated++;
+            else { res.rentersCreated++; rentersCreatedSoFar++; }
           }
         }
       } else if (importMode === "machines") {
@@ -301,6 +310,8 @@ export default function ImportPage() {
             if (existingId) {
               renterId = existingId;
               res.rentersMatched++;
+            } else if (rentersCreatedSoFar >= slotsAvailable) {
+              res.blockedByPlan++;
             } else {
               const { data, error } = await supabase.from("renters").insert(rRecord as any).select("id").single();
               if (error) {
@@ -308,6 +319,7 @@ export default function ImportPage() {
               } else {
                 renterId = data.id;
                 res.rentersCreated++;
+                rentersCreatedSoFar++;
               }
             }
           }
@@ -738,6 +750,11 @@ export default function ImportPage() {
                 {result.skipped > 0 && (
                   <div className="text-sm text-muted-foreground">
                     {result.skipped} rows skipped (blank or failed)
+                  </div>
+                )}
+                {result.blockedByPlan > 0 && (
+                  <div className="text-sm text-destructive font-medium">
+                    {result.blockedByPlan} renters blocked by plan limit — upgrade to import more
                   </div>
                 )}
               </div>
