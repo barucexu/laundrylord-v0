@@ -18,7 +18,10 @@ export default function MachinesList() {
   const [editMachine, setEditMachine] = useState<MachineRow | null>(null);
   const { canAddRenter, tier, renterCount, checkout, loading: planLoading } = useSubscription();
 
-  const getRenterForMachine = (machineId: string) => renters.find(r => r.machine_id === machineId);
+  const getRenterForMachine = (machine: MachineRow) => {
+    if (!machine.assigned_renter_id) return undefined;
+    return renters.find(r => r.id === machine.assigned_renter_id);
+  };
 
   return (
     <div className="space-y-5">
