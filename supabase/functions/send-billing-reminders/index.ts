@@ -20,6 +20,16 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Auth guard: only allow service-role callers
+  const authHeader = req.headers.get("authorization") ?? "";
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!serviceRoleKey || authHeader !== `Bearer ${serviceRoleKey}`) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -127,7 +137,7 @@ serve(async (req) => {
           });
           await supabase.from("payments").insert({
             renter_id: renter.id, user_id: renter.user_id, amount: lateFeeAmount,
-            due_date: todayStr, status: "pending", type: "late_fee",
+            due_date: todayStr, status: "overdue", type: "late_fee",
           });
 
           if (settings.reminder_latefee_enabled !== false && renter.email) {
