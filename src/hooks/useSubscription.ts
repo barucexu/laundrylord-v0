@@ -50,16 +50,6 @@ export function useSubscription(): SubscriptionState {
     setLoading(true);
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.getUser(session.access_token);
-
-      if (authError || !authData.user) {
-        await supabase.auth.signOut({ scope: "local" });
-        setSubscribed(false);
-        setProductId(null);
-        setSubscriptionEnd(null);
-        return;
-      }
-
       const { data, error } = await supabase.functions.invoke("check-subscription");
       if (error) throw error;
       setSubscribed(data?.subscribed ?? false);
