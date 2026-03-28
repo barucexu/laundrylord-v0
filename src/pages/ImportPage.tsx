@@ -752,6 +752,11 @@ export default function ImportPage() {
                     {result.skipped} rows skipped (blank or failed)
                   </div>
                 )}
+                {result.blockedByPlan > 0 && (
+                  <div className="text-sm text-destructive font-medium">
+                    {result.blockedByPlan} renters blocked by plan limit — upgrade to import more
+                  </div>
+                )}
               </div>
               <Button onClick={reset}>Import More</Button>
             </CardContent>
