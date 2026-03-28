@@ -230,6 +230,9 @@ export default function ImportPage() {
     if (!user) return;
     setImporting(true);
 
+    const slotsAvailable = tier.max - renterCount;
+    let rentersCreatedSoFar = 0;
+
     const res: CombinedResult = {
       rentersCreated: 0,
       rentersMatched: 0,
@@ -237,6 +240,7 @@ export default function ImportPage() {
       machinesMatched: 0,
       machinesLinked: 0,
       skipped: 0,
+      blockedByPlan: 0,
     };
 
     try {
