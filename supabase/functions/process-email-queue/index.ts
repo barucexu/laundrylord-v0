@@ -166,8 +166,8 @@ Deno.serve(async (req) => {
     )
     const failedAttemptsByMessageId = new Map<string, number>()
     if (messageIds.length > 0) {
-      const { data: failedRows, error: failedRowsError } = await supabase
-        .from('email_send_log')
+      const { data: failedRows, error: failedRowsError } = await (supabase
+        .from as any)('email_send_log')
         .select('message_id')
         .in('message_id', messageIds)
         .eq('status', 'failed')
