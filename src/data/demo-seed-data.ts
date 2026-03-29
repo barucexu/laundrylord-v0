@@ -212,8 +212,6 @@ function generateRenters(): RenterRow[] {
         secondary_contact: renterIdx % 6 === 0 ? `${FIRST_NAMES[(nameIdx + 3) % FIRST_NAMES.length]} ${lastName} - ${phone}` : null,
         created_at: new Date(new Date(leaseStart).getTime() - 7 * 86400000).toISOString(),
         updated_at: NOW,
-        archived_at: null,
-        billable_until: null,
       });
 
       renterIdx++;

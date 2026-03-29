@@ -1,84 +1,132 @@
+# Coherence & Guardrails Pass
 
+## Diagnosis
 
-# Fix Archive + Upgrade Checkout + Build Errors
+### 1. Machine assignment source-of-truth is inconsistent
 
-## Issues
+`MachinesList.tsx` line 21 resolves assignment via `renters.find(r => r.machine_id === machineId)` — the legacy `renter.machine_id` column. But all write paths (RenterDetail assign/unassign, ImportPage linking) use `machine.assigned_renter_id`. The canonical relation is `machines.assigned_renter_id` (has a foreign key `machines_assigned_renter_id_fkey`). The read in MachinesList must match.
 
-### 1. Can't archive a renter
-The screenshot shows error toast: "Could not find the 'archived_at' column of 'renters' in the schema cache." The `archived_at` and `billable_until` columns exist in the types but PostgREST schema cache may be stale. However, the `demo-seed-data.ts` build error confirms these fields are expected but missing from the demo renter objects — that's a separate build error. The archive action itself uses `as any` cast which should work at runtime. The real fix: this is likely a PostgREST schema cache issue that needs a schema cache refresh, but we should also ensure the code handles gracefully.
+### 2. Route duplication in App.tsx
 
-**Fix**: The archive flow writes `archived_at` and `billable_until` via `updateRenter`. If PostgREST rejects those columns, we need to verify they exist in the DB. Since they're in the generated types, they should exist. The error suggests the schema cache is stale — we should trigger a schema cache refresh. But as a code-level fix, remove the `as any` cast and instead only send the fields that are in the Update type properly.
+Lines 81-91 duplicate the same 10 routes already defined in `PAGE_ROUTES` (lines 28-41). The `PAGE_ROUTES` fragment is already used by demo mode but not by the real authenticated routes.
 
-Actually, looking more carefully: `archived_at` IS in the Update type (line 459). The error is from PostgREST at runtime, not TypeScript. This means the column might not actually exist in the database despite being in the types file. We need to check and potentially add a migration.
+### 3. No meaningful regression tests exist
 
-**Plan**: Add a migration to ensure `archived_at` and `billable_until` columns exist on the `renters` table (idempotent `ALTER TABLE ADD COLUMN IF NOT EXISTS`).
+Only a placeholder `example.test.ts` exists. No coverage for billing status values, webhook timeline types, or machine assignment display logic.
 
-### 2. Upgrade button shows portal instead of new checkout
-From the screenshot: user has an active Starter subscription and hits "Upgrade to Growth". The `create-checkout` function detects `hasSaasSub = true` and redirects to the Stripe Customer Portal. The portal shows current subscriptions but doesn't pre-select the upgrade tier. This is actually correct Stripe behavior — the portal allows plan changes — but the user expected a direct checkout for the new tier.
+### 4. README is a placeholder
 
-**Fix**: When `create-checkout` is called with a `price_id` that differs from the current subscription's price, instead of redirecting to the generic portal, we should update the existing subscription's price via Stripe API directly, or create a portal session with a `flow_data` configuration that pre-selects the upgrade. The simplest correct approach: use `stripe.billingPortal.sessions.create` with `flow_data` of type `subscription_update` pointing to the specific subscription and the target price.
+Contains only "TODO: Document your project here."
 
-### 3. Build errors
+### 5. Already fixed in prior pass (no action needed)
 
-**`demo-seed-data.ts`**: Add `archived_at: null` and `billable_until: null` to each generated renter object.
-
-**Edge functions `npm:@supabase/supabase-js@2.57.2`**: These need a `deno.json` specifying the npm dependency, or switch to the `https://esm.sh/` import pattern. The simplest fix: change all edge functions using `npm:@supabase/supabase-js@2.57.2` to use `npm:@supabase/supabase-js@2` (without patch version) which is more flexible, matching what `process-email-queue` already does.
-
-**`process-email-queue/index.ts`**: The `email_send_log` table and `move_to_dlq` RPC don't exist in the schema types. These are pre-existing type errors not introduced by recent changes. Add `as any` casts to bypass the strict typing for these internal tables.
+- `send-billing-reminders` auth guard: already in place (lines 23-31)
+- `send-billing-reminders` payment status: already writes `"overdue"` (line 140)
+- `stripe-webhook` timeline type `payment_method_saved`: already mapped in RenterDetail (line 22)
 
 ---
 
-## Files to change
+## Plan
 
-| File | Change |
-|------|--------|
-| `src/data/demo-seed-data.ts` | Add `archived_at: null, billable_until: null` to renter objects |
-| `supabase/functions/check-stripe-connection/index.ts` | Change import to `npm:@supabase/supabase-js@2` |
-| `supabase/functions/check-subscription/index.ts` | Change import to `npm:@supabase/supabase-js@2` |
-| `supabase/functions/create-setup-link/index.ts` | Change import to `npm:@supabase/supabase-js@2` |
-| `supabase/functions/create-checkout/index.ts` | Change import + fix upgrade flow to use portal `flow_data` for subscription updates |
-| `supabase/functions/customer-portal/index.ts` | Change import to `npm:@supabase/supabase-js@2` |
-| `supabase/functions/create-subscription/index.ts` | Change import to `npm:@supabase/supabase-js@2` |
-| `supabase/functions/save-stripe-key/index.ts` | Change import to `npm:@supabase/supabase-js@2` |
-| `supabase/functions/send-billing-reminders/index.ts` | Change import to `npm:@supabase/supabase-js@2` |
-| `supabase/functions/stripe-webhook/index.ts` | Change import to `npm:@supabase/supabase-js@2` |
-| `supabase/functions/process-email-queue/index.ts` | Add `as any` casts for `email_send_log` and `move_to_dlq` |
-| DB migration | `ALTER TABLE renters ADD COLUMN IF NOT EXISTS archived_at timestamptz; ALTER TABLE renters ADD COLUMN IF NOT EXISTS billable_until timestamptz;` |
+### Task 1: Fix MachinesList assignment lookup
 
-## Key behavior change: create-checkout upgrade flow
+**File: `src/pages/MachinesList.tsx**`
 
-When `hasSaasSub` is true AND the requested `price_id` differs from the current subscription's price:
+Replace:
+
 ```ts
-// Find the active SaaS subscription
-const saasSubscription = subscriptions.data.find(sub =>
-  sub.items.data.some(item => {
-    const pid = typeof item.price.product === "string" ? item.price.product : item.price.product?.id;
-    return pid && SAAS_PRODUCT_IDS.has(pid);
-  })
-);
-
-// If requesting same price, go to portal (manage existing)
-// If requesting different price, create portal session with subscription_update flow
-if (saasSubscription) {
-  const currentPriceId = saasSubscription.items.data[0].price.id;
-  if (currentPriceId !== price_id) {
-    // Direct upgrade via portal with flow_data
-    const portalSession = await stripe.billingPortal.sessions.create({
-      customer: customerId,
-      return_url: `${origin}/settings?subscription=success`,
-      flow_data: {
-        type: "subscription_update",
-        subscription_update: {
-          subscription: saasSubscription.id,
-        },
-      },
-    });
-    return new Response(JSON.stringify({ url: portalSession.url }), { ... });
-  }
-  // Same price — just go to portal
-  // ... existing portal redirect
-}
+const getRenterForMachine = (machineId: string) => renters.find(r => r.machine_id === machineId);
 ```
 
-This sends the user directly to the plan-change screen in Stripe's portal instead of the generic overview.
+With a lookup using `machine.assigned_renter_id`:
 
+```ts
+const getRenterName = (machine: MachineRow) => {
+  if (!machine.assigned_renter_id) return null;
+  return renters.find(r => r.id === machine.assigned_renter_id);
+};
+```
+
+Update the call site at line 82 to pass the machine object instead of `m.id`. Remove the `useRenters` import dependency on `machine_id`.
+
+**Canonical relation after fix**: `machines.assigned_renter_id → renters.id` for all reads and writes.
+
+### Task 2: Deduplicate routes in App.tsx
+
+Replace lines 81-91 (the duplicated real-mode routes) with `{PAGE_ROUTES}`, matching how demo mode already uses it. The `PAGE_ROUTES` fragment uses relative paths (`path="renters"` not `path="/renters"`), which works correctly inside a layout route element.
+
+**File: `src/App.tsx**` — replace the 10 explicit `<Route>` elements with `{PAGE_ROUTES}`.
+
+### Task 3: Add targeted regression tests
+
+**File: `src/test/machine-assignment.test.tsx**`
+
+- Test that MachinesList renders the assigned renter name using `assigned_renter_id` (not `machine_id`)
+- Mock data: machine with `assigned_renter_id` pointing to a renter, verify renter name appears
+
+**File: `src/test/machine-assignment.test.tsx**`****
+
+**- Test that** `MachinesList` **renders the assigned renter name using** `machine.assigned_renter_id`
+
+**- Mock data: machine with** `assigned_renter_id` **pointing to a renter, verify renter name appears**
+
+**- Also verify a renter with legacy** `machine_id` **but no matching** `assigned_renter_id` **does not drive the displayed assignment**
+
+**File: `src/test/renter-detail-timeline.test.tsx**`****
+
+**- Test that** `RenterDetail` **renders the** `payment_method_saved` **timeline event with the expected icon / label path**
+
+**- Mock timeline data including** `payment_method_saved`**, verify the event renders correctly and does not fall through to an unhandled state**
+
+**File: `src/test/import-linking.test.tsx**`****  
+
+**- Add a small fixture-based regression test around the import/linking flow or helper directly involved in machine↔renter linking**
+
+**- Prove imported/linking data respects the canonical relation** `machines.assigned_renter_id`
+
+**- Keep this narrow and behavior-focused, not a broad import-suite buildout**
+
+**These should be small, pragmatic regression tests aimed at the exact areas that recently drifted.**
+
+**Do not invent new helpers or abstractions just to make tests easier.**
+
+**Prefer testing existing behavior and source-of-truth assumptions directly.**
+
+Do not extract new helpers solely to make tests easier. Test existing behavior directly unless a tiny extraction is already necessary for production clarity.
+
+&nbsp;
+
+### Task 4: Replace README with architecture doc
+
+**File: `README.md**` — replace TODO with:
+
+- App overview (vertical SaaS for washer/dryer rental operators)
+- Entry points (`src/main.tsx`, `src/App.tsx`)
+- Feature areas (dashboard, renters, machines, payments, maintenance, settings, import)
+- Real mode vs demo mode structure
+- Key hooks: `useSupabaseData`, `useSubscription`, `useAuth`
+- Canonical machine assignment: `machines.assigned_renter_id`
+- Edge function matrix with trust level (service-role-only vs user-authenticated vs webhook)
+- Billing/reminder/webhook locations
+- Repo rules: no silent enum drift, edge functions must enforce caller trust, source-of-truth changes must be documented
+
+### Not changed
+
+- `useSupabaseData.ts` — left alone, no split
+- Machine type / payment type constants — already verified consistent
+- No styling or UI changes beyond the assignment lookup fix
+- No edge function changes (auth guard and status already fixed)
+
+---
+
+## Files changed summary
+
+
+| File                                       | Change                                                                               |
+| ------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `src/pages/MachinesList.tsx`               | Fix assignment lookup to use `machine.assigned_renter_id`                            |
+| `src/App.tsx`                              | Replace duplicated real-mode routes with `{PAGE_ROUTES}`                             |
+| `src/test/machine-assignment.test.tsx`     | New: assignment display contract test                                                |
+| `src/test/renter-detail-timeline.test.tsx` | New: regression test for `payment_method_saved` timeline rendering                   |
+| `src/test/import-linking.test.tsx`         | New: narrow regression test for canonical machine↔renter linking in import/link flow |
+| `README.md`                                | Replace TODO with architecture/source-of-truth doc                                   |

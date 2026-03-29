@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -80,42 +80,6 @@ serve(async (req) => {
       );
 
       if (hasSaasSub) {
-        // Find the specific SaaS subscription
-        const saasSubscription = subscriptions.data.find((sub) =>
-          sub.items.data.some((item) => {
-            const productId = typeof item.price.product === "string"
-              ? item.price.product
-              : item.price.product?.id;
-            return productId && SAAS_PRODUCT_IDS.has(productId);
-          })
-        );
-
-        if (saasSubscription) {
-          const currentPriceId = saasSubscription.items.data[0]?.price?.id;
-
-          if (currentPriceId && currentPriceId !== price_id) {
-            // Different price requested — open portal with subscription_update flow
-            logStep("Existing SaaS subscription found with different price — redirecting to upgrade flow", {
-              currentPriceId,
-              requestedPriceId: price_id,
-            });
-            const portalSession = await stripe.billingPortal.sessions.create({
-              customer: customerId,
-              return_url: `${origin}/settings?subscription=success`,
-              flow_data: {
-                type: "subscription_update",
-                subscription_update: {
-                  subscription: saasSubscription.id,
-                },
-              },
-            });
-            return new Response(JSON.stringify({ url: portalSession.url }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
-          }
-        }
-
-        // Same price or couldn't determine — generic portal
         logStep("Existing SaaS subscription found — redirecting to portal");
         const portalSession = await stripe.billingPortal.sessions.create({
           customer: customerId,
