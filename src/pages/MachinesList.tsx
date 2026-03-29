@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useMachines, useRenters, type MachineRow } from "@/hooks/useSupabaseData";
 import { useSubscription } from "@/hooks/useSubscription";
-import { getNextUpgradeTierForCount, tierUpgradeLabel } from "@/lib/pricing-tiers";
+import { tierUpgradeLabel } from "@/lib/pricing-tiers";
 import { Link } from "react-router-dom";
 import { Plus, Pencil } from "lucide-react";
 import { CreateMachineDialog } from "@/components/CreateMachineDialog";
@@ -17,7 +17,6 @@ export default function MachinesList() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editMachine, setEditMachine] = useState<MachineRow | null>(null);
   const { canAddRenter, tier, renterCount, checkout, loading: planLoading } = useSubscription();
-  const upgradeTarget = getNextUpgradeTierForCount(renterCount);
 
   const getRenterForMachine = (machine: MachineRow) => {
     if (!machine.assigned_renter_id) return undefined;
@@ -49,11 +48,11 @@ export default function MachinesList() {
             <PopoverContent className="max-w-xs">
               <p className="font-medium text-sm">You've grown to {renterCount} renter{renterCount !== 1 ? "s" : ""}!</p>
               <p className="text-xs text-muted-foreground mt-1">
-                {tierUpgradeLabel(upgradeTarget || tier)} to add more machines.
+                {tierUpgradeLabel(tier)} to add more machines.
               </p>
-              {upgradeTarget?.price_id && (
-                <Button size="sm" className="w-full mt-3" onClick={() => checkout(upgradeTarget.price_id)}>
-                  {tierUpgradeLabel(upgradeTarget)}
+              {tier.price_id && (
+                <Button size="sm" className="w-full mt-3" onClick={() => checkout()}>
+                  {tierUpgradeLabel(tier)}
                 </Button>
               )}
             </PopoverContent>

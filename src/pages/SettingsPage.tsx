@@ -15,7 +15,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSubscription } from "@/hooks/useSubscription";
-import { TIERS, canFitTier, tierUpgradeLabel } from "@/lib/pricing-tiers";
 
 const DEFAULT_TEMPLATES = {
   template_upcoming_subject: "Payment Reminder",
@@ -165,71 +164,29 @@ export default function SettingsPage() {
               <Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking plan…
             </div>
           ) : (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <p className="text-sm font-medium">
-                    Current billed plan: {subscription.currentBilledTier ? `${subscription.currentBilledTier.name} — ${subscription.currentBilledTier.label}` : "Free"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Required by usage: {subscription.requiredTier.name} {subscription.requiredTier.price > 0 ? `(${subscription.requiredTier.label})` : ""}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Billable renters: {subscription.billableCount} · Active renters: {subscription.activeOperationalCount}
-                    {subscription.subscriptionEnd && ` · Renews ${new Date(subscription.subscriptionEnd).toLocaleDateString()}`}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Archived renters count toward billing for 30 days.
-                  </p>
-                </div>
-                <div className="flex gap-2">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium">
+                  {subscription.tier.name} {subscription.tier.price > 0 ? `— ${subscription.tier.label}` : ""}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {subscription.renterCount} renter{subscription.renterCount !== 1 ? "s" : ""}
+                  {subscription.subscriptionEnd && ` · Renews ${new Date(subscription.subscriptionEnd).toLocaleDateString()}`}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                {subscription.subscribed ? (
                   <Button size="sm" variant="outline" onClick={subscription.manageSubscription} className="gap-1.5">
                     <CreditCard className="h-3.5 w-3.5" />
-                    {subscription.subscribed ? "Manage billing" : "Change plan"}
+                    Manage billing
                   </Button>
-                </div>
+                ) : subscription.tier.price > 0 ? (
+                  <Button size="sm" onClick={subscription.checkout} className="gap-1.5">
+                    <CreditCard className="h-3.5 w-3.5" />
+                    Upgrade to {subscription.tier.name}
+                  </Button>
+                ) : null}
               </div>
-              <Collapsible>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="px-0 text-xs">
-                    View all plans <ChevronDown className="h-3.5 w-3.5 ml-1" />
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="pt-2">
-                  <div className="grid gap-2 md:grid-cols-2">
-                    {TIERS.map((t) => {
-                      const fits = canFitTier(subscription.billableCount, t);
-                      const isCurrent = subscription.currentBilledTier?.name === t.name || (!subscription.currentBilledTier && t.name === "Free");
-                      return (
-                        <div key={t.name} className={`rounded-md border p-2 space-y-1 ${isCurrent ? "border-primary/40 bg-primary/5" : ""}`}>
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium">{t.name}</p>
-                            <p className="text-xs text-muted-foreground">{t.label}</p>
-                          </div>
-                          <p className="text-[11px] text-muted-foreground">{t.min}–{t.max === Infinity ? "∞" : t.max} renters</p>
-                          {isCurrent ? (
-                            <p className="text-[11px] text-primary font-medium">Current billed plan</p>
-                          ) : !fits ? (
-                            <p className="text-[11px] text-muted-foreground">
-                              {subscription.billableCount} billable renters exceeds max {t.max}
-                            </p>
-                          ) : t.price_id ? (
-                            <Button
-                              size="sm"
-                              className="h-7 text-xs"
-                              onClick={() => subscription.subscribed ? subscription.manageSubscription() : subscription.checkout(t.price_id)}
-                            >
-                              {subscription.subscribed ? "Change in portal" : tierUpgradeLabel(t)}
-                            </Button>
-                          ) : (
-                            <p className="text-[11px] text-muted-foreground">Free tier available when no paid subscription is active.</p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
             </div>
           )}
         </CardContent>

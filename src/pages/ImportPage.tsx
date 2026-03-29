@@ -35,7 +35,7 @@ interface CombinedResult {
 
 export default function ImportPage() {
   const { user } = useAuth();
-  const { tier, renterCount, subscribed, loading: planLoading } = useSubscription();
+  const { tier, renterCount } = useSubscription();
   const queryClient = useQueryClient();
   const [importMode, setImportMode] = useState<ImportMode>("combined");
   const [step, setStep] = useState<Step>("upload");
@@ -228,17 +228,9 @@ export default function ImportPage() {
 
   const handleImport = async () => {
     if (!user) return;
-    if (planLoading) {
-      toast.error("Checking plan status. Please try again in a moment.");
-      return;
-    }
     setImporting(true);
 
-    const slotsAvailable = (() => {
-      if (tier.price === 0) return Math.max(0, tier.max - renterCount);
-      if (!subscribed) return 0;
-      return Math.max(0, tier.max - renterCount);
-    })();
+    const slotsAvailable = tier.max - renterCount;
     let rentersCreatedSoFar = 0;
 
     const res: CombinedResult = {
