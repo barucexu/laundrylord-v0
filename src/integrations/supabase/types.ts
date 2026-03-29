@@ -386,7 +386,9 @@ export type Database = {
       renters: {
         Row: {
           address: string | null
+          archived_at: string | null
           balance: number
+          billable_until: string | null
           created_at: string
           days_late: number
           deposit_amount: number
@@ -419,7 +421,9 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          archived_at?: string | null
           balance?: number
+          billable_until?: string | null
           created_at?: string
           days_late?: number
           deposit_amount?: number
@@ -452,7 +456,9 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          archived_at?: string | null
           balance?: number
+          billable_until?: string | null
           created_at?: string
           days_late?: number
           deposit_amount?: number

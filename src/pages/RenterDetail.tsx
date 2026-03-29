@@ -196,10 +196,17 @@ export default function RenterDetail() {
               size="sm"
               onClick={async () => {
                 try {
-                  await updateRenter.mutateAsync({ id: renter.id, status: "archived" });
+                  const now = new Date();
+                  const billableUntil = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+                  await updateRenter.mutateAsync({
+                    id: renter.id,
+                    status: "archived",
+                    archived_at: now.toISOString(),
+                    billable_until: billableUntil.toISOString(),
+                  } as any);
                   queryClient.invalidateQueries({ queryKey: ["renters"] });
                   queryClient.invalidateQueries({ queryKey: ["renters", "archived"] });
-                  toast.success("Renter archived");
+                  toast.success("Renter archived. Archived renters remain billable for 30 days.");
                   navigate("/renters");
                 } catch (err: any) {
                   toast.error(err.message || "Failed to archive");
