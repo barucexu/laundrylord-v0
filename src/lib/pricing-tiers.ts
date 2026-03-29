@@ -31,6 +31,32 @@ export function getTierForCount(totalRenters: number): PricingTier {
   return TIERS.find((t) => totalRenters >= t.min && totalRenters <= t.max) ?? TIERS[0];
 }
 
+export function getRequiredTierForCount(totalRenters: number): PricingTier {
+  return getTierForCount(totalRenters);
+}
+
+export function getTierByProductId(productId: string | null | undefined): PricingTier | null {
+  if (!productId) return null;
+  return TIERS.find((t) => t.product_id === productId) ?? null;
+}
+
+export function getNextUpgradeTierForCount(totalRenters: number): PricingTier | null {
+  const current = getTierForCount(totalRenters);
+  const idx = TIERS.indexOf(current);
+  if (idx === -1) return null;
+
+  // If currently within tier range and already paid, upgrading target is current tier (for unsubscribed flows).
+  if (totalRenters < current.max && current.price > 0) return current;
+
+  // At boundary or free tier, target next tier.
+  const next = TIERS[idx + 1];
+  return next ?? current;
+}
+
+export function canFitTier(totalRenters: number, tier: PricingTier): boolean {
+  return totalRenters <= tier.max;
+}
+
 /** Whether the operator is in a paid tier but may not be subscribed yet. */
 export function needsSubscription(totalRenters: number): boolean {
   return totalRenters > 10;
