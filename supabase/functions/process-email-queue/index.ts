@@ -221,8 +221,8 @@ Deno.serve(async (req) => {
 
       // Guard: skip if another worker already sent this message (VT expired race)
       if (payload.message_id) {
-        const { data: alreadySent } = await supabase
-          .from('email_send_log')
+        const { data: alreadySent } = await (supabase
+          .from as any)('email_send_log')
           .select('id')
           .eq('message_id', payload.message_id)
           .eq('status', 'sent')
