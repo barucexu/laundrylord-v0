@@ -62,15 +62,15 @@ serve(async (req) => {
     if (customers.data.length > 0) {
       customerId = customers.data[0].id;
 
-      // Check if customer already has an active SaaS subscription
-      // If so, redirect to the customer portal for plan changes instead of creating a duplicate
+      // Keep only one SaaS subscription by cancelling prior SaaS subscriptions immediately
+      // before starting checkout for the newly selected plan.
       const subscriptions = await stripe.subscriptions.list({
         customer: customerId,
         status: "active",
-        limit: 10,
+        limit: 50,
       });
 
-      const hasSaasSub = subscriptions.data.some((sub) =>
+      const activeSaasSubs = subscriptions.data.filter((sub) =>
         sub.items.data.some((item) => {
           const productId = typeof item.price.product === "string"
             ? item.price.product
