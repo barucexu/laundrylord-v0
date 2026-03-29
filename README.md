@@ -78,6 +78,14 @@ All reads AND writes must use `machines.assigned_renter_id`. The legacy `renters
 | `payments.status` | `upcoming`, `due_soon`, `overdue`, `failed`, `paid` |
 | `timeline_events.type` | `created`, `machine_assigned`, `payment_succeeded`, `payment_failed`, `payment_method_saved`, `late_fee`, `maintenance_opened`, `maintenance_resolved`, `pickup_scheduled`, `pickup_completed`, `note` |
 
+
+## Project Operating Docs
+
+- `RULES.md` — non-negotiable engineering guardrails
+- `ARCHITECTURE.md` — system map and module boundaries
+- `BILLING_POLICY.md` — SaaS/enforcement policy decisions
+- `QA_RUNBOOK.md` — manual validation checklist for pricing/enforcement
+
 ## Repo Rules
 
 1. **No silent enum/contract drift**: Any new persisted value for type/status/event fields must be added to the canonical value set above and to all UI rendering paths (e.g., `StatusBadge`, `timelineIcons`).
