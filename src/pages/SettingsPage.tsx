@@ -217,9 +217,9 @@ export default function SettingsPage() {
                             <Button
                               size="sm"
                               className="h-7 text-xs"
-                              onClick={() => subscription.checkout(t.price_id)}
+                              onClick={() => subscription.subscribed ? subscription.manageSubscription() : subscription.checkout(t.price_id)}
                             >
-                              {tierUpgradeLabel(t)}
+                              {subscription.subscribed ? "Change in portal" : tierUpgradeLabel(t)}
                             </Button>
                           ) : (
                             <p className="text-[11px] text-muted-foreground">Free tier available when no paid subscription is active.</p>
