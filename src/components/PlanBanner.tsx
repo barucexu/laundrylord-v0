@@ -22,7 +22,7 @@ export function PlanBanner() {
       <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-4 py-2 mb-4 text-xs text-muted-foreground">
         <Sparkles className="h-3.5 w-3.5 text-primary" />
          <span>
-          {upgradeTarget.name} plan · {billableCount} billable renter{billableCount !== 1 ? "s" : ""}
+          {currentBilledTier.name} plan · {billableCount} billable renter{billableCount !== 1 ? "s" : ""}
         </span>
       </div>
     );

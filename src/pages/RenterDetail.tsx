@@ -227,26 +227,7 @@ export default function RenterDetail() {
             <Button
               variant="outline"
               size="sm"
-              onClick={async () => {
-                if (!window.confirm("Archive this renter?\n\nArchived renters remain billable for 30 days.")) return;
-                try {
-                  const now = new Date();
-                  const billableUntil = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-                  await updateRenter.mutateAsync({
-                    id: renter.id,
-                    status: "archived",
-                    archived_at: now.toISOString(),
-                    billable_until: billableUntil.toISOString(),
-                  });
-                  queryClient.invalidateQueries({ queryKey: ["renters"] });
-                  queryClient.invalidateQueries({ queryKey: ["renters", "archived"] });
-                  queryClient.invalidateQueries({ queryKey: ["renters", "billable-count"] });
-                  toast.success("Renter archived");
-                  navigate("/renters");
-                } catch (err: any) {
-                  toast.error(err.message || "Failed to archive");
-                }
-              }}
+              onClick={() => setArchiveDialogOpen(true)}
             >
               <Archive className="h-3.5 w-3.5 mr-1" /> Archive
             </Button>

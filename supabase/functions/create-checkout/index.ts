@@ -102,7 +102,7 @@ serve(async (req) => {
         const subscriptionItemId = saasSubscription.items.data[0].id;
         await stripe.subscriptions.update(saasSubscription.id, {
           items: [{ id: subscriptionItemId, price: price_id }],
-          proration_behavior: "create_prorations",
+          proration_behavior: "always_invoice",
         });
         return new Response(JSON.stringify({
           url: `${origin}/settings?subscription=updated`,
