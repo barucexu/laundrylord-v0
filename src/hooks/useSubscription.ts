@@ -142,11 +142,16 @@ export function useSubscription(): SubscriptionState {
       body: { price_id: priceId },
     });
     if (error) throw error;
+    if (data?.updated) {
+      // Subscription was updated directly via API — just refresh
+      await checkSubscription();
+      return;
+    }
     if (data?.url) {
       window.open(data.url, "_blank");
       startAggressivePolling();
     }
-  }, [tier, upgradeTarget, startAggressivePolling]);
+  }, [tier, upgradeTarget, startAggressivePolling, checkSubscription]);
 
   const manageSubscription = useCallback(async () => {
     const { data, error } = await supabase.functions.invoke("customer-portal");

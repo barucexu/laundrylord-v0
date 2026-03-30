@@ -70,7 +70,7 @@ serve(async (req) => {
         limit: 10,
       });
 
-      const hasSaasSub = subscriptions.data.some((sub) =>
+      const saasSubscription = subscriptions.data.find((sub) =>
         sub.items.data.some((item) => {
           const productId = typeof item.price.product === "string"
             ? item.price.product
@@ -79,13 +79,35 @@ serve(async (req) => {
         })
       );
 
-      if (hasSaasSub) {
-        logStep("Existing SaaS subscription found — redirecting to portal");
-        const portalSession = await stripe.billingPortal.sessions.create({
-          customer: customerId,
-          return_url: `${origin}/settings`,
+      if (saasSubscription) {
+        // Check if the requested price is already the current price (no change needed)
+        const currentPriceId = saasSubscription.items.data[0]?.price?.id;
+        if (currentPriceId === price_id) {
+          logStep("Already on requested plan — redirecting to portal");
+          const portalSession = await stripe.billingPortal.sessions.create({
+            customer: customerId,
+            return_url: `${origin}/settings`,
+          });
+          return new Response(JSON.stringify({ url: portalSession.url }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Update existing subscription to the new price directly via API
+        logStep("Updating existing subscription to new price", {
+          subscriptionId: saasSubscription.id,
+          fromPrice: currentPriceId,
+          toPrice: price_id,
         });
-        return new Response(JSON.stringify({ url: portalSession.url }), {
+        const subscriptionItemId = saasSubscription.items.data[0].id;
+        await stripe.subscriptions.update(saasSubscription.id, {
+          items: [{ id: subscriptionItemId, price: price_id }],
+          proration_behavior: "create_prorations",
+        });
+        return new Response(JSON.stringify({
+          url: `${origin}/settings?subscription=updated`,
+          updated: true,
+        }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
