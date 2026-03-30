@@ -17,7 +17,7 @@ export default function RentersList() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: renters = [], isLoading } = useRenters();
-  const { canAddRenter, tier, renterCount, checkout, loading: planLoading } = useSubscription();
+  const { canAddRenter, billableCount, upgradeTarget, checkout, loading: planLoading } = useSubscription();
 
   const filtered = renters.filter(r => {
     const matchesSearch = r.name.toLowerCase().includes(search.toLowerCase()) || (r.phone || "").includes(search);
@@ -53,13 +53,13 @@ export default function RentersList() {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="max-w-xs">
-              <p className="font-medium text-sm">You've grown to {renterCount} renter{renterCount !== 1 ? "s" : ""}!</p>
+              <p className="font-medium text-sm">You've grown to {billableCount} billable renter{billableCount !== 1 ? "s" : ""}!</p>
               <p className="text-xs text-muted-foreground mt-1">
-                {tierUpgradeLabel(tier)} to {tier.price === 0 ? "keep growing" : "add more renters"}.
+                {tierUpgradeLabel(upgradeTarget)} to keep growing.
               </p>
-              {tier.price_id && (
-                <Button size="sm" className="w-full mt-3" onClick={() => checkout()}>
-                  {tierUpgradeLabel(tier)}
+              {upgradeTarget.price_id && (
+                <Button size="sm" className="w-full mt-3" onClick={() => checkout(upgradeTarget.price_id)}>
+                  {tierUpgradeLabel(upgradeTarget)}
                 </Button>
               )}
             </PopoverContent>
