@@ -153,7 +153,6 @@ export function useSubscription(): SubscriptionState {
     });
     if (error) throw error;
     if (data?.updated) {
-      // Subscription was updated directly via API — just refresh
       await checkSubscription();
       return;
     }
@@ -163,18 +162,45 @@ export function useSubscription(): SubscriptionState {
     }
   }, [tier, upgradeTarget, startAggressivePolling, checkSubscription]);
 
+  // Upgrade confirmation flow
+  const [upgradeIntent, setUpgradeIntent] = useState<UpgradeIntent | null>(null);
+  const [upgradeProcessing, setUpgradeProcessing] = useState(false);
+
+  const initiateUpgrade = useCallback((targetPriceId: string) => {
+    const targetTier = TIERS.find(t => t.price_id === targetPriceId);
+    if (!targetTier) return;
+    setUpgradeIntent({
+      priceId: targetPriceId,
+      tierName: targetTier.name,
+      tierLabel: targetTier.label,
+      isUpgrade: subscribed,
+    });
+  }, [subscribed]);
+
+  const confirmUpgrade = useCallback(async () => {
+    if (!upgradeIntent) return;
+    setUpgradeProcessing(true);
+    try {
+      await checkout(upgradeIntent.priceId);
+      setUpgradeIntent(null);
+    } finally {
+      setUpgradeProcessing(false);
+    }
+  }, [upgradeIntent, checkout]);
+
+  const cancelUpgrade = useCallback(() => {
+    setUpgradeIntent(null);
+  }, []);
+
   const manageSubscription = useCallback(async () => {
     const { data, error } = await supabase.functions.invoke("customer-portal");
     if (error) throw error;
     if (data?.url) window.open(data.url, "_blank");
   }, []);
 
-  // Canonical enforcement using billableCount
   const canAddRenter = (() => {
     if (loading) return false;
-    // Free tier: can add up to max (10)
     if (tier.price === 0) return billableCount < tier.max;
-    // Paid tiers: must be subscribed and under the effective tier max
     return subscribed && billableCount < effectiveTier.max;
   })();
 
@@ -193,6 +219,11 @@ export function useSubscription(): SubscriptionState {
     productId,
     canAddRenter,
     checkout,
+    initiateUpgrade,
+    upgradeIntent,
+    confirmUpgrade,
+    cancelUpgrade,
+    upgradeProcessing,
     manageSubscription,
     refresh: checkSubscription,
   };
