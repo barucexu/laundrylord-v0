@@ -65,5 +65,17 @@ export function PlanBanner() {
         <X className="h-4 w-4" />
       </button>
     </div>
+    {upgradeIntent && (
+      <UpgradeConfirmDialog
+        open={!!upgradeIntent}
+        onOpenChange={(open) => { if (!open) cancelUpgrade(); }}
+        tierName={upgradeIntent.tierName}
+        tierLabel={upgradeIntent.tierLabel}
+        isUpgrade={upgradeIntent.isUpgrade}
+        loading={upgradeProcessing}
+        onConfirm={confirmUpgrade}
+      />
+    )}
+    </>
   );
 }
