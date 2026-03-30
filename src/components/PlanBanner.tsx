@@ -7,7 +7,7 @@ import { toast } from "@/hooks/use-toast";
 import { UpgradeConfirmDialog } from "@/components/UpgradeConfirmDialog";
 
 export function PlanBanner() {
-  const { billableCount, subscribed, loading, upgradeTarget, currentBilledTier, checkout } = useSubscription();
+  const { billableCount, subscribed, loading, upgradeTarget, currentBilledTier, checkout, initiateUpgrade, upgradeIntent, confirmUpgrade, cancelUpgrade, upgradeProcessing } = useSubscription();
   const [dismissed, setDismissed] = useState<string | null>(null);
 
   if (loading) return null;
