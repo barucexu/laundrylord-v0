@@ -10,6 +10,7 @@ import { Plus, Pencil } from "lucide-react";
 import { CreateMachineDialog } from "@/components/CreateMachineDialog";
 import { EditMachineDialog } from "@/components/EditMachineDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { UpgradeConfirmDialog } from "@/components/UpgradeConfirmDialog";
 
 export default function MachinesList() {
   const { data: machines = [], isLoading } = useMachines();
