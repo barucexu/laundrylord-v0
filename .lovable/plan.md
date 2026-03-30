@@ -1,59 +1,155 @@
+Inspect the current LaundryLord repo first, then implement the smallest safe diff to make Bruce/LaundryLord SaaS billing boring, correct, and hard to misunderstand.
 
+&nbsp;
 
-# Plan: Immediate Plan Payment, Banner Refresh, Archive Dialog
+This pass is only about PLATFORM SaaS billing (Bruce charging operators). Do not modify operator->renter billing flows.
 
-## Three issues
+&nbsp;
 
-1. **Plan changes defer payment to next cycle.** `stripe.subscriptions.update` with `proration_behavior: "create_prorations"` creates proration invoice items but doesn't collect immediately. Fix: add `payment_behavior: "pending_if_incomplete"` and create + pay the prorated invoice immediately after update.
+Hard constraints:
 
-2. **PlanBanner shows stale tier after plan change.** When `checkout()` detects `data.updated`, it calls `checkSubscription()` — but the banner reads `upgradeTarget` which derives from `billableCount`, not the subscription product. The banner's "subscribed" path shows `upgradeTarget.name` instead of `currentBilledTier.name`. Fix: banner should show `currentBilledTier` when subscribed.
+- Preserve separation:
 
-3. **Archive confirm uses `window.confirm()`** which shows the ugly domain. Fix: replace with a proper `AlertDialog` component.
+  - Operator -> renter billing uses each operator’s own Stripe key / stripe_keys flow
 
-## Changes
+  - Bruce/LaundryLord platform -> operator SaaS billing uses platform STRIPE_SECRET_KEY
 
-### File 1: `supabase/functions/create-checkout/index.ts`
+- Do not modify these renter billing functions:
 
-In the existing subscription update block (lines 102-106), after `stripe.subscriptions.update`:
-- Add `invoice_settings: { days_until_due: 0 }` is not needed; instead, after the update call, create an invoice and pay it immediately:
-```ts
-await stripe.subscriptions.update(saasSubscription.id, {
-  items: [{ id: subscriptionItemId, price: price_id }],
-  proration_behavior: "always_invoice",
-});
-```
-Using `proration_behavior: "always_invoice"` will immediately generate and finalize an invoice for the prorated amount, charging the customer's default payment method right away.
+  - supabase/functions/create-setup-link/index.ts
 
-Actually, the cleanest Stripe approach: use `proration_behavior: "always_invoice"` which creates and immediately finalizes the prorated invoice. But this only auto-charges if the customer has a default payment method. Since these operators already have a payment method on file (they subscribed via checkout), this should work.
+  - supabase/functions/create-subscription/index.ts
 
-### File 2: `src/components/PlanBanner.tsx`
+  - supabase/functions/stripe-webhook/index.ts
 
-Line 25: change `{upgradeTarget.name} plan` to `{subscription.currentBilledTier.name} plan` when subscribed. Need to destructure `currentBilledTier` from `useSubscription()`.
+- Do not broaden scope into renter billing cleanup
 
-### File 3: `src/pages/RenterDetail.tsx`
+- Smallest safe diff only
 
-Replace `window.confirm(...)` with a `<AlertDialog>` from the existing UI components. Add state `archiveDialogOpen`, render an `AlertDialog` with:
-- Title: "Archive this renter?"
-- Description: "Archived renters remain billable for 30 days."
-- Cancel / OK buttons
-- On confirm: run the existing archive mutation logic.
+&nbsp;
 
-## Technical details
+What I want this feature to do, clearly:
 
-### Stripe immediate payment
-`proration_behavior: "always_invoice"` tells Stripe to immediately generate a finalized invoice for the price difference. Since the customer already has a payment method from their original checkout, Stripe will attempt to charge it immediately. This is the standard approach for mid-cycle upgrades that should be paid now.
+&nbsp;
 
-### Banner staleness
-The banner currently destructures `upgradeTarget` and uses its name for the subscribed state display. After a plan change, `productId` updates via `checkSubscription()`, which updates `currentBilledTier`. The banner should use `currentBilledTier.name` for the subscribed display line.
+1. Billable-count / plan logic
 
-### Archive dialog
-Uses existing `AlertDialog` from `src/components/ui/alert-dialog.tsx`. No new dependencies.
+- Keep the current billable-count philosophy and threshold behavior exactly as intended now:
 
-## Files changed
+  - billable count should remain archive-aware
 
-| File | Change |
-|------|--------|
-| `supabase/functions/create-checkout/index.ts` | Change `proration_behavior` to `"always_invoice"` for immediate charge |
-| `src/components/PlanBanner.tsx` | Use `currentBilledTier.name` instead of `upgradeTarget.name` when subscribed |
-| `src/pages/RenterDetail.tsx` | Replace `window.confirm` with `AlertDialog` component |
+  - current threshold/next-renter upgrade trigger behavior should stay intact
 
+- Do not change the tier ladder or tier boundaries in this pass
+
+- Do not change the archive cooldown concept in this pass unless absolutely necessary
+
+&nbsp;
+
+2. First-time paid subscription
+
+- If an operator is entering a paid plan for the first time, use Stripe Checkout
+
+- They should be charged the intended full monthly amount upfront
+
+- Do not allow accidental "$0 due today" behavior caused by stale/orphaned SaaS customer credit to silently make a first paid subscription free
+
+- But do NOT blindly wipe or override legitimate Stripe credit without inspecting first
+
+- Use the safest, most transparent handling for Stripe customer balance / credit edge cases
+
+&nbsp;
+
+3. Mid-cycle upgrades
+
+- For operators already on a paid SaaS subscription, use Stripe-native subscription update behavior with proration
+
+- Do not cancel-and-recreate if Stripe-native upgrade with proration can handle this cleanly
+
+- No custom manual billing math
+
+- No duplicate subscriptions
+
+- Keep the renewal date in the cleanest Stripe-native way
+
+&nbsp;
+
+4. Upgrade UX
+
+- Keep exact-tier selection UX from banner / settings / blocked-action surfaces
+
+- Route each surface through the correct flow:
+
+  - first-time paid -> Checkout
+
+  - existing paid subscriber upgrade -> Stripe-native subscription update/proration flow
+
+- I care more about correct billing behavior than whether the surface is checkout vs portal vs API update
+
+- Keep the UX calm and premium
+
+-Ensure the Laundrylord (my customer) is told clearly that they will be billed whatever the calculated amount is. Perhaps a pop-up where they must click confirm or something like that. Make it for sure more official, since they are spending more money.
+
+&nbsp;
+
+5. Enforcement
+
+- Keep the current client-side UX gating
+
+- Add server-side authoritative enforcement for renter creation/import paths so plan limits cannot be bypassed through direct insert/import paths
+
+- Preserve current product intent around add-renter/add-machine gating unless you find a concrete inconsistency
+
+- Do not create harsh lockouts for existing data; just stop over-limit additions
+
+&nbsp;
+
+6. Archive-aware behavior
+
+- Keep archive/unarchive and archive cooldown logic coherent with billing/enforcement
+
+- Do not change the overall archive policy in this pass
+
+- Just make sure enforcement and billing count stay consistent with the current implementation intent
+
+&nbsp;
+
+Important implementation philosophy:
+
+- Prefer boring correctness over cleverness
+
+- Prefer one canonical first-time paid path, one canonical upgrade path, and one canonical billable-count rule
+
+- Preserve working renter billing flows
+
+- Preserve Stripe account separation
+
+- Use Stripe-native behavior wherever possible
+
+- Avoid hidden billing surprises
+
+- Avoid broad rewrites
+
+&nbsp;
+
+Verification checklist required in output:
+
+- first-time paid checkout charges expected amount and does not accidentally become free from stale/orphaned SaaS credit
+
+- existing paid-plan upgrade uses Stripe-native proration
+
+- no duplicate SaaS subscriptions are created
+
+- renewal amount/date after upgrade are correct
+
+- threshold/next-renter upgrade trigger behavior remains correct
+
+- archive/unarchive remains coherent with billable enforcement
+
+- add renter / add machine / renter import cannot bypass plan enforcement through direct client paths
+
+- renter billing flows remain untouched
+
+- SaaS billing still uses Bruce’s platform Stripe only
+
+- operator renter billing still uses operator Stripe only
