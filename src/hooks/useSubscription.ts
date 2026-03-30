@@ -199,10 +199,20 @@ export function useSubscription(): SubscriptionState {
     if (data?.url) window.open(data.url, "_blank");
   }, []);
 
+  // Demo mode: simulate Starter plan subscription
+  const isDemo = !!demo?.isDemo;
+  const demoStarterTier = TIERS.find(t => t.name === "Starter") ?? TIERS[1];
+
+  const finalSubscribed = isDemo ? true : subscribed;
+  const finalCurrentBilledTier = isDemo ? demoStarterTier : currentBilledTier;
+  const finalEffectiveTier = isDemo ? demoStarterTier : effectiveTier;
+  const finalProductId = isDemo ? (demoStarterTier.product_id ?? null) : productId;
+  const finalLoading = isDemo ? false : loading;
+
   const canAddRenter = (() => {
-    if (loading) return false;
+    if (finalLoading) return false;
     if (tier.price === 0) return billableCount < tier.max;
-    return subscribed && billableCount < effectiveTier.max;
+    return finalSubscribed && billableCount < finalEffectiveTier.max;
   })();
 
   return {
@@ -211,13 +221,13 @@ export function useSubscription(): SubscriptionState {
     billableCount,
     renterCount: activeOperationalCount,
     requiredTier,
-    currentBilledTier,
-    effectiveTier,
+    currentBilledTier: finalCurrentBilledTier,
+    effectiveTier: finalEffectiveTier,
     upgradeTarget,
-    subscribed,
-    loading,
-    subscriptionEnd,
-    productId,
+    subscribed: finalSubscribed,
+    loading: finalLoading,
+    subscriptionEnd: isDemo ? null : subscriptionEnd,
+    productId: finalProductId,
     canAddRenter,
     checkout,
     initiateUpgrade,
