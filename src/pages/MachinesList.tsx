@@ -52,7 +52,7 @@ export default function MachinesList() {
                 {tierUpgradeLabel(upgradeTarget)} to add more machines.
               </p>
               {upgradeTarget.price_id && (
-                <Button size="sm" className="w-full mt-3" onClick={() => checkout(upgradeTarget.price_id)}>
+                <Button size="sm" className="w-full mt-3" onClick={() => initiateUpgrade(upgradeTarget.price_id!)}>
                   {tierUpgradeLabel(upgradeTarget)}
                 </Button>
               )}
