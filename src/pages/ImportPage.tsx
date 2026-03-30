@@ -35,7 +35,7 @@ interface CombinedResult {
 
 export default function ImportPage() {
   const { user } = useAuth();
-  const { tier, renterCount } = useSubscription();
+  const { tier, billableCount, subscribed } = useSubscription();
   const queryClient = useQueryClient();
   const [importMode, setImportMode] = useState<ImportMode>("combined");
   const [step, setStep] = useState<Step>("upload");
