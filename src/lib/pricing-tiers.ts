@@ -31,6 +31,37 @@ export function getTierForCount(totalRenters: number): PricingTier {
   return TIERS.find((t) => totalRenters >= t.min && totalRenters <= t.max) ?? TIERS[0];
 }
 
+/** Alias: returns the tier required by the current billable count. */
+export function getRequiredTierForCount(count: number): PricingTier {
+  return getTierForCount(count);
+}
+
+/** Lookup tier by Stripe product_id. Returns Free tier if not found. */
+export function getTierByProductId(productId: string | null): PricingTier {
+  if (!productId) return TIERS[0];
+  return TIERS.find((t) => t.product_id === productId) ?? TIERS[0];
+}
+
+/**
+ * Returns the next paid tier the operator should upgrade to.
+ * If count is at or above the current tier's max, returns the next tier up.
+ * Always returns a tier with a price_id (skips Free).
+ */
+export function getNextUpgradeTierForCount(count: number): PricingTier {
+  const current = getTierForCount(count);
+  // If still under the current tier max and current tier is paid, that's the target
+  if (count < current.max && current.price_id) return current;
+  // Otherwise find the next tier above the current one
+  const idx = TIERS.indexOf(current);
+  const next = TIERS[idx + 1];
+  return next ?? current; // at top tier, return self
+}
+
+/** Whether a given renter count fits within a tier's range. */
+export function canFitTier(count: number, tier: PricingTier): boolean {
+  return count <= tier.max;
+}
+
 /** Whether the operator is in a paid tier but may not be subscribed yet. */
 export function needsSubscription(totalRenters: number): boolean {
   return totalRenters > 10;
@@ -38,10 +69,5 @@ export function needsSubscription(totalRenters: number): boolean {
 
 /** Consistent upgrade CTA label used across the app. */
 export function tierUpgradeLabel(tier: PricingTier): string {
-  if (tier.price === 0) {
-    // Next tier after free is always Starter
-    const starter = TIERS.find((t) => t.name === "Starter");
-    return starter ? `Upgrade to ${starter.name} (${starter.label})` : "Upgrade";
-  }
   return `Upgrade to ${tier.name} (${tier.label})`;
 }
