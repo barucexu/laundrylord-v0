@@ -1,303 +1,59 @@
-You are modifying the LaundryLord repo. Implement the smallest safe, production-ready fixes for SaaS plan enforcement and plan UX, without breaking renter billing flows.
 
-PRIMARY GOAL
 
-Make pricing enforcement reliable, hard to game, and predictable.
+# Plan: Immediate Plan Payment, Banner Refresh, Archive Dialog
 
-NON-GOALS
+## Three issues
 
-- Do not redesign renter billing architecture.
+1. **Plan changes defer payment to next cycle.** `stripe.subscriptions.update` with `proration_behavior: "create_prorations"` creates proration invoice items but doesn't collect immediately. Fix: add `payment_behavior: "pending_if_incomplete"` and create + pay the prorated invoice immediately after update.
 
-- Do not change operator Stripe key renter-charge flows.
+2. **PlanBanner shows stale tier after plan change.** When `checkout()` detects `data.updated`, it calls `checkSubscription()` — but the banner reads `upgradeTarget` which derives from `billableCount`, not the subscription product. The banner's "subscribed" path shows `upgradeTarget.name` instead of `currentBilledTier.name`. Fix: banner should show `currentBilledTier` when subscribed.
 
-- Do not modify:
+3. **Archive confirm uses `window.confirm()`** which shows the ugly domain. Fix: replace with a proper `AlertDialog` component.
 
-  - supabase/functions/create-setup-link/index.ts
+## Changes
 
-  - supabase/functions/create-subscription/index.ts
+### File 1: `supabase/functions/create-checkout/index.ts`
 
-  - supabase/functions/stripe-webhook/index.ts
+In the existing subscription update block (lines 102-106), after `stripe.subscriptions.update`:
+- Add `invoice_settings: { days_until_due: 0 }` is not needed; instead, after the update call, create an invoice and pay it immediately:
+```ts
+await stripe.subscriptions.update(saasSubscription.id, {
+  items: [{ id: subscriptionItemId, price: price_id }],
+  proration_behavior: "always_invoice",
+});
+```
+Using `proration_behavior: "always_invoice"` will immediately generate and finalize an invoice for the prorated amount, charging the customer's default payment method right away.
 
-- Do not change create-checkout portal/duplicate-subscription behavior in this task unless explicitly required by acceptance tests.
+Actually, the cleanest Stripe approach: use `proration_behavior: "always_invoice"` which creates and immediately finalizes the prorated invoice. But this only auto-charges if the customer has a default payment method. Since these operators already have a payment method on file (they subscribed via checkout), this should work.
 
-==================================================
+### File 2: `src/components/PlanBanner.tsx`
 
-A) ANTI-GAMING BILLABLE COUNT (30-DAY COOLDOWN)
+Line 25: change `{upgradeTarget.name} plan` to `{subscription.currentBilledTier.name} plan` when subscribed. Need to destructure `currentBilledTier` from `useSubscription()`.
 
-==================================================
+### File 3: `src/pages/RenterDetail.tsx`
 
-1) Add/ensure cooldown columns with an idempotent migration:
+Replace `window.confirm(...)` with a `<AlertDialog>` from the existing UI components. Add state `archiveDialogOpen`, render an `AlertDialog` with:
+- Title: "Archive this renter?"
+- Description: "Archived renters remain billable for 30 days."
+- Cancel / OK buttons
+- On confirm: run the existing archive mutation logic.
 
-- renters.archived_at timestamptz nullable
+## Technical details
 
-- renters.billable_until timestamptz nullable
+### Stripe immediate payment
+`proration_behavior: "always_invoice"` tells Stripe to immediately generate a finalized invoice for the price difference. Since the customer already has a payment method from their original checkout, Stripe will attempt to charge it immediately. This is the standard approach for mid-cycle upgrades that should be paid now.
 
-Use:
+### Banner staleness
+The banner currently destructures `upgradeTarget` and uses its name for the subscribed state display. After a plan change, `productId` updates via `checkSubscription()`, which updates `currentBilledTier`. The banner should use `currentBilledTier.name` for the subscribed display line.
 
-- ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...
+### Archive dialog
+Uses existing `AlertDialog` from `src/components/ui/alert-dialog.tsx`. No new dependencies.
 
-2) Archive behavior:
+## Files changed
 
-- On archive action:
+| File | Change |
+|------|--------|
+| `supabase/functions/create-checkout/index.ts` | Change `proration_behavior` to `"always_invoice"` for immediate charge |
+| `src/components/PlanBanner.tsx` | Use `currentBilledTier.name` instead of `upgradeTarget.name` when subscribed |
+| `src/pages/RenterDetail.tsx` | Replace `window.confirm` with `AlertDialog` component |
 
-  - set status = "archived"
-
-  - set archived_at = now()
-
-  - set billable_until = now() + interval '30 days'
-
-- On unarchive action:
-
-  - set status = "closed" (or existing intended non-archived status)
-
-  - DO NOT clear archived_at / billable_until history fields
-
-3) Billable count definition:
-
-- billableCount = non-archived renters + archived renters where billable_until > now()
-
-- activeOperationalCount = non-archived renters only
-
-- Use billableCount for plan enforcement
-
-- Use activeOperationalCount for operational display only
-
-==================================================
-
-B) CENTRALIZE PLAN LOGIC
-
-==================================================
-
-Target files:
-
-- src/lib/pricing-tiers.ts
-
-- src/hooks/useSubscription.ts
-
-In pricing helpers, ensure:
-
-- getTierForCount(count)
-
-- getRequiredTierForCount(count)
-
-- getTierByProductId(productId)
-
-- getNextUpgradeTierForCount(count)
-
-- canFitTier(count, tier)
-
-- shared label helper for upgrade text consistency
-
-In useSubscription:
-
-- Keep one canonical source for enforcement state:
-
-  - billableCount
-
-  - activeOperationalCount
-
-  - requiredTier (by billableCount)
-
-  - currentBilledTier (from subscription product_id when subscribed)
-
-  - effectiveTier
-
-- checkout(targetPriceId?) must accept explicit target plan ID
-
-- canAddRenter logic must use billableCount, not operational count
-
-Canonical enforcement rules:
-
-- Free tier: allow if billableCount < free.max
-
-- Paid required + unsubscribed: block renter creates/imports
-
-- Paid required + subscribed: allow if billableCount < effectiveTier.max
-
-==================================================
-
-C) FIX KNOWN UX/LOOPHOLES
-
-==================================================
-
-1) Boundary CTA bug (10/24/49/etc)
-
-Files:
-
-- src/pages/RentersList.tsx
-
-- src/pages/MachinesList.tsx
-
-- src/components/PlanBanner.tsx
-
-Requirements:
-
-- blocked state must use next upgrade target tier (not current tier)
-
-- CTA must stay visible/actionable at boundaries:
-
-  - 10 -> Starter
-
-  - 24 -> Growth
-
-  - 49 -> Pro
-
-- loading state stays neutral (no misleading tier label while loading)
-
-2) Import parity
-
-File:
-
-- src/pages/ImportPage.tsx
-
-Requirements:
-
-- Use canonical enforcement from useSubscription
-
-- Do not rely only on slotsAvailable math
-
-- For any cap math, use billableCount (not non-archived-only count)
-
-- Paid required + unsubscribed => block renter imports
-
-- Machines-only import remains unaffected
-
-- Preserve blockedByPlan reporting
-
-==================================================
-
-D) SETTINGS PLAN UX (ALWAYS AVAILABLE, CLEAR)
-
-==================================================
-
-File:
-
-- src/pages/SettingsPage.tsx
-
-Requirements:
-
-1) Always show:
-
-- current billed plan
-
-- required plan by usage
-
-- billableCount and activeOperationalCount
-
-- compact line: “Archived renters count toward billing for 30 days.”
-
-2) Always show change-plan controls:
-
-- Plan grid/list always visible
-
-- If billableCount exceeds target tier max: disable that option and show reason
-
-- Upgrade targets remain selectable when valid
-
-3) Action behavior:
-
-- Keep top-level Manage billing button for portal
-
-- Plan selection actions should use checkout(targetPriceId) for explicit paid-tier selection
-
-- Avoid mixed/ambiguous CTA behavior
-
-==================================================
-
-E) MINIMAL CUSTOMER COMMUNICATION
-
-==================================================
-
-Add wording in exactly two places:
-
-1) Archive confirm/action context in renter detail:
-
-   “Archived renters remain billable for 30 days.”
-
-2) Settings plan helper line:
-
-   “Archived renters count toward billing for 30 days.”
-
-No extra global warning banners/toasts.
-
-==================================================
-
-F) ACCEPTANCE CRITERIA (MUST PASS)
-
-==================================================
-
-Boundary CTA:
-
-- billableCount=10 => blocked + Starter CTA visible/clickable
-
-- 24 => Growth CTA
-
-- 49 => Pro CTA
-
-- no misleading tier flash during loading
-
-Anti-gaming:
-
-- archive today does not immediately reduce billable enforcement
-
-- unarchive before cooldown expiry does not create loophole
-
-- archived renters older than 30 days no longer count billable
-
-Import parity:
-
-- Free at 9 importing 3 => 1 created, 2 blocked
-
-- Paid required + unsubscribed => renter imports blocked
-
-- Paid required + subscribed near cap => only up to cap created
-
-- Machines-only import unaffected
-
-Settings:
-
-- current billed and required plan both visible
-
-- billable + active counts visible
-
-- disabled downgrade/plan options explain why when out of range
-
-- plan selection opens explicit target checkout path
-
-Regression safety:
-
-- add renter/machine hard-stops still work
-
-- renter billing setup/subscription/webhook flows untouched
-
-==================================================
-
-G) QA OUTPUT REQUIRED
-
-==================================================
-
-After implementation, provide:
-
-1) Changed files + reason for each
-
-2) Migration summary (idempotent column additions)
-
-3) Manual QA checklist covering:
-
-   - boundaries: 10/24/49/74/99
-
-   - archive immediate vs >30 days
-
-   - unarchive before cooldown expiry
-
-   - paid-unsubscribed import attempts
-
-4) Explicit pass/fail for:
-
-   - boundary CTA always actionable
-
-   - archive gaming blocked
-
-   - import cannot bypass paid-tier subscription requirement
-
-   - settings messaging clear and minimal
