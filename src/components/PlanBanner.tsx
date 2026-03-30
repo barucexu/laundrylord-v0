@@ -38,6 +38,7 @@ export function PlanBanner() {
     }
   };
 
+  return (
     <>
     <div className="relative flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 px-5 py-4 mb-4">
       <Sparkles className="h-5 w-5 text-primary mt-0.5 shrink-0" />
