@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { EditRenterDialog } from "@/components/EditRenterDialog";
 import { RecordPaymentDialog } from "@/components/RecordPaymentDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const timelineIcons: Record<string, typeof User> = {
   created: User,
@@ -46,6 +56,28 @@ export default function RenterDetail() {
   const [activating, setActivating] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+
+  const handleArchive = useCallback(async () => {
+    if (!renter) return;
+    try {
+      const now = new Date();
+      const billableUntil = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      await updateRenter.mutateAsync({
+        id: renter.id,
+        status: "archived",
+        archived_at: now.toISOString(),
+        billable_until: billableUntil.toISOString(),
+      });
+      queryClient.invalidateQueries({ queryKey: ["renters"] });
+      queryClient.invalidateQueries({ queryKey: ["renters", "archived"] });
+      queryClient.invalidateQueries({ queryKey: ["renters", "billable-count"] });
+      toast.success("Renter archived");
+      navigate("/renters");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to archive");
+    }
+  }, [renter, updateRenter, queryClient, navigate]);
 
   // Show toast on setup return
   const setupResult = searchParams.get("setup");
@@ -195,26 +227,7 @@ export default function RenterDetail() {
             <Button
               variant="outline"
               size="sm"
-              onClick={async () => {
-                if (!window.confirm("Archive this renter?\n\nArchived renters remain billable for 30 days.")) return;
-                try {
-                  const now = new Date();
-                  const billableUntil = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-                  await updateRenter.mutateAsync({
-                    id: renter.id,
-                    status: "archived",
-                    archived_at: now.toISOString(),
-                    billable_until: billableUntil.toISOString(),
-                  });
-                  queryClient.invalidateQueries({ queryKey: ["renters"] });
-                  queryClient.invalidateQueries({ queryKey: ["renters", "archived"] });
-                  queryClient.invalidateQueries({ queryKey: ["renters", "billable-count"] });
-                  toast.success("Renter archived");
-                  navigate("/renters");
-                } catch (err: any) {
-                  toast.error(err.message || "Failed to archive");
-                }
-              }}
+              onClick={() => setArchiveDialogOpen(true)}
             >
               <Archive className="h-3.5 w-3.5 mr-1" /> Archive
             </Button>
@@ -585,6 +598,21 @@ export default function RenterDetail() {
       </div>
       <EditRenterDialog open={editOpen} onOpenChange={setEditOpen} renter={renter} />
       {paymentOpen && <RecordPaymentDialog open={paymentOpen} onOpenChange={setPaymentOpen} renter={renter} />}
+
+      <AlertDialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive this renter?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Archived renters remain billable for 30 days.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleArchive}>Archive</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

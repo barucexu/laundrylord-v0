@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 
 export function PlanBanner() {
-  const { billableCount, subscribed, loading, upgradeTarget, checkout } = useSubscription();
+  const { billableCount, subscribed, loading, upgradeTarget, currentBilledTier, checkout } = useSubscription();
   const [dismissed, setDismissed] = useState<string | null>(null);
 
   if (loading) return null;
@@ -22,7 +22,7 @@ export function PlanBanner() {
       <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-4 py-2 mb-4 text-xs text-muted-foreground">
         <Sparkles className="h-3.5 w-3.5 text-primary" />
          <span>
-          {upgradeTarget.name} plan · {billableCount} billable renter{billableCount !== 1 ? "s" : ""}
+          {currentBilledTier.name} plan · {billableCount} billable renter{billableCount !== 1 ? "s" : ""}
         </span>
       </div>
     );
