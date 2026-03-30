@@ -4,6 +4,7 @@ import { needsSubscription, tierUpgradeLabel } from "@/lib/pricing-tiers";
 import { X, Sparkles, ArrowUpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { UpgradeConfirmDialog } from "@/components/UpgradeConfirmDialog";
 
 export function PlanBanner() {
   const { billableCount, subscribed, loading, upgradeTarget, currentBilledTier, checkout } = useSubscription();
