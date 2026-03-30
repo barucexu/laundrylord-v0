@@ -230,7 +230,12 @@ export default function ImportPage() {
     if (!user) return;
     setImporting(true);
 
-    const slotsAvailable = tier.max - renterCount;
+    // Canonical enforcement: free tier = cap only; paid tier = must be subscribed + cap
+    const slotsAvailable = (() => {
+      if (tier.price === 0) return tier.max - billableCount;
+      if (!subscribed) return 0;
+      return tier.max - billableCount;
+    })();
     let rentersCreatedSoFar = 0;
 
     const res: CombinedResult = {
