@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 
 export function PlanBanner() {
-  const { billableCount, subscribed, loading, upgradeTarget, checkout } = useSubscription();
+  const { billableCount, subscribed, loading, upgradeTarget, currentBilledTier, checkout } = useSubscription();
   const [dismissed, setDismissed] = useState<string | null>(null);
 
   if (loading) return null;
