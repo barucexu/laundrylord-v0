@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { UpgradeConfirmDialog } from "@/components/UpgradeConfirmDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -241,7 +242,7 @@ export default function SettingsPage() {
                           size="sm"
                           variant="outline"
                           className="h-6 text-[10px] w-full"
-                          onClick={() => subscription.checkout(t.price_id)}
+                          onClick={() => subscription.initiateUpgrade(t.price_id!)}
                         >
                           Select
                         </Button>
@@ -523,6 +524,18 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {subscription.upgradeIntent && (
+        <UpgradeConfirmDialog
+          open={!!subscription.upgradeIntent}
+          onOpenChange={(open) => { if (!open) subscription.cancelUpgrade(); }}
+          tierName={subscription.upgradeIntent.tierName}
+          tierLabel={subscription.upgradeIntent.tierLabel}
+          isUpgrade={subscription.upgradeIntent.isUpgrade}
+          loading={subscription.upgradeProcessing}
+          onConfirm={subscription.confirmUpgrade}
+        />
+      )}
     </div>
   );
 }

@@ -11,13 +11,14 @@ import { tierUpgradeLabel } from "@/lib/pricing-tiers";
 import { Search, Plus } from "lucide-react";
 import { CreateRenterDialog } from "@/components/CreateRenterDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { UpgradeConfirmDialog } from "@/components/UpgradeConfirmDialog";
 
 export default function RentersList() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: renters = [], isLoading } = useRenters();
-  const { canAddRenter, billableCount, upgradeTarget, checkout, loading: planLoading } = useSubscription();
+  const { canAddRenter, billableCount, upgradeTarget, checkout, initiateUpgrade, upgradeIntent, confirmUpgrade, cancelUpgrade, upgradeProcessing, loading: planLoading } = useSubscription();
 
   const filtered = renters.filter(r => {
     const matchesSearch = r.name.toLowerCase().includes(search.toLowerCase()) || (r.phone || "").includes(search);
@@ -58,7 +59,7 @@ export default function RentersList() {
                 {tierUpgradeLabel(upgradeTarget)} to keep growing.
               </p>
               {upgradeTarget.price_id && (
-                <Button size="sm" className="w-full mt-3" onClick={() => checkout(upgradeTarget.price_id)}>
+                <Button size="sm" className="w-full mt-3" onClick={() => initiateUpgrade(upgradeTarget.price_id!)}>
                   {tierUpgradeLabel(upgradeTarget)}
                 </Button>
               )}
@@ -138,6 +139,17 @@ export default function RentersList() {
       )}
 
       <CreateRenterDialog open={dialogOpen} onOpenChange={setDialogOpen} canAddRenter={canAddRenter} />
+      {upgradeIntent && (
+        <UpgradeConfirmDialog
+          open={!!upgradeIntent}
+          onOpenChange={(open) => { if (!open) cancelUpgrade(); }}
+          tierName={upgradeIntent.tierName}
+          tierLabel={upgradeIntent.tierLabel}
+          isUpgrade={upgradeIntent.isUpgrade}
+          loading={upgradeProcessing}
+          onConfirm={confirmUpgrade}
+        />
+      )}
     </div>
   );
 }

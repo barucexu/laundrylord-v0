@@ -10,13 +10,14 @@ import { Plus, Pencil } from "lucide-react";
 import { CreateMachineDialog } from "@/components/CreateMachineDialog";
 import { EditMachineDialog } from "@/components/EditMachineDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { UpgradeConfirmDialog } from "@/components/UpgradeConfirmDialog";
 
 export default function MachinesList() {
   const { data: machines = [], isLoading } = useMachines();
   const { data: renters = [] } = useRenters();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editMachine, setEditMachine] = useState<MachineRow | null>(null);
-  const { canAddRenter, billableCount, upgradeTarget, checkout, loading: planLoading } = useSubscription();
+  const { canAddRenter, billableCount, upgradeTarget, checkout, initiateUpgrade, upgradeIntent, confirmUpgrade, cancelUpgrade, upgradeProcessing, loading: planLoading } = useSubscription();
 
   const getRenterForMachine = (machine: MachineRow) => {
     if (!machine.assigned_renter_id) return undefined;
@@ -51,7 +52,7 @@ export default function MachinesList() {
                 {tierUpgradeLabel(upgradeTarget)} to add more machines.
               </p>
               {upgradeTarget.price_id && (
-                <Button size="sm" className="w-full mt-3" onClick={() => checkout(upgradeTarget.price_id)}>
+                <Button size="sm" className="w-full mt-3" onClick={() => initiateUpgrade(upgradeTarget.price_id!)}>
                   {tierUpgradeLabel(upgradeTarget)}
                 </Button>
               )}
@@ -124,6 +125,17 @@ export default function MachinesList() {
       <CreateMachineDialog open={dialogOpen} onOpenChange={setDialogOpen} canAddRenter={canAddRenter} />
       {editMachine && (
         <EditMachineDialog open={!!editMachine} onOpenChange={(o) => { if (!o) setEditMachine(null); }} machine={editMachine} />
+      )}
+      {upgradeIntent && (
+        <UpgradeConfirmDialog
+          open={!!upgradeIntent}
+          onOpenChange={(open) => { if (!open) cancelUpgrade(); }}
+          tierName={upgradeIntent.tierName}
+          tierLabel={upgradeIntent.tierLabel}
+          isUpgrade={upgradeIntent.isUpgrade}
+          loading={upgradeProcessing}
+          onConfirm={confirmUpgrade}
+        />
       )}
     </div>
   );

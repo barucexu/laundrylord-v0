@@ -4,9 +4,10 @@ import { needsSubscription, tierUpgradeLabel } from "@/lib/pricing-tiers";
 import { X, Sparkles, ArrowUpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { UpgradeConfirmDialog } from "@/components/UpgradeConfirmDialog";
 
 export function PlanBanner() {
-  const { billableCount, subscribed, loading, upgradeTarget, currentBilledTier, checkout } = useSubscription();
+  const { billableCount, subscribed, loading, upgradeTarget, currentBilledTier, checkout, initiateUpgrade, upgradeIntent, confirmUpgrade, cancelUpgrade, upgradeProcessing } = useSubscription();
   const [dismissed, setDismissed] = useState<string | null>(null);
 
   if (loading) return null;
@@ -31,19 +32,14 @@ export function PlanBanner() {
   // Paid tier, not subscribed — upgrade nudge
   if (dismissed === upgradeTarget.name) return null;
 
-  const handleCheckout = async () => {
-    try {
-      await checkout(upgradeTarget.price_id);
-    } catch (e) {
-      toast({
-        title: "Couldn't start checkout",
-        description: String(e),
-        variant: "destructive",
-      });
+  const handleCheckout = () => {
+    if (upgradeTarget.price_id) {
+      initiateUpgrade(upgradeTarget.price_id);
     }
   };
 
   return (
+    <>
     <div className="relative flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 px-5 py-4 mb-4">
       <Sparkles className="h-5 w-5 text-primary mt-0.5 shrink-0" />
       <div className="space-y-2">
@@ -70,5 +66,17 @@ export function PlanBanner() {
         <X className="h-4 w-4" />
       </button>
     </div>
+    {upgradeIntent && (
+      <UpgradeConfirmDialog
+        open={!!upgradeIntent}
+        onOpenChange={(open) => { if (!open) cancelUpgrade(); }}
+        tierName={upgradeIntent.tierName}
+        tierLabel={upgradeIntent.tierLabel}
+        isUpgrade={upgradeIntent.isUpgrade}
+        loading={upgradeProcessing}
+        onConfirm={confirmUpgrade}
+      />
+    )}
+    </>
   );
 }
