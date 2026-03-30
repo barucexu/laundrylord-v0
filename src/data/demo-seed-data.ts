@@ -210,6 +210,8 @@ function generateRenters(): RenterRow[] {
         dryer_outlet: renterIdx % 20 === 0 ? null : renterIdx % 3 === 0 ? "4-prong" : "3-prong",
         notes: renterIdx % 4 === 0 ? "Good tenant, always pays on time." : renterIdx % 7 === 0 ? "Had minor maintenance issue last month." : null,
         secondary_contact: renterIdx % 6 === 0 ? `${FIRST_NAMES[(nameIdx + 3) % FIRST_NAMES.length]} ${lastName} - ${phone}` : null,
+        archived_at: status === "archived" ? NOW : null,
+        billable_until: status === "archived" ? new Date(Date.now() + 30 * 86400000).toISOString() : null,
         created_at: new Date(new Date(leaseStart).getTime() - 7 * 86400000).toISOString(),
         updated_at: NOW,
       });

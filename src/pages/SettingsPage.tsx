@@ -181,7 +181,7 @@ export default function SettingsPage() {
                     Manage billing
                   </Button>
                 ) : subscription.tier.price > 0 ? (
-                  <Button size="sm" onClick={subscription.checkout} className="gap-1.5">
+                  <Button size="sm" onClick={() => subscription.checkout()} className="gap-1.5">
                     <CreditCard className="h-3.5 w-3.5" />
                     Upgrade to {subscription.tier.name}
                   </Button>
