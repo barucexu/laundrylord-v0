@@ -32,15 +32,9 @@ export function PlanBanner() {
   // Paid tier, not subscribed — upgrade nudge
   if (dismissed === upgradeTarget.name) return null;
 
-  const handleCheckout = async () => {
-    try {
-      await checkout(upgradeTarget.price_id);
-    } catch (e) {
-      toast({
-        title: "Couldn't start checkout",
-        description: String(e),
-        variant: "destructive",
-      });
+  const handleCheckout = () => {
+    if (upgradeTarget.price_id) {
+      initiateUpgrade(upgradeTarget.price_id);
     }
   };
 
