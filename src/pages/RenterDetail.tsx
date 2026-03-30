@@ -13,6 +13,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { EditRenterDialog } from "@/components/EditRenterDialog";
 import { RecordPaymentDialog } from "@/components/RecordPaymentDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const timelineIcons: Record<string, typeof User> = {
   created: User,
