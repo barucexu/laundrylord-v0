@@ -56,6 +56,28 @@ export default function RenterDetail() {
   const [activating, setActivating] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+
+  const handleArchive = useCallback(async () => {
+    if (!renter) return;
+    try {
+      const now = new Date();
+      const billableUntil = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      await updateRenter.mutateAsync({
+        id: renter.id,
+        status: "archived",
+        archived_at: now.toISOString(),
+        billable_until: billableUntil.toISOString(),
+      });
+      queryClient.invalidateQueries({ queryKey: ["renters"] });
+      queryClient.invalidateQueries({ queryKey: ["renters", "archived"] });
+      queryClient.invalidateQueries({ queryKey: ["renters", "billable-count"] });
+      toast.success("Renter archived");
+      navigate("/renters");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to archive");
+    }
+  }, [renter, updateRenter, queryClient, navigate]);
 
   // Show toast on setup return
   const setupResult = searchParams.get("setup");
