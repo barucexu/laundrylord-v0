@@ -59,7 +59,7 @@ export default function RentersList() {
                 {tierUpgradeLabel(upgradeTarget)} to keep growing.
               </p>
               {upgradeTarget.price_id && (
-                <Button size="sm" className="w-full mt-3" onClick={() => checkout(upgradeTarget.price_id)}>
+                <Button size="sm" className="w-full mt-3" onClick={() => initiateUpgrade(upgradeTarget.price_id!)}>
                   {tierUpgradeLabel(upgradeTarget)}
                 </Button>
               )}
