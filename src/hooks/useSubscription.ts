@@ -9,6 +9,7 @@ import {
   getRequiredTierForCount,
   getTierByProductId,
   getNextUpgradeTierForCount,
+  TIERS,
   type PricingTier,
 } from "@/lib/pricing-tiers";
 
