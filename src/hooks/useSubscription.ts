@@ -12,21 +12,21 @@ import {
   type PricingTier,
 } from "@/lib/pricing-tiers";
 
+interface UpgradeIntent {
+  priceId: string;
+  tierName: string;
+  tierLabel: string;
+  isUpgrade: boolean;
+}
+
 interface SubscriptionState {
   tier: PricingTier;
-  /** Non-archived renters (operational display) */
   activeOperationalCount: number;
-  /** Non-archived + archived-in-cooldown (enforcement) */
   billableCount: number;
-  /** Legacy alias for activeOperationalCount */
   renterCount: number;
-  /** Tier required by billableCount */
   requiredTier: PricingTier;
-  /** Tier currently paid for (from subscription product_id) */
   currentBilledTier: PricingTier;
-  /** Effective tier for enforcement */
   effectiveTier: PricingTier;
-  /** Next tier to upgrade to when blocked */
   upgradeTarget: PricingTier;
   subscribed: boolean;
   loading: boolean;
@@ -35,6 +35,16 @@ interface SubscriptionState {
   canAddRenter: boolean;
   /** Start checkout for a specific tier (or current required tier) */
   checkout: (targetPriceId?: string) => Promise<void>;
+  /** Initiate upgrade with confirmation dialog */
+  initiateUpgrade: (targetPriceId: string) => void;
+  /** Current pending upgrade intent (for confirmation dialog) */
+  upgradeIntent: UpgradeIntent | null;
+  /** Confirm the pending upgrade */
+  confirmUpgrade: () => Promise<void>;
+  /** Cancel the pending upgrade */
+  cancelUpgrade: () => void;
+  /** Whether an upgrade is currently processing */
+  upgradeProcessing: boolean;
   /** Open customer portal */
   manageSubscription: () => Promise<void>;
   /** Refresh subscription status */
