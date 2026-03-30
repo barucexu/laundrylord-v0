@@ -241,7 +241,7 @@ export default function SettingsPage() {
                           size="sm"
                           variant="outline"
                           className="h-6 text-[10px] w-full"
-                          onClick={() => subscription.checkout(t.price_id)}
+                          onClick={() => subscription.initiateUpgrade(t.price_id!)}
                         >
                           Select
                         </Button>
