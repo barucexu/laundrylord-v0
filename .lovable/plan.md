@@ -1,132 +1,303 @@
-# Coherence & Guardrails Pass
+You are modifying the LaundryLord repo. Implement the smallest safe, production-ready fixes for SaaS plan enforcement and plan UX, without breaking renter billing flows.
 
-## Diagnosis
+PRIMARY GOAL
 
-### 1. Machine assignment source-of-truth is inconsistent
+Make pricing enforcement reliable, hard to game, and predictable.
 
-`MachinesList.tsx` line 21 resolves assignment via `renters.find(r => r.machine_id === machineId)` — the legacy `renter.machine_id` column. But all write paths (RenterDetail assign/unassign, ImportPage linking) use `machine.assigned_renter_id`. The canonical relation is `machines.assigned_renter_id` (has a foreign key `machines_assigned_renter_id_fkey`). The read in MachinesList must match.
+NON-GOALS
 
-### 2. Route duplication in App.tsx
+- Do not redesign renter billing architecture.
 
-Lines 81-91 duplicate the same 10 routes already defined in `PAGE_ROUTES` (lines 28-41). The `PAGE_ROUTES` fragment is already used by demo mode but not by the real authenticated routes.
+- Do not change operator Stripe key renter-charge flows.
 
-### 3. No meaningful regression tests exist
+- Do not modify:
 
-Only a placeholder `example.test.ts` exists. No coverage for billing status values, webhook timeline types, or machine assignment display logic.
+  - supabase/functions/create-setup-link/index.ts
 
-### 4. README is a placeholder
+  - supabase/functions/create-subscription/index.ts
 
-Contains only "TODO: Document your project here."
+  - supabase/functions/stripe-webhook/index.ts
 
-### 5. Already fixed in prior pass (no action needed)
+- Do not change create-checkout portal/duplicate-subscription behavior in this task unless explicitly required by acceptance tests.
 
-- `send-billing-reminders` auth guard: already in place (lines 23-31)
-- `send-billing-reminders` payment status: already writes `"overdue"` (line 140)
-- `stripe-webhook` timeline type `payment_method_saved`: already mapped in RenterDetail (line 22)
+==================================================
 
----
+A) ANTI-GAMING BILLABLE COUNT (30-DAY COOLDOWN)
 
-## Plan
+==================================================
 
-### Task 1: Fix MachinesList assignment lookup
+1) Add/ensure cooldown columns with an idempotent migration:
 
-**File: `src/pages/MachinesList.tsx**`
+- renters.archived_at timestamptz nullable
 
-Replace:
+- renters.billable_until timestamptz nullable
 
-```ts
-const getRenterForMachine = (machineId: string) => renters.find(r => r.machine_id === machineId);
-```
+Use:
 
-With a lookup using `machine.assigned_renter_id`:
+- ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...
 
-```ts
-const getRenterName = (machine: MachineRow) => {
-  if (!machine.assigned_renter_id) return null;
-  return renters.find(r => r.id === machine.assigned_renter_id);
-};
-```
+2) Archive behavior:
 
-Update the call site at line 82 to pass the machine object instead of `m.id`. Remove the `useRenters` import dependency on `machine_id`.
+- On archive action:
 
-**Canonical relation after fix**: `machines.assigned_renter_id → renters.id` for all reads and writes.
+  - set status = "archived"
 
-### Task 2: Deduplicate routes in App.tsx
+  - set archived_at = now()
 
-Replace lines 81-91 (the duplicated real-mode routes) with `{PAGE_ROUTES}`, matching how demo mode already uses it. The `PAGE_ROUTES` fragment uses relative paths (`path="renters"` not `path="/renters"`), which works correctly inside a layout route element.
+  - set billable_until = now() + interval '30 days'
 
-**File: `src/App.tsx**` — replace the 10 explicit `<Route>` elements with `{PAGE_ROUTES}`.
+- On unarchive action:
 
-### Task 3: Add targeted regression tests
+  - set status = "closed" (or existing intended non-archived status)
 
-**File: `src/test/machine-assignment.test.tsx**`
+  - DO NOT clear archived_at / billable_until history fields
 
-- Test that MachinesList renders the assigned renter name using `assigned_renter_id` (not `machine_id`)
-- Mock data: machine with `assigned_renter_id` pointing to a renter, verify renter name appears
+3) Billable count definition:
 
-**File: `src/test/machine-assignment.test.tsx**`****
+- billableCount = non-archived renters + archived renters where billable_until > now()
 
-**- Test that** `MachinesList` **renders the assigned renter name using** `machine.assigned_renter_id`
+- activeOperationalCount = non-archived renters only
 
-**- Mock data: machine with** `assigned_renter_id` **pointing to a renter, verify renter name appears**
+- Use billableCount for plan enforcement
 
-**- Also verify a renter with legacy** `machine_id` **but no matching** `assigned_renter_id` **does not drive the displayed assignment**
+- Use activeOperationalCount for operational display only
 
-**File: `src/test/renter-detail-timeline.test.tsx**`****
+==================================================
 
-**- Test that** `RenterDetail` **renders the** `payment_method_saved` **timeline event with the expected icon / label path**
+B) CENTRALIZE PLAN LOGIC
 
-**- Mock timeline data including** `payment_method_saved`**, verify the event renders correctly and does not fall through to an unhandled state**
+==================================================
 
-**File: `src/test/import-linking.test.tsx**`****  
+Target files:
 
-**- Add a small fixture-based regression test around the import/linking flow or helper directly involved in machine↔renter linking**
+- src/lib/pricing-tiers.ts
 
-**- Prove imported/linking data respects the canonical relation** `machines.assigned_renter_id`
+- src/hooks/useSubscription.ts
 
-**- Keep this narrow and behavior-focused, not a broad import-suite buildout**
+In pricing helpers, ensure:
 
-**These should be small, pragmatic regression tests aimed at the exact areas that recently drifted.**
+- getTierForCount(count)
 
-**Do not invent new helpers or abstractions just to make tests easier.**
+- getRequiredTierForCount(count)
 
-**Prefer testing existing behavior and source-of-truth assumptions directly.**
+- getTierByProductId(productId)
 
-Do not extract new helpers solely to make tests easier. Test existing behavior directly unless a tiny extraction is already necessary for production clarity.
+- getNextUpgradeTierForCount(count)
 
-&nbsp;
+- canFitTier(count, tier)
 
-### Task 4: Replace README with architecture doc
+- shared label helper for upgrade text consistency
 
-**File: `README.md**` — replace TODO with:
+In useSubscription:
 
-- App overview (vertical SaaS for washer/dryer rental operators)
-- Entry points (`src/main.tsx`, `src/App.tsx`)
-- Feature areas (dashboard, renters, machines, payments, maintenance, settings, import)
-- Real mode vs demo mode structure
-- Key hooks: `useSupabaseData`, `useSubscription`, `useAuth`
-- Canonical machine assignment: `machines.assigned_renter_id`
-- Edge function matrix with trust level (service-role-only vs user-authenticated vs webhook)
-- Billing/reminder/webhook locations
-- Repo rules: no silent enum drift, edge functions must enforce caller trust, source-of-truth changes must be documented
+- Keep one canonical source for enforcement state:
 
-### Not changed
+  - billableCount
 
-- `useSupabaseData.ts` — left alone, no split
-- Machine type / payment type constants — already verified consistent
-- No styling or UI changes beyond the assignment lookup fix
-- No edge function changes (auth guard and status already fixed)
+  - activeOperationalCount
 
----
+  - requiredTier (by billableCount)
 
-## Files changed summary
+  - currentBilledTier (from subscription product_id when subscribed)
 
+  - effectiveTier
 
-| File                                       | Change                                                                               |
-| ------------------------------------------ | ------------------------------------------------------------------------------------ |
-| `src/pages/MachinesList.tsx`               | Fix assignment lookup to use `machine.assigned_renter_id`                            |
-| `src/App.tsx`                              | Replace duplicated real-mode routes with `{PAGE_ROUTES}`                             |
-| `src/test/machine-assignment.test.tsx`     | New: assignment display contract test                                                |
-| `src/test/renter-detail-timeline.test.tsx` | New: regression test for `payment_method_saved` timeline rendering                   |
-| `src/test/import-linking.test.tsx`         | New: narrow regression test for canonical machine↔renter linking in import/link flow |
-| `README.md`                                | Replace TODO with architecture/source-of-truth doc                                   |
+- checkout(targetPriceId?) must accept explicit target plan ID
+
+- canAddRenter logic must use billableCount, not operational count
+
+Canonical enforcement rules:
+
+- Free tier: allow if billableCount < free.max
+
+- Paid required + unsubscribed: block renter creates/imports
+
+- Paid required + subscribed: allow if billableCount < effectiveTier.max
+
+==================================================
+
+C) FIX KNOWN UX/LOOPHOLES
+
+==================================================
+
+1) Boundary CTA bug (10/24/49/etc)
+
+Files:
+
+- src/pages/RentersList.tsx
+
+- src/pages/MachinesList.tsx
+
+- src/components/PlanBanner.tsx
+
+Requirements:
+
+- blocked state must use next upgrade target tier (not current tier)
+
+- CTA must stay visible/actionable at boundaries:
+
+  - 10 -> Starter
+
+  - 24 -> Growth
+
+  - 49 -> Pro
+
+- loading state stays neutral (no misleading tier label while loading)
+
+2) Import parity
+
+File:
+
+- src/pages/ImportPage.tsx
+
+Requirements:
+
+- Use canonical enforcement from useSubscription
+
+- Do not rely only on slotsAvailable math
+
+- For any cap math, use billableCount (not non-archived-only count)
+
+- Paid required + unsubscribed => block renter imports
+
+- Machines-only import remains unaffected
+
+- Preserve blockedByPlan reporting
+
+==================================================
+
+D) SETTINGS PLAN UX (ALWAYS AVAILABLE, CLEAR)
+
+==================================================
+
+File:
+
+- src/pages/SettingsPage.tsx
+
+Requirements:
+
+1) Always show:
+
+- current billed plan
+
+- required plan by usage
+
+- billableCount and activeOperationalCount
+
+- compact line: “Archived renters count toward billing for 30 days.”
+
+2) Always show change-plan controls:
+
+- Plan grid/list always visible
+
+- If billableCount exceeds target tier max: disable that option and show reason
+
+- Upgrade targets remain selectable when valid
+
+3) Action behavior:
+
+- Keep top-level Manage billing button for portal
+
+- Plan selection actions should use checkout(targetPriceId) for explicit paid-tier selection
+
+- Avoid mixed/ambiguous CTA behavior
+
+==================================================
+
+E) MINIMAL CUSTOMER COMMUNICATION
+
+==================================================
+
+Add wording in exactly two places:
+
+1) Archive confirm/action context in renter detail:
+
+   “Archived renters remain billable for 30 days.”
+
+2) Settings plan helper line:
+
+   “Archived renters count toward billing for 30 days.”
+
+No extra global warning banners/toasts.
+
+==================================================
+
+F) ACCEPTANCE CRITERIA (MUST PASS)
+
+==================================================
+
+Boundary CTA:
+
+- billableCount=10 => blocked + Starter CTA visible/clickable
+
+- 24 => Growth CTA
+
+- 49 => Pro CTA
+
+- no misleading tier flash during loading
+
+Anti-gaming:
+
+- archive today does not immediately reduce billable enforcement
+
+- unarchive before cooldown expiry does not create loophole
+
+- archived renters older than 30 days no longer count billable
+
+Import parity:
+
+- Free at 9 importing 3 => 1 created, 2 blocked
+
+- Paid required + unsubscribed => renter imports blocked
+
+- Paid required + subscribed near cap => only up to cap created
+
+- Machines-only import unaffected
+
+Settings:
+
+- current billed and required plan both visible
+
+- billable + active counts visible
+
+- disabled downgrade/plan options explain why when out of range
+
+- plan selection opens explicit target checkout path
+
+Regression safety:
+
+- add renter/machine hard-stops still work
+
+- renter billing setup/subscription/webhook flows untouched
+
+==================================================
+
+G) QA OUTPUT REQUIRED
+
+==================================================
+
+After implementation, provide:
+
+1) Changed files + reason for each
+
+2) Migration summary (idempotent column additions)
+
+3) Manual QA checklist covering:
+
+   - boundaries: 10/24/49/74/99
+
+   - archive immediate vs >30 days
+
+   - unarchive before cooldown expiry
+
+   - paid-unsubscribed import attempts
+
+4) Explicit pass/fail for:
+
+   - boundary CTA always actionable
+
+   - archive gaming blocked
+
+   - import cannot bypass paid-tier subscription requirement
+
+   - settings messaging clear and minimal
