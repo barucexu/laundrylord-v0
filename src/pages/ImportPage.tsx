@@ -187,10 +187,10 @@ export default function ImportPage() {
     if (record.cost_basis) record.cost_basis = parseFloat(record.cost_basis) || 0;
   };
 
-  // Dedup: try to find existing renter by email or phone
+  // Dedup: try to find existing renter by email or phone (only meaningful values)
   const findExistingRenter = async (record: Record<string, any>): Promise<string | null> => {
     if (!user) return null;
-    if (record.email) {
+    if (isMeaningfulValue(record.email)) {
       const { data } = await supabase
         .from("renters")
         .select("id")
@@ -199,7 +199,7 @@ export default function ImportPage() {
         .limit(1);
       if (data && data.length > 0) return data[0].id;
     }
-    if (record.phone) {
+    if (isMeaningfulValue(record.phone)) {
       const { data } = await supabase
         .from("renters")
         .select("id")
