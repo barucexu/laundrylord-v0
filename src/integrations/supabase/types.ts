@@ -47,6 +47,13 @@ export type Database = {
             referencedRelation: "renters"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "billing_reminders_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_renters_with_owner"
+            referencedColumns: ["id"]
+          },
         ]
       }
       email_send_log: {
@@ -143,13 +150,13 @@ export type Database = {
           cost_basis: number | null
           created_at: string
           id: string
-          model: string
+          model: string | null
           notes: string | null
           prong: string | null
-          serial: string
+          serial: string | null
           sourced_from: string | null
           status: string
-          type: string
+          type: string | null
           updated_at: string
           user_id: string
         }
@@ -159,13 +166,13 @@ export type Database = {
           cost_basis?: number | null
           created_at?: string
           id?: string
-          model: string
+          model?: string | null
           notes?: string | null
           prong?: string | null
-          serial: string
+          serial?: string | null
           sourced_from?: string | null
           status?: string
-          type: string
+          type?: string | null
           updated_at?: string
           user_id: string
         }
@@ -175,13 +182,13 @@ export type Database = {
           cost_basis?: number | null
           created_at?: string
           id?: string
-          model?: string
+          model?: string | null
           notes?: string | null
           prong?: string | null
-          serial?: string
+          serial?: string | null
           sourced_from?: string | null
           status?: string
-          type?: string
+          type?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -191,6 +198,13 @@ export type Database = {
             columns: ["assigned_renter_id"]
             isOneToOne: false
             referencedRelation: "renters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machines_assigned_renter_id_fkey"
+            columns: ["assigned_renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_renters_with_owner"
             referencedColumns: ["id"]
           },
         ]
@@ -250,10 +264,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "maintenance_logs_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_machines_with_owner"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "maintenance_logs_renter_id_fkey"
             columns: ["renter_id"]
             isOneToOne: false
             referencedRelation: "renters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_logs_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_renters_with_owner"
             referencedColumns: ["id"]
           },
         ]
@@ -269,6 +297,7 @@ export type Database = {
           id: string
           late_fee_after_days: number
           late_fee_amount: number
+          owner_email: string | null
           reminder_days_before: number
           reminder_failed_enabled: boolean
           reminder_latefee_enabled: boolean
@@ -292,6 +321,7 @@ export type Database = {
           id?: string
           late_fee_after_days?: number
           late_fee_amount?: number
+          owner_email?: string | null
           reminder_days_before?: number
           reminder_failed_enabled?: boolean
           reminder_latefee_enabled?: boolean
@@ -315,6 +345,7 @@ export type Database = {
           id?: string
           late_fee_after_days?: number
           late_fee_amount?: number
+          owner_email?: string | null
           reminder_days_before?: number
           reminder_failed_enabled?: boolean
           reminder_latefee_enabled?: boolean
@@ -381,6 +412,13 @@ export type Database = {
             referencedRelation: "renters"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "payments_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_renters_with_owner"
+            referencedColumns: ["id"]
+          },
         ]
       }
       renters: {
@@ -406,7 +444,7 @@ export type Database = {
           machine_id: string | null
           min_term_end_date: string | null
           monthly_rate: number
-          name: string
+          name: string | null
           next_due_date: string | null
           notes: string | null
           paid_through_date: string | null
@@ -441,7 +479,7 @@ export type Database = {
           machine_id?: string | null
           min_term_end_date?: string | null
           monthly_rate?: number
-          name: string
+          name?: string | null
           next_due_date?: string | null
           notes?: string | null
           paid_through_date?: string | null
@@ -476,7 +514,7 @@ export type Database = {
           machine_id?: string | null
           min_term_end_date?: string | null
           monthly_rate?: number
-          name?: string
+          name?: string | null
           next_due_date?: string | null
           notes?: string | null
           paid_through_date?: string | null
@@ -495,6 +533,13 @@ export type Database = {
             columns: ["machine_id"]
             isOneToOne: false
             referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_renters_machine"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_machines_with_owner"
             referencedColumns: ["id"]
           },
         ]
@@ -580,11 +625,108 @@ export type Database = {
             referencedRelation: "renters"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "timeline_events_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_renters_with_owner"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Views: {
-      [_ in never]: never
+      v_machines_with_owner: {
+        Row: {
+          assigned_renter_id: string | null
+          business_name: string | null
+          condition: string | null
+          cost_basis: number | null
+          created_at: string | null
+          id: string | null
+          model: string | null
+          notes: string | null
+          owner_email: string | null
+          prong: string | null
+          serial: string | null
+          sourced_from: string | null
+          status: string | null
+          type: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machines_assigned_renter_id_fkey"
+            columns: ["assigned_renter_id"]
+            isOneToOne: false
+            referencedRelation: "renters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machines_assigned_renter_id_fkey"
+            columns: ["assigned_renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_renters_with_owner"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_renters_with_owner: {
+        Row: {
+          address: string | null
+          archived_at: string | null
+          balance: number | null
+          billable_until: string | null
+          business_name: string | null
+          created_at: string | null
+          days_late: number | null
+          deposit_amount: number | null
+          deposit_collected: boolean | null
+          dryer_outlet: string | null
+          email: string | null
+          has_payment_method: boolean | null
+          id: string | null
+          install_fee: number | null
+          install_fee_collected: boolean | null
+          install_notes: string | null
+          language: string | null
+          late_fee: number | null
+          lease_start_date: string | null
+          machine_id: string | null
+          min_term_end_date: string | null
+          monthly_rate: number | null
+          name: string | null
+          next_due_date: string | null
+          notes: string | null
+          owner_email: string | null
+          paid_through_date: string | null
+          phone: string | null
+          rent_collected: number | null
+          secondary_contact: string | null
+          status: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_renters_machine"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_renters_machine"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_machines_with_owner"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       delete_email: {
