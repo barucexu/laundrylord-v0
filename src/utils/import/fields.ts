@@ -182,7 +182,7 @@ export const MACHINE_FIELDS: ImportField[] = [
     key: "cost_basis",
     label: "Cost Basis ($)",
     placeholder: "",
-    synonyms: ["cost", "cost basis $", "purchase price", "price", "acquisition cost"],
+    synonyms: ["cost", "cost basis $", "purchase price", "price", "acquisition cost", "purchase cost"],
     group: "machine",
   },
   {
