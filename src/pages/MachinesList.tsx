@@ -10,14 +10,13 @@ import { Plus, Pencil } from "lucide-react";
 import { CreateMachineDialog } from "@/components/CreateMachineDialog";
 import { EditMachineDialog } from "@/components/EditMachineDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { UpgradeConfirmDialog } from "@/components/UpgradeConfirmDialog";
 
 export default function MachinesList() {
   const { data: machines = [], isLoading } = useMachines();
   const { data: renters = [] } = useRenters();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editMachine, setEditMachine] = useState<MachineRow | null>(null);
-  const { canAddRenter, tier, renterCount, checkout, loading: planLoading } = useSubscription();
+  const { canAddRenter, effectiveTier: tier, billableCount, renterCount, checkout, loading: planLoading } = useSubscription();
   const upgradeTarget = getNextUpgradeTierForCount(renterCount);
 
   const getRenterForMachine = (machine: MachineRow) => {
@@ -48,7 +47,7 @@ export default function MachinesList() {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="max-w-xs">
-              <p className="font-medium text-sm">You've grown to {billableCount} billable renter{billableCount !== 1 ? "s" : ""}!</p>
+              <p className="font-medium text-sm">You've grown to {renterCount} billable renter{renterCount !== 1 ? "s" : ""}!</p>
               <p className="text-xs text-muted-foreground mt-1">
                 {tierUpgradeLabel(upgradeTarget || tier)} to add more machines.
               </p>
@@ -126,17 +125,6 @@ export default function MachinesList() {
       <CreateMachineDialog open={dialogOpen} onOpenChange={setDialogOpen} canAddRenter={canAddRenter} />
       {editMachine && (
         <EditMachineDialog open={!!editMachine} onOpenChange={(o) => { if (!o) setEditMachine(null); }} machine={editMachine} />
-      )}
-      {upgradeIntent && (
-        <UpgradeConfirmDialog
-          open={!!upgradeIntent}
-          onOpenChange={(open) => { if (!open) cancelUpgrade(); }}
-          tierName={upgradeIntent.tierName}
-          tierLabel={upgradeIntent.tierLabel}
-          isUpgrade={upgradeIntent.isUpgrade}
-          loading={upgradeProcessing}
-          onConfirm={confirmUpgrade}
-        />
       )}
     </div>
   );

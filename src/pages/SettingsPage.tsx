@@ -505,17 +505,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {subscription.upgradeIntent && (
-        <UpgradeConfirmDialog
-          open={!!subscription.upgradeIntent}
-          onOpenChange={(open) => { if (!open) subscription.cancelUpgrade(); }}
-          tierName={subscription.upgradeIntent.tierName}
-          tierLabel={subscription.upgradeIntent.tierLabel}
-          isUpgrade={subscription.upgradeIntent.isUpgrade}
-          loading={subscription.upgradeProcessing}
-          onConfirm={subscription.confirmUpgrade}
-        />
-      )}
     </div>
   );
 }

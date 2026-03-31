@@ -29,7 +29,7 @@ export function applyInsertDefaults(
   const map = tab === "customers" ? RENTER_INSERT_DEFAULTS : MACHINE_INSERT_DEFAULTS;
   for (const [key, placeholder] of Object.entries(map)) {
     if (record[key] === undefined || record[key] === null || record[key] === "") {
-      record[key] = defaultVal;
+      record[key] = placeholder;
     }
   }
 }
@@ -46,6 +46,28 @@ export function applyInsertDefaultsForGroup(
     if (record[key] === undefined || record[key] === null || record[key] === "") {
       record[key] = placeholder;
     }
+  }
+}
+
+/**
+ * Validate minimum required data for a record.
+ * Returns an error string if insufficient, or null if OK.
+ */
+export function checkMinimumData(
+  tab: "customers" | "machines",
+  record: Record<string, any>,
+): string | null {
+  if (tab === "customers") {
+    if (!record.name || String(record.name).trim() === "") {
+      return "Missing renter name";
+    }
+    return null;
+  }
+  // machines
+  const hasSerial = record.serial && String(record.serial).trim() !== "";
+  const hasType = record.type && String(record.type).trim() !== "";
+  if (!hasSerial && !hasType) {
+    return "Missing machine serial or type";
   }
   return null;
 }
@@ -70,12 +92,4 @@ export function ensureRequiredFieldsForGroup(
   record: Record<string, any>,
 ): void {
   applyInsertDefaultsForGroup(group, record);
-}
-
-export function getPlaceholder(
-  tab: "customers" | "machines",
-  fieldKey: string,
-): any | undefined {
-  const map = tab === "customers" ? RENTER_DEFAULTS : MACHINE_DEFAULTS;
-  return map[fieldKey];
 }

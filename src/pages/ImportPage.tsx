@@ -19,7 +19,7 @@ import { parseCSV } from "@/utils/import/csv-parser";
 import { parseXLSX } from "@/utils/import/xlsx-parser";
 import { parseImage } from "@/utils/import/image-parser";
 import { autoMap, autoMapCombined } from "@/utils/import/auto-mapper";
-import { applyInsertDefaults, ensureRequiredFieldsForGroup } from "@/utils/import/placeholders";
+import { applyInsertDefaults, ensureRequiredFieldsForGroup, checkMinimumData } from "@/utils/import/placeholders";
 
 type Step = "upload" | "map" | "preview" | "done";
 
@@ -338,14 +338,6 @@ export default function ImportPage() {
             else res.machinesCreated++;
           }
 
-          applyInsertDefaults("machines", record);
-
-          const reason = checkMinimumData("machines", record);
-          if (reason) { console.warn("Skipping machine row:", reason); res.skipped++; continue; }
-
-          const { error } = await supabase.from("machines").insert(record as any);
-          if (error) { console.error("Insert error:", error); res.skipped++; }
-          else res.machinesCreated++;
         }
       } else {
         // Combined mode
