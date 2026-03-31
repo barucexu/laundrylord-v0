@@ -33,7 +33,7 @@ export const RENTER_FIELDS: ImportField[] = [
     key: "dryer_outlet",
     label: "Dryer Outlet",
     placeholder: "",
-    synonyms: ["outlet", "outlet type", "dryer prong", "prong type"],
+    synonyms: ["outlet", "outlet type", "dryer prong", "prong type", "plug", "plug type"],
     group: "renter",
   },
   {
