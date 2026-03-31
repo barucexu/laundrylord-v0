@@ -154,7 +154,7 @@ export const MACHINE_FIELDS: ImportField[] = [
     key: "serial",
     label: "Serial #",
     placeholder: "No serial yet",
-    synonyms: ["serial number", "serial #", "sn"],
+    synonyms: ["serial number", "serial #", "sn", "serial no", "serial num", "s/n", "ser", "serial#"],
     group: "machine",
   },
   {
