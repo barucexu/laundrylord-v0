@@ -189,7 +189,7 @@ export const MACHINE_FIELDS: ImportField[] = [
     key: "sourced_from",
     label: "Sourced From",
     placeholder: "",
-    synonyms: ["source", "acquired from", "vendor", "supplier", "purchased from"],
+    synonyms: ["source", "acquired from", "vendor", "supplier", "purchased from", "bought from"],
     group: "machine",
   },
   {

@@ -390,9 +390,15 @@ export default function ImportPage() {
 
       const totalCreated = res.rentersCreated + res.machinesCreated;
       const totalMatched = res.rentersMatched + res.machinesMatched;
-      toast.success(
-        `Imported ${totalCreated} records${totalMatched > 0 ? `, matched ${totalMatched} existing` : ""}${res.skipped > 0 ? `, ${res.skipped} skipped` : ""}`
-      );
+      if (totalCreated === 0 && totalMatched === 0 && res.skipped > 0) {
+        toast.error(
+          `All ${res.skipped} rows were skipped — check that your column mappings are correct.`
+        );
+      } else {
+        toast.success(
+          `Imported ${totalCreated} records${totalMatched > 0 ? `, matched ${totalMatched} existing` : ""}${res.skipped > 0 ? `, ${res.skipped} skipped` : ""}`
+        );
+      }
     } catch (err: any) {
       toast.error(err.message || "Import failed");
     } finally {
