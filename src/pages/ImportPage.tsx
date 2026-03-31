@@ -211,10 +211,10 @@ export default function ImportPage() {
     return null;
   };
 
-  // Dedup: try to find existing machine by serial
+  // Dedup: try to find existing machine by serial (only meaningful values)
   const findExistingMachine = async (record: Record<string, any>): Promise<string | null> => {
     if (!user) return null;
-    if (record.serial) {
+    if (isMeaningfulValue(record.serial)) {
       const { data } = await supabase
         .from("machines")
         .select("id")
