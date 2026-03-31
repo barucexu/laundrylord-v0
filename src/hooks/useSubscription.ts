@@ -214,8 +214,8 @@ export function useSubscription(): SubscriptionState {
 
   const canAddRenter = (() => {
     if (finalLoading) return false;
-    if (tier.price === 0) return billableCount < tier.max;
-    return finalSubscribed && billableCount < finalEffectiveTier.max;
+    if (finalSubscribed) return billableCount < finalEffectiveTier.max;
+    return billableCount < TIERS[0].max;
   })();
 
   return {
