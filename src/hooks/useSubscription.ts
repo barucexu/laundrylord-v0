@@ -138,14 +138,18 @@ export function useSubscription(): SubscriptionState {
   const startAggressivePolling = useCallback(() => {
     if (aggressivePollRef.current) clearInterval(aggressivePollRef.current);
     if (aggressiveTimeoutRef.current) clearTimeout(aggressiveTimeoutRef.current);
-    aggressivePollRef.current = setInterval(checkSubscription, 5_000);
+    aggressivePollRef.current = setInterval(() => {
+      checkSubscription();
+      queryClient.invalidateQueries({ queryKey: ["renters"] });
+      queryClient.invalidateQueries({ queryKey: ["renters", "billable-count"] });
+    }, 5_000);
     aggressiveTimeoutRef.current = setTimeout(() => {
       if (aggressivePollRef.current) {
         clearInterval(aggressivePollRef.current);
         aggressivePollRef.current = null;
       }
     }, 60_000);
-  }, [checkSubscription]);
+  }, [checkSubscription, queryClient]);
 
   const checkout = useCallback(async (targetPriceId?: string) => {
     const priceId = targetPriceId ?? upgradeTarget.price_id ?? tier.price_id;

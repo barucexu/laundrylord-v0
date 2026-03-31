@@ -762,7 +762,10 @@ export default function ImportPage() {
                 )}
                 {result.skipped > 0 && (
                   <div className="text-sm text-muted-foreground">
-                    {result.skipped} rows skipped (blank or failed)
+                    {result.skipped} rows skipped
+                    {(result.rentersCreated + result.machinesCreated + result.rentersMatched + result.machinesMatched) === 0
+                      ? " — check that your columns are mapped correctly"
+                      : " (blank or failed)"}
                   </div>
                 )}
                 {result.blockedByPlan > 0 && (
