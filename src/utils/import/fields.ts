@@ -140,7 +140,7 @@ export const MACHINE_FIELDS: ImportField[] = [
     key: "type",
     label: "Type",
     placeholder: "No type yet",
-    synonyms: ["machine type", "appliance type", "washer or dryer", "equipment type"],
+    synonyms: ["machine type", "appliance type", "washer or dryer", "equipment type", "make", "appliance", "washer dryer", "w/d"],
     group: "machine",
   },
   {
