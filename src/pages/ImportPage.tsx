@@ -187,10 +187,17 @@ export default function ImportPage() {
     if (record.cost_basis) record.cost_basis = parseFloat(record.cost_basis) || 0;
   };
 
+  const PLACEHOLDER_VALUES = new Set([
+    "no name yet", "no phone yet", "no email yet", "no address yet",
+    "no type yet", "no model yet", "no serial yet",
+  ]);
+
+  const isPlaceholder = (val: any) => typeof val === "string" && PLACEHOLDER_VALUES.has(val.toLowerCase());
+
   // Dedup: try to find existing renter by email or phone
   const findExistingRenter = async (record: Record<string, any>): Promise<string | null> => {
     if (!user) return null;
-    if (record.email) {
+    if (record.email && !isPlaceholder(record.email)) {
       const { data } = await supabase
         .from("renters")
         .select("id")
@@ -199,7 +206,7 @@ export default function ImportPage() {
         .limit(1);
       if (data && data.length > 0) return data[0].id;
     }
-    if (record.phone) {
+    if (record.phone && !isPlaceholder(record.phone)) {
       const { data } = await supabase
         .from("renters")
         .select("id")
@@ -214,7 +221,7 @@ export default function ImportPage() {
   // Dedup: try to find existing machine by serial
   const findExistingMachine = async (record: Record<string, any>): Promise<string | null> => {
     if (!user) return null;
-    if (record.serial) {
+    if (record.serial && !isPlaceholder(record.serial)) {
       const { data } = await supabase
         .from("machines")
         .select("id")
