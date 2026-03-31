@@ -29,13 +29,15 @@ export function applyInsertDefaults(
   const map = tab === "customers" ? RENTER_INSERT_DEFAULTS : MACHINE_INSERT_DEFAULTS;
   for (const [key, placeholder] of Object.entries(map)) {
     if (record[key] === undefined || record[key] === null || record[key] === "") {
-      record[key] = placeholder;
+      record[key] = defaultVal;
     }
   }
 }
 
-// Ensure required fields for a specific group in combined mode
-export function ensureRequiredFieldsForGroup(
+/**
+ * Same as applyInsertDefaults but keyed by group name (for combined mode).
+ */
+export function applyInsertDefaultsForGroup(
   group: "renter" | "machine",
   record: Record<string, any>,
 ): void {
@@ -45,4 +47,35 @@ export function ensureRequiredFieldsForGroup(
       record[key] = placeholder;
     }
   }
+  return null;
+}
+
+export function checkMinimumDataForGroup(
+  group: "renter" | "machine",
+  record: Record<string, any>,
+): string | null {
+  return checkMinimumData(group === "renter" ? "customers" : "machines", record);
+}
+
+// Legacy exports for backward compat (re-routed to new logic)
+export function ensureRequiredFields(
+  tab: "customers" | "machines",
+  record: Record<string, any>,
+): void {
+  applyInsertDefaults(tab, record);
+}
+
+export function ensureRequiredFieldsForGroup(
+  group: "renter" | "machine",
+  record: Record<string, any>,
+): void {
+  applyInsertDefaultsForGroup(group, record);
+}
+
+export function getPlaceholder(
+  tab: "customers" | "machines",
+  fieldKey: string,
+): any | undefined {
+  const map = tab === "customers" ? RENTER_DEFAULTS : MACHINE_DEFAULTS;
+  return map[fieldKey];
 }

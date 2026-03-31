@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { UpgradeConfirmDialog } from "@/components/UpgradeConfirmDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useStripeConnection, useOperatorSettings, useSaveOperatorSettings } from "@/hooks/useSupabaseData";
-import { CheckCircle, AlertTriangle, Loader2, ExternalLink, Eye, EyeOff, ChevronDown, Mail, RotateCcw, Sparkles, CreditCard } from "lucide-react";
+import { CheckCircle, AlertTriangle, Loader2, ExternalLink, Eye, EyeOff, ChevronDown, Mail, RotateCcw, Sparkles, CreditCard, Info } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -159,7 +160,7 @@ export default function SettingsPage() {
             Your Plan
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-3 pt-0">
+        <CardContent className="p-3 pt-0 space-y-3">
           {subscription.loading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking plan…
@@ -503,6 +504,18 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {subscription.upgradeIntent && (
+        <UpgradeConfirmDialog
+          open={!!subscription.upgradeIntent}
+          onOpenChange={(open) => { if (!open) subscription.cancelUpgrade(); }}
+          tierName={subscription.upgradeIntent.tierName}
+          tierLabel={subscription.upgradeIntent.tierLabel}
+          isUpgrade={subscription.upgradeIntent.isUpgrade}
+          loading={subscription.upgradeProcessing}
+          onConfirm={subscription.confirmUpgrade}
+        />
+      )}
     </div>
   );
 }

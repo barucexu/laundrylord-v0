@@ -1,132 +1,65 @@
-# Coherence & Guardrails Pass
 
-## Diagnosis
 
-### 1. Machine assignment source-of-truth is inconsistent
+# Plan: Fix Plan Gating After Upgrade + Fix Import Blank Row Bug
 
-`MachinesList.tsx` line 21 resolves assignment via `renters.find(r => r.machine_id === machineId)` — the legacy `renter.machine_id` column. But all write paths (RenterDetail assign/unassign, ImportPage linking) use `machine.assigned_renter_id`. The canonical relation is `machines.assigned_renter_id` (has a foreign key `machines_assigned_renter_id_fkey`). The read in MachinesList must match.
+## Issue 1: `canAddRenter` stays false after upgrading
 
-### 2. Route duplication in App.tsx
+**Root cause**: The `canAddRenter` check at line 212-216 uses `tier` (which is `requiredTier`, derived from `billableCount`) — but when `tier.price > 0`, it requires `subscribed && billableCount < effectiveTier.max`. The problem is that `effectiveTier` is `currentBilledTier` when subscribed, and `currentBilledTier` comes from `productId` which is fetched via `checkSubscription()`. After upgrading, the aggressive polling runs every 5 seconds — but the React Query for renters doesn't refetch, so `billableCount` and tier derivations use stale data.
 
-Lines 81-91 duplicate the same 10 routes already defined in `PAGE_ROUTES` (lines 28-41). The `PAGE_ROUTES` fragment is already used by demo mode but not by the real authenticated routes.
+More importantly, the logic `if (tier.price === 0) return billableCount < tier.max` means: at exactly 10 renters, `billableCount` (10) is NOT less than `tier.max` (10), so it returns `false`. The `tier` variable is `requiredTier` = Free tier (max 10). Even after subscribing to Starter (max 24), `tier` still resolves to Free because `billableCount=10` falls in the Free range (1-10). So the check uses Free tier's max (10) instead of Starter's max (24).
 
-### 3. No meaningful regression tests exist
-
-Only a placeholder `example.test.ts` exists. No coverage for billing status values, webhook timeline types, or machine assignment display logic.
-
-### 4. README is a placeholder
-
-Contains only "TODO: Document your project here."
-
-### 5. Already fixed in prior pass (no action needed)
-
-- `send-billing-reminders` auth guard: already in place (lines 23-31)
-- `send-billing-reminders` payment status: already writes `"overdue"` (line 140)
-- `stripe-webhook` timeline type `payment_method_saved`: already mapped in RenterDetail (line 22)
-
----
-
-## Plan
-
-### Task 1: Fix MachinesList assignment lookup
-
-**File: `src/pages/MachinesList.tsx**`
-
-Replace:
+**Fix**: The `canAddRenter` logic should use `effectiveTier` (which accounts for subscription) rather than `tier`/`requiredTier`:
 
 ```ts
-const getRenterForMachine = (machineId: string) => renters.find(r => r.machine_id === machineId);
+const canAddRenter = (() => {
+  if (finalLoading) return false;
+  // If subscribed, use the billed tier's max
+  if (finalSubscribed) return billableCount < finalEffectiveTier.max;
+  // Not subscribed: only free tier is available
+  return billableCount < TIERS[0].max;
+})();
 ```
 
-With a lookup using `machine.assigned_renter_id`:
+Also, after `checkout()` completes (either `data.updated` or after aggressive polling detects the new subscription), invalidate the `["renters"]` and `["renters", "billable-count"]` queries so counts refresh without a manual page reload.
 
-```ts
-const getRenterName = (machine: MachineRow) => {
-  if (!machine.assigned_renter_id) return null;
-  return renters.find(r => r.id === machine.assigned_renter_id);
-};
-```
+**File: `src/hooks/useSubscription.ts`**
+- Fix `canAddRenter` to use `finalEffectiveTier.max` when subscribed, and the free tier max (10) when not subscribed
+- In `checkout()`, after `checkSubscription()` resolves (for `data.updated`), also invalidate relevant React Query keys
+- Import `useQueryClient` and call `queryClient.invalidateQueries` for `["renters"]` and `["renters", "billable-count"]` after subscription changes
 
-Update the call site at line 82 to pass the machine object instead of `m.id`. Remove the `useRenters` import dependency on `machine_id`.
+## Issue 2: Import shows all rows as blank for another user
 
-**Canonical relation after fix**: `machines.assigned_renter_id → renters.id` for all reads and writes.
+**Root cause**: The `buildPayload` function at line 152 iterates over `fields` and looks up `mapping[f.key]` to find which CSV column maps to that field. In combined mode, fields use prefixed keys like `renter.status` and `machine.status` for colliding fields, but non-colliding fields use unprefixed keys like `name`, `phone`, `model`, `serial`.
 
-### Task 2: Deduplicate routes in App.tsx
+The bug is that the auto-mapper successfully maps CSV headers to field keys, but `buildPayload` filters by `fields` that belong to the group. In combined mode, `renterFields` and `machineFields` are filtered from `activeFields` by `f.group`. The issue: when the user imports in **machines-only** or **customers-only** mode but has file columns that don't match any synonyms, `autoMap` produces an empty mapping. Then `buildPayload` finds no mapped columns → `hasContent = false` for every row → all rows skipped.
 
-Replace lines 81-91 (the duplicated real-mode routes) with `{PAGE_ROUTES}`, matching how demo mode already uses it. The `PAGE_ROUTES` fragment uses relative paths (`path="renters"` not `path="/renters"`), which works correctly inside a layout route element.
+But the user said the preview showed data. So the preview worked but the import didn't. Let me re-examine...
 
-**File: `src/App.tsx**` — replace the 10 explicit `<Route>` elements with `{PAGE_ROUTES}`.
+Actually, looking more carefully: the user's client imported ~88 machine rows and ~50 renter rows. He probably used "combined" mode. The preview showed data. But import said "50 blank rows."
 
-### Task 3: Add targeted regression tests
+The most likely bug: the user's CSV has rows where some rows only have machine data (no renter data) and vice versa. In combined mode, if a row has neither renter nor machine content according to the mapping, it's skipped. But the user saw the preview correctly...
 
-**File: `src/test/machine-assignment.test.tsx**`
+Wait — there's a subtler issue. The `buildPayload` checks `const csvCol = mapping[f.key]`. In combined mode, machine fields use keys like `type`, `model`, `serial` (no prefix for non-colliding ones). But `renterFields` filtered from combined mode still have keys like `name`, `phone` — also no prefix. So mapping should work.
 
-- Test that MachinesList renders the assigned renter name using `assigned_renter_id` (not `machine_id`)
-- Mock data: machine with `assigned_renter_id` pointing to a renter, verify renter name appears
+Let me think about what could cause ALL rows to appear blank. The `hasContent` flag only becomes `true` if at least one `val` (trimmed cell value) is non-empty. If the mapping object is empty (no fields mapped), then every row would have `hasContent = false`.
 
-**File: `src/test/machine-assignment.test.tsx**`****
+The most likely scenario: the user uploaded an XLSX file where the auto-mapper couldn't match any headers. The preview shows raw data but the mapping dropdowns were all set to "—" (unmapped). The user didn't notice this and clicked Import. Since no fields are mapped, `buildPayload` returns `hasContent: false` for every row.
 
-**- Test that** `MachinesList` **renders the assigned renter name using** `machine.assigned_renter_id`
+But the user said "they all populated in the data import preview" — this could mean the preview cards showed the raw row data, but the mapped fields were all placeholders. The preview might show rows with placeholder text which could look "populated."
 
-**- Mock data: machine with** `assigned_renter_id` **pointing to a renter, verify renter name appears**
+**Fix**: Add a pre-import validation that checks if at least one field is mapped. If the mapping is empty (or has no actual field mappings), show an error toast before attempting import: "No columns are mapped. Please map at least one column to a LaundryLord field before importing."
 
-**- Also verify a renter with legacy** `machine_id` **but no matching** `assigned_renter_id` **does not drive the displayed assignment**
+Also, improve the `hasContent` check messaging — instead of silently skipping and reporting "X skipped," report explicitly that rows were skipped because no fields were mapped.
 
-**File: `src/test/renter-detail-timeline.test.tsx**`****
+**File: `src/pages/ImportPage.tsx`**
+- Before `handleImport` processes rows, check if `Object.keys(mapping).length === 0` and show a clear error
+- After import, if `res.skipped > 0` and total created is 0, show a more descriptive error message mentioning unmapped columns
+- Add a visual indicator on the mapping step when no columns are mapped (warning banner)
 
-**- Test that** `RenterDetail` **renders the** `payment_method_saved` **timeline event with the expected icon / label path**
+## Files changed
 
-**- Mock timeline data including** `payment_method_saved`**, verify the event renders correctly and does not fall through to an unhandled state**
+| File | Change |
+|------|--------|
+| `src/hooks/useSubscription.ts` | Fix `canAddRenter` to use `effectiveTier.max` when subscribed; invalidate queries after plan change |
+| `src/pages/ImportPage.tsx` | Add pre-import validation for empty mappings; improve error messaging for blank-row scenarios |
 
-**File: `src/test/import-linking.test.tsx**`****  
-
-**- Add a small fixture-based regression test around the import/linking flow or helper directly involved in machine↔renter linking**
-
-**- Prove imported/linking data respects the canonical relation** `machines.assigned_renter_id`
-
-**- Keep this narrow and behavior-focused, not a broad import-suite buildout**
-
-**These should be small, pragmatic regression tests aimed at the exact areas that recently drifted.**
-
-**Do not invent new helpers or abstractions just to make tests easier.**
-
-**Prefer testing existing behavior and source-of-truth assumptions directly.**
-
-Do not extract new helpers solely to make tests easier. Test existing behavior directly unless a tiny extraction is already necessary for production clarity.
-
-&nbsp;
-
-### Task 4: Replace README with architecture doc
-
-**File: `README.md**` — replace TODO with:
-
-- App overview (vertical SaaS for washer/dryer rental operators)
-- Entry points (`src/main.tsx`, `src/App.tsx`)
-- Feature areas (dashboard, renters, machines, payments, maintenance, settings, import)
-- Real mode vs demo mode structure
-- Key hooks: `useSupabaseData`, `useSubscription`, `useAuth`
-- Canonical machine assignment: `machines.assigned_renter_id`
-- Edge function matrix with trust level (service-role-only vs user-authenticated vs webhook)
-- Billing/reminder/webhook locations
-- Repo rules: no silent enum drift, edge functions must enforce caller trust, source-of-truth changes must be documented
-
-### Not changed
-
-- `useSupabaseData.ts` — left alone, no split
-- Machine type / payment type constants — already verified consistent
-- No styling or UI changes beyond the assignment lookup fix
-- No edge function changes (auth guard and status already fixed)
-
----
-
-## Files changed summary
-
-
-| File                                       | Change                                                                               |
-| ------------------------------------------ | ------------------------------------------------------------------------------------ |
-| `src/pages/MachinesList.tsx`               | Fix assignment lookup to use `machine.assigned_renter_id`                            |
-| `src/App.tsx`                              | Replace duplicated real-mode routes with `{PAGE_ROUTES}`                             |
-| `src/test/machine-assignment.test.tsx`     | New: assignment display contract test                                                |
-| `src/test/renter-detail-timeline.test.tsx` | New: regression test for `payment_method_saved` timeline rendering                   |
-| `src/test/import-linking.test.tsx`         | New: narrow regression test for canonical machine↔renter linking in import/link flow |
-| `README.md`                                | Replace TODO with architecture/source-of-truth doc                                   |

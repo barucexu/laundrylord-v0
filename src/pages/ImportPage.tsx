@@ -235,7 +235,7 @@ export default function ImportPage() {
     return null;
   };
 
-  // Dedup: try to find existing machine by serial
+  // Dedup: try to find existing machine by serial (only meaningful values)
   const findExistingMachine = async (record: Record<string, any>): Promise<string | null> => {
     if (!user) return null;
     if (isMeaningfulValue(record.serial)) {
@@ -292,10 +292,21 @@ export default function ImportPage() {
           record.user_id = user.id;
           parseRenterRecord(record);
 
+          // Dedup BEFORE applying defaults (no placeholder poisoning)
           const existingId = await findExistingRenter(record);
           if (existingId) {
             res.rentersMatched++;
-          } else if (rentersCreatedSoFar >= slotsAvailable) {
+            continue;
+          }
+
+          // Apply safe defaults only after dedup miss
+          applyInsertDefaults("customers", record);
+
+          // Check minimum required data
+          const reason = checkMinimumData("customers", record);
+          if (reason) { console.warn("Skipping renter row:", reason); res.skipped++; continue; }
+
+          if (rentersCreatedSoFar >= slotsAvailable) {
             res.blockedByPlan++;
           } else if (!hasMinimumRenterData(record)) {
             res.skipped++;
@@ -314,6 +325,7 @@ export default function ImportPage() {
           record.user_id = user.id;
           parseMachineRecord(record);
 
+          // Dedup BEFORE applying defaults
           const existingId = await findExistingMachine(record);
           if (existingId) {
             res.machinesMatched++;
@@ -325,6 +337,15 @@ export default function ImportPage() {
             if (error) { console.error("Insert error:", error); res.skipped++; }
             else res.machinesCreated++;
           }
+
+          applyInsertDefaults("machines", record);
+
+          const reason = checkMinimumData("machines", record);
+          if (reason) { console.warn("Skipping machine row:", reason); res.skipped++; continue; }
+
+          const { error } = await supabase.from("machines").insert(record as any);
+          if (error) { console.error("Insert error:", error); res.skipped++; }
+          else res.machinesCreated++;
         }
       } else {
         // Combined mode
@@ -345,6 +366,7 @@ export default function ImportPage() {
             rRecord.user_id = user.id;
             parseRenterRecord(rRecord);
 
+            // Dedup BEFORE defaults
             const existingId = await findExistingRenter(rRecord);
             if (existingId) {
               renterId = existingId;
@@ -360,9 +382,15 @@ export default function ImportPage() {
                 console.error("Renter insert error:", error);
                 res.skipped++;
               } else {
-                renterId = data.id;
-                res.rentersCreated++;
-                rentersCreatedSoFar++;
+                const { data, error } = await supabase.from("renters").insert(rRecord as any).select("id").single();
+                if (error) {
+                  console.error("Renter insert error:", error);
+                  res.skipped++;
+                } else {
+                  renterId = data.id;
+                  res.rentersCreated++;
+                  rentersCreatedSoFar++;
+                }
               }
             }
           }
@@ -379,6 +407,7 @@ export default function ImportPage() {
               mRecord.status = "assigned";
             }
 
+            // Dedup BEFORE defaults
             const existingId = await findExistingMachine(mRecord);
             if (existingId) {
               res.machinesMatched++;
@@ -625,7 +654,7 @@ export default function ImportPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="skip">— Skip —</SelectItem>
-                          {headers.map((h) => (
+                          {headers.filter((h) => h !== "").map((h) => (
                             <SelectItem key={h} value={h}>
                               {h}
                             </SelectItem>
@@ -661,7 +690,7 @@ export default function ImportPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="skip">— Skip —</SelectItem>
-                          {headers.map((h) => (
+                          {headers.filter((h) => h !== "").map((h) => (
                             <SelectItem key={h} value={h}>
                               {h}
                             </SelectItem>
@@ -803,7 +832,10 @@ export default function ImportPage() {
                 )}
                 {result.skipped > 0 && (
                   <div className="text-sm text-muted-foreground">
-                    {result.skipped} rows skipped (blank or failed)
+                    {result.skipped} rows skipped
+                    {(result.rentersCreated + result.machinesCreated + result.rentersMatched + result.machinesMatched) === 0
+                      ? " — check that your columns are mapped correctly"
+                      : " (blank or failed)"}
                   </div>
                 )}
                 {result.blockedByPlan > 0 && (

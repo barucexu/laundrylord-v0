@@ -64,10 +64,5 @@ export function needsSubscription(totalRenters: number): boolean {
 
 /** Consistent upgrade CTA label used across the app. */
 export function tierUpgradeLabel(tier: PricingTier): string {
-  if (tier.price === 0) {
-    // Next tier after free is always Starter
-    const starter = TIERS.find((t) => t.name === "Starter");
-    return starter ? `Upgrade to ${starter.name} (${starter.label})` : "Upgrade";
-  }
   return `Upgrade to ${tier.name} (${tier.label})`;
 }
