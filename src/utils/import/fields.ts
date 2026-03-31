@@ -68,7 +68,7 @@ export const RENTER_FIELDS: ImportField[] = [
     key: "monthly_rate",
     label: "Monthly Rate",
     placeholder: "",
-    synonyms: ["monthly rent", "rent", "rate", "monthly rate $", "monthly fee"],
+    synonyms: ["monthly rent", "rent", "rate", "monthly rate $", "monthly fee", "monthly", "rent/mo", "mo rate"],
     group: "renter",
   },
   {
