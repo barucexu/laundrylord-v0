@@ -16,7 +16,7 @@ export default function MachinesList() {
   const { data: renters = [] } = useRenters();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editMachine, setEditMachine] = useState<MachineRow | null>(null);
-  const { canAddRenter, tier, renterCount, checkout, loading: planLoading } = useSubscription();
+  const { canAddRenter, effectiveTier: tier, billableCount, renterCount, checkout, loading: planLoading } = useSubscription();
   const upgradeTarget = getNextUpgradeTierForCount(renterCount);
 
   const getRenterForMachine = (machine: MachineRow) => {
