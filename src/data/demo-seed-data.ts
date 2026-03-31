@@ -371,6 +371,7 @@ function generateOperatorSettings(): OperatorSettingsRow {
     id: demoId("stng", 0),
     user_id: DEMO_USER_ID,
     business_name: "NYC Laundry Rentals",
+    owner_email: "demo@laundrylord.com",
     default_monthly_rate: 65,
     default_install_fee: 100,
     default_deposit: 150,

@@ -49,12 +49,3 @@ export function autoMap(
 
   return mapping;
 }
-
-// Combined auto-mapper that handles both renter and machine fields
-// Uses the same logic but operates on the combined field set with prefixed keys
-export function autoMapCombined(
-  csvHeaders: string[],
-  combinedFields: ImportField[],
-): Record<string, string> {
-  return autoMap(csvHeaders, combinedFields);
-}
