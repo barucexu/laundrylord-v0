@@ -1,64 +1,65 @@
 
 
-# Plan: Demo Data Tuning, Line Chart, Compact Rows
+# Plan: Fix Plan Gating After Upgrade + Fix Import Blank Row Bug
 
-## Four changes
+## Issue 1: `canAddRenter` stays false after upgrading
 
-### 1. Demo seed data → 15 renters, ~20 machines, all in NYC, Starter plan, curated payments
+**Root cause**: The `canAddRenter` check at line 212-216 uses `tier` (which is `requiredTier`, derived from `billableCount`) — but when `tier.price > 0`, it requires `subscribed && billableCount < effectiveTier.max`. The problem is that `effectiveTier` is `currentBilledTier` when subscribed, and `currentBilledTier` comes from `productId` which is fetched via `checkSubscription()`. After upgrading, the aggressive polling runs every 5 seconds — but the React Query for renters doesn't refetch, so `billableCount` and tier derivations use stale data.
 
-**File: `src/data/demo-seed-data.ts`**
+More importantly, the logic `if (tier.price === 0) return billableCount < tier.max` means: at exactly 10 renters, `billableCount` (10) is NOT less than `tier.max` (10), so it returns `false`. The `tier` variable is `requiredTier` = Free tier (max 10). Even after subscribing to Starter (max 24), `tier` still resolves to Free because `billableCount=10` falls in the Free range (1-10). So the check uses Free tier's max (10) instead of Starter's max (24).
 
-- Replace all market addresses with a single NYC market (Manhattan/Brooklyn streets, NY zips)
-- Set `MARKET_RENTER_COUNTS` to `[15]` total
-- Status distribution: ~10 active, 2 late, 1 scheduled, 1 maintenance, 1 lead
-- Generate ~20 machines: 15 assigned (one per active/late/maintenance renter) + 5 unassigned inventory
-- Payment history: 6 months per active renter, ~85% paid via `stripe` autopay, 2 specific exceptions (1 Venmo, 1 Zelle), a few `late`/`overdue` scattered in
-- Update `MARKET_CENTERS` to only include NYC center coords
-- Update `buildDemoGeoCache` accordingly (single NYC cluster)
-- Reduce maintenance logs proportionally (~5-8 entries)
-- Reduce timeline events proportionally
+**Fix**: The `canAddRenter` logic should use `effectiveTier` (which accounts for subscription) rather than `tier`/`requiredTier`:
 
-### 2. Settings plan display in demo → show "Starter" as current, not "$X required"
+```ts
+const canAddRenter = (() => {
+  if (finalLoading) return false;
+  // If subscribed, use the billed tier's max
+  if (finalSubscribed) return billableCount < finalEffectiveTier.max;
+  // Not subscribed: only free tier is available
+  return billableCount < TIERS[0].max;
+})();
+```
 
-**File: `src/pages/SettingsPage.tsx`**
+Also, after `checkout()` completes (either `data.updated` or after aggressive polling detects the new subscription), invalidate the `["renters"]` and `["renters", "billable-count"]` queries so counts refresh without a manual page reload.
 
-- In the "Your Plan" card, when in demo mode, show the plan status as if subscribed to Starter (since 15 renters = Starter tier). The demo context doesn't set `subscription.subscribed`, so the display falls through to the "required" wording.
-- Fix: In demo mode, display "Starter plan — $29/mo" with "Current" highlighted on the Starter tile in the plan grid. Add a demo-specific override in the plan status section.
+**File: `src/hooks/useSubscription.ts`**
+- Fix `canAddRenter` to use `finalEffectiveTier.max` when subscribed, and the free tier max (10) when not subscribed
+- In `checkout()`, after `checkSubscription()` resolves (for `data.updated`), also invalidate relevant React Query keys
+- Import `useQueryClient` and call `queryClient.invalidateQueries` for `["renters"]` and `["renters", "billable-count"]` after subscription changes
 
-**File: `src/hooks/useSubscription.ts`** (minor)
-- When `isDemo`, return `subscribed: true` with `currentBilledTier` set to the Starter tier (matching 15 renters).
+## Issue 2: Import shows all rows as blank for another user
 
-### 3. Dashboard chart → line graph (both demo and real accounts)
+**Root cause**: The `buildPayload` function at line 152 iterates over `fields` and looks up `mapping[f.key]` to find which CSV column maps to that field. In combined mode, fields use prefixed keys like `renter.status` and `machine.status` for colliding fields, but non-colliding fields use unprefixed keys like `name`, `phone`, `model`, `serial`.
 
-**File: `src/pages/Dashboard.tsx`**
+The bug is that the auto-mapper successfully maps CSV headers to field keys, but `buildPayload` filters by `fields` that belong to the group. In combined mode, `renterFields` and `machineFields` are filtered from `activeFields` by `f.group`. The issue: when the user imports in **machines-only** or **customers-only** mode but has file columns that don't match any synonyms, `autoMap` produces an empty mapping. Then `buildPayload` finds no mapped columns → `hasContent = false` for every row → all rows skipped.
 
-- Replace `BarChart` + `Bar` imports with `LineChart` + `Line` from recharts
-- Use `type="monotone"`, `stroke="hsl(var(--primary))"`, `strokeWidth={2}`, `dot={{ r: 3 }}`, `fill` under line area optional
-- Add `AreaChart`/`Area` for the filled-under-line look matching the reference image, or use `LineChart` with area fill
-- Actually: use `AreaChart` + `Area` for the smooth filled line look from the reference image: `type="monotone"`, `fill="hsl(var(--primary))"`, `fillOpacity={0.1}`, `stroke="hsl(var(--primary))"`, `strokeWidth={2}`
+But the user said the preview showed data. So the preview worked but the import didn't. Let me re-examine...
 
-### 4. Compact table rows → fit ~18 renters on screen
+Actually, looking more carefully: the user's client imported ~88 machine rows and ~50 renter rows. He probably used "combined" mode. The preview showed data. But import said "50 blank rows."
 
-**File: `src/components/ui/table.tsx`**
+The most likely bug: the user's CSV has rows where some rows only have machine data (no renter data) and vice versa. In combined mode, if a row has neither renter nor machine content according to the mapping, it's skipped. But the user saw the preview correctly...
 
-- Change `TableCell` padding from `py-3` to `py-1.5` 
-- Change `TableHead` height from `h-10` to `h-8`
+Wait — there's a subtler issue. The `buildPayload` checks `const csvCol = mapping[f.key]`. In combined mode, machine fields use keys like `type`, `model`, `serial` (no prefix for non-colliding ones). But `renterFields` filtered from combined mode still have keys like `name`, `phone` — also no prefix. So mapping should work.
 
-This applies globally to all tables (renters, machines, payments, maintenance) which is the right behavior.
+Let me think about what could cause ALL rows to appear blank. The `hasContent` flag only becomes `true` if at least one `val` (trimmed cell value) is non-empty. If the mapping object is empty (no fields mapped), then every row would have `hasContent = false`.
 
-## Technical details
+The most likely scenario: the user uploaded an XLSX file where the auto-mapper couldn't match any headers. The preview shows raw data but the mapping dropdowns were all set to "—" (unmapped). The user didn't notice this and clicked Import. Since no fields are mapped, `buildPayload` returns `hasContent: false` for every row.
 
-- Demo seed data generators are fully rewritten for 15 renters / 20 machines / NYC-only
-- The `useSubscription` demo path currently returns `subscribed: false` — changing it to `true` with Starter tier makes settings show "Starter plan" with "Current" badge
-- Recharts `AreaChart` gives the smooth line-with-fill look from the reference image
-- Table cell padding reduction from `py-3` (12px each side = 24px) to `py-1.5` (6px each side = 12px) roughly doubles visible rows
+But the user said "they all populated in the data import preview" — this could mean the preview cards showed the raw row data, but the mapped fields were all placeholders. The preview might show rows with placeholder text which could look "populated."
+
+**Fix**: Add a pre-import validation that checks if at least one field is mapped. If the mapping is empty (or has no actual field mappings), show an error toast before attempting import: "No columns are mapped. Please map at least one column to a LaundryLord field before importing."
+
+Also, improve the `hasContent` check messaging — instead of silently skipping and reporting "X skipped," report explicitly that rows were skipped because no fields were mapped.
+
+**File: `src/pages/ImportPage.tsx`**
+- Before `handleImport` processes rows, check if `Object.keys(mapping).length === 0` and show a clear error
+- After import, if `res.skipped > 0` and total created is 0, show a more descriptive error message mentioning unmapped columns
+- Add a visual indicator on the mapping step when no columns are mapped (warning banner)
 
 ## Files changed
 
 | File | Change |
 |------|--------|
-| `src/data/demo-seed-data.ts` | Rewrite: 15 renters, 20 machines, NYC only, 6mo payments, stripe-heavy, 2 exceptions |
-| `src/hooks/useSubscription.ts` | Demo mode returns `subscribed: true`, `currentBilledTier: Starter` |
-| `src/pages/Dashboard.tsx` | Replace BarChart with AreaChart (line + fill), both demo and real |
-| `src/components/ui/table.tsx` | Reduce cell padding and header height for compact rows |
+| `src/hooks/useSubscription.ts` | Fix `canAddRenter` to use `effectiveTier.max` when subscribed; invalidate queries after plan change |
+| `src/pages/ImportPage.tsx` | Add pre-import validation for empty mappings; improve error messaging for blank-row scenarios |
 
