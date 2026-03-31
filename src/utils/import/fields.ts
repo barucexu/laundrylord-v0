@@ -26,7 +26,7 @@ export const RENTER_FIELDS: ImportField[] = [
     key: "address",
     label: "Address",
     placeholder: "No address yet",
-    synonyms: ["service address", "home address", "street address", "location"],
+    synonyms: ["service address", "home address", "street address", "location", "addr", "address 1", "delivery address", "install address"],
     group: "renter",
   },
   {
