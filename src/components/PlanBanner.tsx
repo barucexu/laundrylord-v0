@@ -29,7 +29,7 @@ export function PlanBanner() {
   }
 
   // Paid tier, not subscribed — upgrade nudge
-  if (dismissed === upgradeTarget.name) return null;
+  if (dismissed === tier.name) return null;
 
   // Determine if this is the first paid tier (Free → Starter)
   const isFirstUpgrade = upgradeTarget.name === "Starter";

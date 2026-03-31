@@ -22,6 +22,14 @@ interface SubscriptionState {
   checkout: (targetPriceId?: string) => Promise<void>;
   /** Open customer portal */
   manageSubscription: () => Promise<void>;
+  /** Backwards-compatible alias used by older upgrade confirmation UIs */
+  initiateUpgrade: (targetPriceId: string) => void;
+  /** Optional pending upgrade intent for legacy components */
+  upgradeIntent: { priceId: string } | null;
+  /** Confirm pending upgrade intent (legacy support) */
+  confirmUpgrade: () => Promise<void>;
+  /** Cancel pending upgrade intent (legacy support) */
+  cancelUpgrade: () => void;
   /** Refresh subscription status */
   refresh: () => Promise<void>;
 }
@@ -36,6 +44,7 @@ export function useSubscription(): SubscriptionState {
   const [subscriptionEnd, setSubscriptionEnd] = useState<string | null>(null);
   const [productId, setProductId] = useState<string | null>(null);
   const [billableArchivedCount, setBillableArchivedCount] = useState(0);
+  const [upgradeIntent, setUpgradeIntent] = useState<{ priceId: string } | null>(null);
   const aggressivePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const aggressiveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -138,16 +147,24 @@ export function useSubscription(): SubscriptionState {
     if (data?.url) window.open(data.url, "_blank");
   }, []);
 
-  // Demo mode: simulate Starter plan subscription
-  const isDemo = !!demo?.isDemo;
-  const demoStarterTier = TIERS.find(t => t.name === "Starter") ?? TIERS[1];
+  // Legacy compatibility: some UIs use an "initiate -> confirm/cancel" pattern.
+  const initiateUpgrade = useCallback((targetPriceId: string) => {
+    if (!targetPriceId) return;
+    setUpgradeIntent({ priceId: targetPriceId });
+  }, []);
 
-  const finalSubscribed = isDemo ? true : subscribed;
-  const finalCurrentBilledTier = isDemo ? demoStarterTier : currentBilledTier;
-  const finalEffectiveTier = isDemo ? demoStarterTier : effectiveTier;
-  const finalProductId = isDemo ? (demoStarterTier.product_id ?? null) : productId;
-  const finalLoading = isDemo ? false : loading;
+  const confirmUpgrade = useCallback(async () => {
+    if (!upgradeIntent?.priceId) return;
+    await checkout(upgradeIntent.priceId);
+    setUpgradeIntent(null);
+  }, [checkout, upgradeIntent?.priceId]);
 
+  const cancelUpgrade = useCallback(() => {
+    setUpgradeIntent(null);
+  }, []);
+
+  // Compute whether the operator can add more renters
+  // HARD STOP: while loading, block additions to prevent race condition
   const canAddRenter = (() => {
     if (loading) return false;
     // Free tier: can add up to max (10)
@@ -176,6 +193,10 @@ export function useSubscription(): SubscriptionState {
     cancelUpgrade,
     upgradeProcessing,
     manageSubscription,
+    initiateUpgrade,
+    upgradeIntent,
+    confirmUpgrade,
+    cancelUpgrade,
     refresh: checkSubscription,
   };
 }
