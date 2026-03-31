@@ -54,7 +54,7 @@ export const RENTER_FIELDS: ImportField[] = [
     key: "status",
     label: "Status",
     placeholder: "",
-    synonyms: ["renter status", "customer status", "account status"],
+    synonyms: ["renter status", "customer status", "account status", "cust status"],
     group: "renter",
   },
   {
