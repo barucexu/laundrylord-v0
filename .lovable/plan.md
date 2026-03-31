@@ -1,50 +1,65 @@
 
 
-# Plan: Fix Import Dedup False Matches + Skipped Rows
+# Plan: Fix Plan Gating After Upgrade + Fix Import Blank Row Bug
 
-## Two bugs
+## Issue 1: `canAddRenter` stays false after upgrading
 
-### Bug 1: "47 matched existing" is false — placeholder dedup poisoning
+**Root cause**: The `canAddRenter` check at line 212-216 uses `tier` (which is `requiredTier`, derived from `billableCount`) — but when `tier.price > 0`, it requires `subscribed && billableCount < effectiveTier.max`. The problem is that `effectiveTier` is `currentBilledTier` when subscribed, and `currentBilledTier` comes from `productId` which is fetched via `checkSubscription()`. After upgrading, the aggressive polling runs every 5 seconds — but the React Query for renters doesn't refetch, so `billableCount` and tier derivations use stale data.
 
-**Root cause**: `ensureRequiredFields` runs BEFORE `findExistingRenter` / `findExistingMachine`. It fills empty email with `"No email yet"`, empty phone with `"No phone yet"`, empty serial with `"No serial yet"`. Then the dedup query matches every existing record that also has that placeholder value. One match in the DB causes ALL unmapped-email rows to "match existing."
+More importantly, the logic `if (tier.price === 0) return billableCount < tier.max` means: at exactly 10 renters, `billableCount` (10) is NOT less than `tier.max` (10), so it returns `false`. The `tier` variable is `requiredTier` = Free tier (max 10). Even after subscribing to Starter (max 24), `tier` still resolves to Free because `billableCount=10` falls in the Free range (1-10). So the check uses Free tier's max (10) instead of Starter's max (24).
 
-**Fix** (`src/pages/ImportPage.tsx`): Reorder so `ensureRequiredFields` / `ensureRequiredFieldsForGroup` runs AFTER the dedup check, right before the actual insert. Three code paths need fixing:
+**Fix**: The `canAddRenter` logic should use `effectiveTier` (which accounts for subscription) rather than `tier`/`requiredTier`:
 
-1. **Customers-only** (line ~271): move `ensureRequiredFields("customers", record)` to after the `findExistingRenter` check, just before the `supabase.from("renters").insert()` call
-2. **Machines-only** (line ~291): move `ensureRequiredFields("machines", record)` to after `findExistingMachine`, just before insert
-3. **Combined** (lines ~320, ~345): move `ensureRequiredFieldsForGroup("renter", rRecord)` and `ensureRequiredFieldsForGroup("machine", mRecord)` to after their respective dedup checks, before insert
+```ts
+const canAddRenter = (() => {
+  if (finalLoading) return false;
+  // If subscribed, use the billed tier's max
+  if (finalSubscribed) return billableCount < finalEffectiveTier.max;
+  // Not subscribed: only free tier is available
+  return billableCount < TIERS[0].max;
+})();
+```
 
-Additionally, add placeholder guards in `findExistingRenter` and `findExistingMachine` — skip the query if the value is a known placeholder string (`"No email yet"`, `"No phone yet"`, `"No serial yet"`).
+Also, after `checkout()` completes (either `data.updated` or after aggressive polling detects the new subscription), invalidate the `["renters"]` and `["renters", "billable-count"]` queries so counts refresh without a manual page reload.
 
-### Bug 2: Machine rows all skipped — auto-mapper can't match Konrad's headers
+**File: `src/hooks/useSubscription.ts`**
+- Fix `canAddRenter` to use `finalEffectiveTier.max` when subscribed, and the free tier max (10) when not subscribed
+- In `checkout()`, after `checkSubscription()` resolves (for `data.updated`), also invalidate relevant React Query keys
+- Import `useQueryClient` and call `queryClient.invalidateQueries` for `["renters"]` and `["renters", "billable-count"]` after subscription changes
 
-**Root cause**: Konrad's Excel file likely uses column headers that don't match any of the current synonyms (e.g., "Make" instead of "Type", "Serial Number" with different casing/spacing, etc.). The auto-mapper produces an empty mapping → `buildPayload` returns `hasContent: false` for every row → all skipped.
+## Issue 2: Import shows all rows as blank for another user
 
-**Fix** (`src/utils/import/auto-mapper.ts` + `src/utils/import/fields.ts`):
+**Root cause**: The `buildPayload` function at line 152 iterates over `fields` and looks up `mapping[f.key]` to find which CSV column maps to that field. In combined mode, fields use prefixed keys like `renter.status` and `machine.status` for colliding fields, but non-colliding fields use unprefixed keys like `name`, `phone`, `model`, `serial`.
 
-1. **Expand machine synonyms** to cover common real-world header names:
-   - `type`: add `"make"`, `"appliance"`, `"w/d"`, `"washer dryer"`
-   - `model`: add `"model no"`, `"model num"`
-   - `serial`: add `"serial no"`, `"serial num"`, `"s/n"`, `"ser"`, `"serial#"`
-   - `condition`: add `"cond"`
-   - `status`: add `"avail"`, `"in use"`
+The bug is that the auto-mapper successfully maps CSV headers to field keys, but `buildPayload` filters by `fields` that belong to the group. In combined mode, `renterFields` and `machineFields` are filtered from `activeFields` by `f.group`. The issue: when the user imports in **machines-only** or **customers-only** mode but has file columns that don't match any synonyms, `autoMap` produces an empty mapping. Then `buildPayload` finds no mapped columns → `hasContent = false` for every row → all rows skipped.
 
-2. **Also expand renter synonyms** for common variants:
-   - `name`: add `"customer"`, `"tenant"`, `"client"`, `"client name"`
-   - `phone`: add `"tel"`, `"ph"`, `"contact"`
-   - `address`: add `"addr"`, `"delivery address"`, `"install address"`
-   - `monthly_rate`: add `"monthly"`, `"mo rate"`, `"rent/mo"`, `"rent mo"`
+But the user said the preview showed data. So the preview worked but the import didn't. Let me re-examine...
 
-3. **Add machine error counting** in combined mode — currently machine insert errors only `console.error` without incrementing `res.skipped`. Add `res.skipped++` in the machine insert error path (line ~368).
+Actually, looking more carefully: the user's client imported ~88 machine rows and ~50 renter rows. He probably used "combined" mode. The preview showed data. But import said "50 blank rows."
 
-### Bug 3 (minor): Improve error messaging
+The most likely bug: the user's CSV has rows where some rows only have machine data (no renter data) and vice versa. In combined mode, if a row has neither renter nor machine content according to the mapping, it's skipped. But the user saw the preview correctly...
 
-When `res.skipped > 0` and total created is 0, the toast should say something more helpful like "All rows were skipped — check that your column mappings are correct" instead of just "0 records, X skipped."
+Wait — there's a subtler issue. The `buildPayload` checks `const csvCol = mapping[f.key]`. In combined mode, machine fields use keys like `type`, `model`, `serial` (no prefix for non-colliding ones). But `renterFields` filtered from combined mode still have keys like `name`, `phone` — also no prefix. So mapping should work.
+
+Let me think about what could cause ALL rows to appear blank. The `hasContent` flag only becomes `true` if at least one `val` (trimmed cell value) is non-empty. If the mapping object is empty (no fields mapped), then every row would have `hasContent = false`.
+
+The most likely scenario: the user uploaded an XLSX file where the auto-mapper couldn't match any headers. The preview shows raw data but the mapping dropdowns were all set to "—" (unmapped). The user didn't notice this and clicked Import. Since no fields are mapped, `buildPayload` returns `hasContent: false` for every row.
+
+But the user said "they all populated in the data import preview" — this could mean the preview cards showed the raw row data, but the mapped fields were all placeholders. The preview might show rows with placeholder text which could look "populated."
+
+**Fix**: Add a pre-import validation that checks if at least one field is mapped. If the mapping is empty (or has no actual field mappings), show an error toast before attempting import: "No columns are mapped. Please map at least one column to a LaundryLord field before importing."
+
+Also, improve the `hasContent` check messaging — instead of silently skipping and reporting "X skipped," report explicitly that rows were skipped because no fields were mapped.
+
+**File: `src/pages/ImportPage.tsx`**
+- Before `handleImport` processes rows, check if `Object.keys(mapping).length === 0` and show a clear error
+- After import, if `res.skipped > 0` and total created is 0, show a more descriptive error message mentioning unmapped columns
+- Add a visual indicator on the mapping step when no columns are mapped (warning banner)
 
 ## Files changed
 
 | File | Change |
 |------|--------|
-| `src/pages/ImportPage.tsx` | Move `ensureRequiredFields` after dedup; add placeholder guards to dedup functions; count machine insert errors in combined mode; improve zero-result messaging |
-| `src/utils/import/fields.ts` | Expand synonyms for machine and renter fields to cover real-world header variants |
+| `src/hooks/useSubscription.ts` | Fix `canAddRenter` to use `effectiveTier.max` when subscribed; invalidate queries after plan change |
+| `src/pages/ImportPage.tsx` | Add pre-import validation for empty mappings; improve error messaging for blank-row scenarios |
 

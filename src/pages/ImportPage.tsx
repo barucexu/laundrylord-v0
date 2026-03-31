@@ -187,17 +187,10 @@ export default function ImportPage() {
     if (record.cost_basis) record.cost_basis = parseFloat(record.cost_basis) || 0;
   };
 
-  const PLACEHOLDER_VALUES = new Set([
-    "no name yet", "no phone yet", "no email yet", "no address yet",
-    "no type yet", "no model yet", "no serial yet",
-  ]);
-
-  const isPlaceholder = (val: any) => typeof val === "string" && PLACEHOLDER_VALUES.has(val.toLowerCase());
-
   // Dedup: try to find existing renter by email or phone
   const findExistingRenter = async (record: Record<string, any>): Promise<string | null> => {
     if (!user) return null;
-    if (record.email && !isPlaceholder(record.email)) {
+    if (record.email) {
       const { data } = await supabase
         .from("renters")
         .select("id")
@@ -206,7 +199,7 @@ export default function ImportPage() {
         .limit(1);
       if (data && data.length > 0) return data[0].id;
     }
-    if (record.phone && !isPlaceholder(record.phone)) {
+    if (record.phone) {
       const { data } = await supabase
         .from("renters")
         .select("id")
@@ -221,7 +214,7 @@ export default function ImportPage() {
   // Dedup: try to find existing machine by serial
   const findExistingMachine = async (record: Record<string, any>): Promise<string | null> => {
     if (!user) return null;
-    if (record.serial && !isPlaceholder(record.serial)) {
+    if (record.serial) {
       const { data } = await supabase
         .from("machines")
         .select("id")
@@ -275,6 +268,7 @@ export default function ImportPage() {
           if (!hasContent) { res.skipped++; continue; }
           record.user_id = user.id;
           parseRenterRecord(record);
+          ensureRequiredFields("customers", record);
 
           const existingId = await findExistingRenter(record);
           if (existingId) {
@@ -282,7 +276,6 @@ export default function ImportPage() {
           } else if (rentersCreatedSoFar >= slotsAvailable) {
             res.blockedByPlan++;
           } else {
-            ensureRequiredFields("customers", record);
             const { error } = await supabase.from("renters").insert(record as any);
             if (error) { console.error("Insert error:", error); res.skipped++; }
             else { res.rentersCreated++; rentersCreatedSoFar++; }
@@ -295,12 +288,12 @@ export default function ImportPage() {
           if (!hasContent) { res.skipped++; continue; }
           record.user_id = user.id;
           parseMachineRecord(record);
+          ensureRequiredFields("machines", record);
 
           const existingId = await findExistingMachine(record);
           if (existingId) {
             res.machinesMatched++;
           } else {
-            ensureRequiredFields("machines", record);
             const { error } = await supabase.from("machines").insert(record as any);
             if (error) { console.error("Insert error:", error); res.skipped++; }
             else res.machinesCreated++;
@@ -324,6 +317,7 @@ export default function ImportPage() {
             const rRecord = renterResult.record;
             rRecord.user_id = user.id;
             parseRenterRecord(rRecord);
+            ensureRequiredFieldsForGroup("renter", rRecord);
 
             const existingId = await findExistingRenter(rRecord);
             if (existingId) {
@@ -332,7 +326,6 @@ export default function ImportPage() {
             } else if (rentersCreatedSoFar >= slotsAvailable) {
               res.blockedByPlan++;
             } else {
-              ensureRequiredFieldsForGroup("renter", rRecord);
               const { data, error } = await supabase.from("renters").insert(rRecord as any).select("id").single();
               if (error) {
                 console.error("Renter insert error:", error);
@@ -349,6 +342,7 @@ export default function ImportPage() {
             const mRecord = machineResult.record;
             mRecord.user_id = user.id;
             parseMachineRecord(mRecord);
+            ensureRequiredFieldsForGroup("machine", mRecord);
 
             // Link to renter if we have one
             if (renterId) {
@@ -369,11 +363,9 @@ export default function ImportPage() {
                 res.machinesLinked++;
               }
             } else {
-              ensureRequiredFieldsForGroup("machine", mRecord);
               const { error } = await supabase.from("machines").insert(mRecord as any);
               if (error) {
                 console.error("Machine insert error:", error);
-                res.skipped++;
               } else {
                 res.machinesCreated++;
                 if (renterId) res.machinesLinked++;
@@ -390,15 +382,9 @@ export default function ImportPage() {
 
       const totalCreated = res.rentersCreated + res.machinesCreated;
       const totalMatched = res.rentersMatched + res.machinesMatched;
-      if (totalCreated === 0 && totalMatched === 0 && res.skipped > 0) {
-        toast.error(
-          `All ${res.skipped} rows were skipped — check that your column mappings are correct.`
-        );
-      } else {
-        toast.success(
-          `Imported ${totalCreated} records${totalMatched > 0 ? `, matched ${totalMatched} existing` : ""}${res.skipped > 0 ? `, ${res.skipped} skipped` : ""}`
-        );
-      }
+      toast.success(
+        `Imported ${totalCreated} records${totalMatched > 0 ? `, matched ${totalMatched} existing` : ""}${res.skipped > 0 ? `, ${res.skipped} skipped` : ""}`
+      );
     } catch (err: any) {
       toast.error(err.message || "Import failed");
     } finally {
