@@ -12,7 +12,7 @@ export const RENTER_FIELDS: ImportField[] = [
     key: "phone",
     label: "Phone",
     placeholder: "No phone yet",
-    synonyms: ["phone number", "mobile", "cell", "cell phone", "telephone"],
+    synonyms: ["phone number", "mobile", "cell", "cell phone", "telephone", "tel", "ph", "contact"],
     group: "renter",
   },
   {
