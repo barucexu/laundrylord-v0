@@ -349,7 +349,6 @@ export default function ImportPage() {
             const mRecord = machineResult.record;
             mRecord.user_id = user.id;
             parseMachineRecord(mRecord);
-            ensureRequiredFieldsForGroup("machine", mRecord);
 
             // Link to renter if we have one
             if (renterId) {
@@ -370,9 +369,11 @@ export default function ImportPage() {
                 res.machinesLinked++;
               }
             } else {
+              ensureRequiredFieldsForGroup("machine", mRecord);
               const { error } = await supabase.from("machines").insert(mRecord as any);
               if (error) {
                 console.error("Machine insert error:", error);
+                res.skipped++;
               } else {
                 res.machinesCreated++;
                 if (renterId) res.machinesLinked++;
