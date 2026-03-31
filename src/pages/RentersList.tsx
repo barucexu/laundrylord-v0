@@ -11,7 +11,6 @@ import { getNextUpgradeTierForCount, tierUpgradeLabel } from "@/lib/pricing-tier
 import { Search, Plus } from "lucide-react";
 import { CreateRenterDialog } from "@/components/CreateRenterDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { UpgradeConfirmDialog } from "@/components/UpgradeConfirmDialog";
 
 export default function RentersList() {
   const [search, setSearch] = useState("");
