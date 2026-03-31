@@ -5,7 +5,7 @@ export const RENTER_FIELDS: ImportField[] = [
     key: "name",
     label: "Name",
     placeholder: "No name yet",
-    synonyms: ["full name", "renter name", "customer name", "renter full name", "tenant name"],
+    synonyms: ["full name", "renter name", "customer name", "renter full name", "tenant name", "customer", "tenant", "client"],
     group: "renter",
   },
   {
