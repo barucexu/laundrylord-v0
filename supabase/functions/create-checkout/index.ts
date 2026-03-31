@@ -88,6 +88,15 @@ serve(async (req) => {
       }
     }
 
+    // Clear orphaned customer credit that could make first checkout $0
+    if (customerId) {
+      const customer = await stripe.customers.retrieve(customerId);
+      if (!customer.deleted && customer.balance < 0) {
+        logStep("Clearing orphaned customer credit before first checkout", { balance: customer.balance });
+        await stripe.customers.update(customerId, { balance: 0 });
+      }
+    }
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
