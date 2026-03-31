@@ -584,7 +584,7 @@ export default function ImportPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="skip">— Skip —</SelectItem>
-                          {headers.map((h) => (
+                          {headers.filter((h) => h !== "").map((h) => (
                             <SelectItem key={h} value={h}>
                               {h}
                             </SelectItem>
@@ -620,7 +620,7 @@ export default function ImportPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="skip">— Skip —</SelectItem>
-                          {headers.map((h) => (
+                          {headers.filter((h) => h !== "").map((h) => (
                             <SelectItem key={h} value={h}>
                               {h}
                             </SelectItem>
