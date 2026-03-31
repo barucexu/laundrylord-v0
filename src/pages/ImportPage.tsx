@@ -295,12 +295,12 @@ export default function ImportPage() {
           if (!hasContent) { res.skipped++; continue; }
           record.user_id = user.id;
           parseMachineRecord(record);
-          ensureRequiredFields("machines", record);
 
           const existingId = await findExistingMachine(record);
           if (existingId) {
             res.machinesMatched++;
           } else {
+            ensureRequiredFields("machines", record);
             const { error } = await supabase.from("machines").insert(record as any);
             if (error) { console.error("Insert error:", error); res.skipped++; }
             else res.machinesCreated++;
