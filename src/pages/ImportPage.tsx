@@ -228,6 +228,14 @@ export default function ImportPage() {
 
   const handleImport = async () => {
     if (!user) return;
+
+    // Pre-import validation: ensure at least one column is mapped
+    const mappedFieldCount = Object.keys(mapping).length;
+    if (mappedFieldCount === 0) {
+      toast.error("No columns are mapped. Please map at least one column to a LaundryLord field before importing.");
+      return;
+    }
+
     setImporting(true);
 
     // Canonical enforcement: free tier = cap only; paid tier = must be subscribed + cap
@@ -754,7 +762,10 @@ export default function ImportPage() {
                 )}
                 {result.skipped > 0 && (
                   <div className="text-sm text-muted-foreground">
-                    {result.skipped} rows skipped (blank or failed)
+                    {result.skipped} rows skipped
+                    {(result.rentersCreated + result.machinesCreated + result.rentersMatched + result.machinesMatched) === 0
+                      ? " — check that your columns are mapped correctly"
+                      : " (blank or failed)"}
                   </div>
                 )}
                 {result.blockedByPlan > 0 && (

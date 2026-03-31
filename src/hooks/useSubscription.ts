@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useRenters } from "@/hooks/useSupabaseData";
@@ -55,6 +55,7 @@ interface SubscriptionState {
 export function useSubscription(): SubscriptionState {
   const { user, session, loading: authLoading } = useAuth();
   const demo = useDemo();
+  const queryClient = useQueryClient();
   const { data: renters } = useRenters();
   const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -137,14 +138,18 @@ export function useSubscription(): SubscriptionState {
   const startAggressivePolling = useCallback(() => {
     if (aggressivePollRef.current) clearInterval(aggressivePollRef.current);
     if (aggressiveTimeoutRef.current) clearTimeout(aggressiveTimeoutRef.current);
-    aggressivePollRef.current = setInterval(checkSubscription, 5_000);
+    aggressivePollRef.current = setInterval(() => {
+      checkSubscription();
+      queryClient.invalidateQueries({ queryKey: ["renters"] });
+      queryClient.invalidateQueries({ queryKey: ["renters", "billable-count"] });
+    }, 5_000);
     aggressiveTimeoutRef.current = setTimeout(() => {
       if (aggressivePollRef.current) {
         clearInterval(aggressivePollRef.current);
         aggressivePollRef.current = null;
       }
     }, 60_000);
-  }, [checkSubscription]);
+  }, [checkSubscription, queryClient]);
 
   const checkout = useCallback(async (targetPriceId?: string) => {
     const priceId = targetPriceId ?? upgradeTarget.price_id ?? tier.price_id;
@@ -155,13 +160,15 @@ export function useSubscription(): SubscriptionState {
     if (error) throw error;
     if (data?.updated) {
       await checkSubscription();
+      queryClient.invalidateQueries({ queryKey: ["renters"] });
+      queryClient.invalidateQueries({ queryKey: ["renters", "billable-count"] });
       return;
     }
     if (data?.url) {
       window.open(data.url, "_blank");
       startAggressivePolling();
     }
-  }, [tier, upgradeTarget, startAggressivePolling, checkSubscription]);
+  }, [tier, upgradeTarget, startAggressivePolling, checkSubscription, queryClient]);
 
   // Upgrade confirmation flow
   const [upgradeIntent, setUpgradeIntent] = useState<UpgradeIntent | null>(null);
@@ -211,8 +218,8 @@ export function useSubscription(): SubscriptionState {
 
   const canAddRenter = (() => {
     if (finalLoading) return false;
-    if (tier.price === 0) return billableCount < tier.max;
-    return finalSubscribed && billableCount < finalEffectiveTier.max;
+    if (finalSubscribed) return billableCount < finalEffectiveTier.max;
+    return billableCount < TIERS[0].max;
   })();
 
   return {
