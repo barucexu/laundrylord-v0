@@ -19,7 +19,7 @@ import { parseCSV } from "@/utils/import/csv-parser";
 import { parseXLSX } from "@/utils/import/xlsx-parser";
 import { parseImage } from "@/utils/import/image-parser";
 import { autoMap, autoMapCombined } from "@/utils/import/auto-mapper";
-import { ensureRequiredFields, ensureRequiredFieldsForGroup } from "@/utils/import/placeholders";
+import { applyInsertDefaults, applyInsertDefaultsForGroup, isMeaningfulValue, checkMinimumData, checkMinimumDataForGroup } from "@/utils/import/placeholders";
 
 type Step = "upload" | "map" | "preview" | "done";
 
