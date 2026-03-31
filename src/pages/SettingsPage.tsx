@@ -17,7 +17,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSubscription } from "@/hooks/useSubscription";
 import { TIERS, canFitTier, tierUpgradeLabel } from "@/lib/pricing-tiers";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const DEFAULT_TEMPLATES = {
   template_upcoming_subject: "Payment Reminder",
@@ -167,91 +166,72 @@ export default function SettingsPage() {
               <Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking plan…
             </div>
           ) : (
-            <>
-              {/* Current status */}
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <p className="text-sm font-medium">
-                    {subscription.subscribed
-                      ? `${subscription.currentBilledTier.name} plan — ${subscription.currentBilledTier.label}`
-                      : `${subscription.requiredTier.name} ${subscription.requiredTier.price > 0 ? `— ${subscription.requiredTier.label} required` : ""}`
-                    }
+                    Current billed plan: {subscription.currentBilledTier ? `${subscription.currentBilledTier.name} — ${subscription.currentBilledTier.label}` : "Free"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {subscription.activeOperationalCount} active renter{subscription.activeOperationalCount !== 1 ? "s" : ""}
-                    {subscription.billableCount !== subscription.activeOperationalCount && (
-                      <> · {subscription.billableCount} billable</>
-                    )}
+                    Required by usage: {subscription.requiredTier.name} {subscription.requiredTier.price > 0 ? `(${subscription.requiredTier.label})` : ""}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Billable renters: {subscription.billableCount} · Active renters: {subscription.activeOperationalCount}
                     {subscription.subscriptionEnd && ` · Renews ${new Date(subscription.subscriptionEnd).toLocaleDateString()}`}
                   </p>
-                  <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
-                    <Info className="h-3 w-3" />
+                  <p className="text-[11px] text-muted-foreground">
                     Archived renters count toward billing for 30 days.
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  {subscription.subscribed && (
-                    <Button size="sm" variant="outline" onClick={subscription.manageSubscription} className="gap-1.5">
-                      <CreditCard className="h-3.5 w-3.5" />
-                      Manage billing
-                    </Button>
-                  )}
+                  <Button size="sm" variant="outline" onClick={subscription.manageSubscription} className="gap-1.5">
+                    <CreditCard className="h-3.5 w-3.5" />
+                    {subscription.subscribed ? "Manage billing" : "Change plan"}
+                  </Button>
                 </div>
               </div>
-
-              {/* Plan grid */}
-              <Separator />
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-                {TIERS.filter(t => t.price >= 0).map(t => {
-                  const isCurrent = subscription.subscribed && subscription.currentBilledTier.name === t.name;
-                  const isRequired = subscription.requiredTier.name === t.name;
-                  const fits = canFitTier(subscription.billableCount, t);
-                  const isPaid = !!t.price_id;
-
-                  return (
-                    <div
-                      key={t.name}
-                      className={`rounded-md border p-2 text-center space-y-1 ${
-                        isCurrent ? "border-primary bg-primary/5" : "border-border"
-                      }`}
-                    >
-                      <div className="text-xs font-semibold">{t.name}</div>
-                      <div className="text-[10px] text-muted-foreground">
-                        {t.price === 0 ? "Free" : t.label}
-                      </div>
-                      <div className="text-[10px] text-muted-foreground">
-                        {t.max === Infinity ? `${t.min}+` : `${t.min}–${t.max}`} renters
-                      </div>
-                      {isCurrent ? (
-                        <div className="text-[10px] font-medium text-primary">Current</div>
-                      ) : !isPaid ? (
-                        <div className="text-[10px] text-muted-foreground">—</div>
-                      ) : !fits ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="text-[10px] text-muted-foreground cursor-help">
-                              Not available
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs">{subscription.billableCount} billable renters exceeds {t.name} max of {t.max}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-6 text-[10px] w-full"
-                          onClick={() => subscription.initiateUpgrade(t.price_id!)}
-                        >
-                          Select
-                        </Button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </>
+              <Collapsible>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="px-0 text-xs">
+                    View all plans <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-2">
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {TIERS.map((t) => {
+                      const fits = canFitTier(subscription.billableCount, t);
+                      const isCurrent = subscription.currentBilledTier?.name === t.name || (!subscription.currentBilledTier && t.name === "Free");
+                      return (
+                        <div key={t.name} className={`rounded-md border p-2 space-y-1 ${isCurrent ? "border-primary/40 bg-primary/5" : ""}`}>
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-medium">{t.name}</p>
+                            <p className="text-xs text-muted-foreground">{t.label}</p>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">{t.min}–{t.max === Infinity ? "∞" : t.max} renters</p>
+                          {isCurrent ? (
+                            <p className="text-[11px] text-primary font-medium">Current billed plan</p>
+                          ) : !fits ? (
+                            <p className="text-[11px] text-muted-foreground">
+                              {subscription.billableCount} billable renters exceeds max {t.max}
+                            </p>
+                          ) : t.price_id ? (
+                            <Button
+                              size="sm"
+                              className="h-7 text-xs"
+                              onClick={() => subscription.checkout(t.price_id)}
+                            >
+                              {tierUpgradeLabel(t)}
+                            </Button>
+                          ) : (
+                            <p className="text-[11px] text-muted-foreground">Free tier available when no paid subscription is active.</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
           )}
         </CardContent>
       </Card>

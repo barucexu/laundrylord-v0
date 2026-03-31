@@ -19,7 +19,7 @@ import { parseCSV } from "@/utils/import/csv-parser";
 import { parseXLSX } from "@/utils/import/xlsx-parser";
 import { parseImage } from "@/utils/import/image-parser";
 import { autoMap, autoMapCombined } from "@/utils/import/auto-mapper";
-import { applyInsertDefaults, applyInsertDefaultsForGroup, isMeaningfulValue, checkMinimumData, checkMinimumDataForGroup } from "@/utils/import/placeholders";
+import { applyInsertDefaults, ensureRequiredFieldsForGroup } from "@/utils/import/placeholders";
 
 type Step = "upload" | "map" | "preview" | "done";
 
@@ -35,7 +35,7 @@ interface CombinedResult {
 
 export default function ImportPage() {
   const { user } = useAuth();
-  const { tier, billableCount, subscribed } = useSubscription();
+  const { tier, renterCount, subscribed, loading: planLoading } = useSubscription();
   const queryClient = useQueryClient();
   const [importMode, setImportMode] = useState<ImportMode>("combined");
   const [step, setStep] = useState<Step>("upload");
@@ -187,7 +187,31 @@ export default function ImportPage() {
     if (record.cost_basis) record.cost_basis = parseFloat(record.cost_basis) || 0;
   };
 
-  // Dedup: try to find existing renter by email or phone (only meaningful values)
+  const PLACEHOLDER_SET = new Set([
+    "no name yet",
+    "no phone yet",
+    "no email yet",
+    "no address yet",
+    "no type yet",
+    "no model yet",
+    "no serial yet",
+  ]);
+
+  const isMeaningfulValue = (value: unknown): boolean => {
+    if (value === undefined || value === null) return false;
+    const normalized = String(value).trim().toLowerCase();
+    if (!normalized) return false;
+    if (normalized === "skip" || normalized === "—") return false;
+    return !PLACEHOLDER_SET.has(normalized);
+  };
+
+  const hasAnyMappedField = () => Object.values(mapping).some((v) => v && v !== "skip");
+
+  const hasMinimumRenterData = (record: Record<string, any>) => isMeaningfulValue(record.name);
+  const hasMinimumMachineData = (record: Record<string, any>) =>
+    isMeaningfulValue(record.type) && isMeaningfulValue(record.model) && isMeaningfulValue(record.serial);
+
+  // Dedup: try to find existing renter by email or phone
   const findExistingRenter = async (record: Record<string, any>): Promise<string | null> => {
     if (!user) return null;
     if (isMeaningfulValue(record.email)) {
@@ -228,21 +252,20 @@ export default function ImportPage() {
 
   const handleImport = async () => {
     if (!user) return;
-
-    // Pre-import validation: ensure at least one column is mapped
-    const mappedFieldCount = Object.keys(mapping).length;
-    if (mappedFieldCount === 0) {
-      toast.error("No columns are mapped. Please map at least one column to a LaundryLord field before importing.");
+    if (!hasAnyMappedField()) {
+      toast.error("No columns are mapped. Please map at least one column before importing.");
       return;
     }
-
+    if (planLoading) {
+      toast.error("Checking plan status. Please try again in a moment.");
+      return;
+    }
     setImporting(true);
 
-    // Canonical enforcement: free tier = cap only; paid tier = must be subscribed + cap
     const slotsAvailable = (() => {
-      if (tier.price === 0) return tier.max - billableCount;
+      if (tier.price === 0) return Math.max(0, tier.max - renterCount);
       if (!subscribed) return 0;
-      return tier.max - billableCount;
+      return Math.max(0, tier.max - renterCount);
     })();
     let rentersCreatedSoFar = 0;
 
@@ -285,7 +308,10 @@ export default function ImportPage() {
 
           if (rentersCreatedSoFar >= slotsAvailable) {
             res.blockedByPlan++;
+          } else if (!hasMinimumRenterData(record)) {
+            res.skipped++;
           } else {
+            applyInsertDefaults("customers", record);
             const { error } = await supabase.from("renters").insert(record as any);
             if (error) { console.error("Insert error:", error); res.skipped++; }
             else { res.rentersCreated++; rentersCreatedSoFar++; }
@@ -303,7 +329,13 @@ export default function ImportPage() {
           const existingId = await findExistingMachine(record);
           if (existingId) {
             res.machinesMatched++;
-            continue;
+          } else if (!hasMinimumMachineData(record)) {
+            res.skipped++;
+          } else {
+            applyInsertDefaults("machines", record);
+            const { error } = await supabase.from("machines").insert(record as any);
+            if (error) { console.error("Insert error:", error); res.skipped++; }
+            else res.machinesCreated++;
           }
 
           applyInsertDefaults("machines", record);
@@ -339,15 +371,16 @@ export default function ImportPage() {
             if (existingId) {
               renterId = existingId;
               res.rentersMatched++;
+            } else if (rentersCreatedSoFar >= slotsAvailable) {
+              res.blockedByPlan++;
+            } else if (!hasMinimumRenterData(rRecord)) {
+              res.skipped++;
             } else {
-              // Apply defaults only for new records
-              applyInsertDefaultsForGroup("renter", rRecord);
-
-              const reason = checkMinimumDataForGroup("renter", rRecord);
-              if (reason) {
-                console.warn("Skipping renter side:", reason);
-              } else if (rentersCreatedSoFar >= slotsAvailable) {
-                res.blockedByPlan++;
+              ensureRequiredFieldsForGroup("renter", rRecord);
+              const { data, error } = await supabase.from("renters").insert(rRecord as any).select("id").single();
+              if (error) {
+                console.error("Renter insert error:", error);
+                res.skipped++;
               } else {
                 const { data, error } = await supabase.from("renters").insert(rRecord as any).select("id").single();
                 if (error) {
@@ -388,15 +421,11 @@ export default function ImportPage() {
                 res.machinesLinked++;
               }
             } else {
-              applyInsertDefaultsForGroup("machine", mRecord);
-
-              const reason = checkMinimumDataForGroup("machine", mRecord);
-              if (reason) {
-                console.warn("Skipping machine side:", reason);
+              if (!hasMinimumMachineData(mRecord)) {
                 res.skipped++;
                 continue;
               }
-
+              ensureRequiredFieldsForGroup("machine", mRecord);
               const { error } = await supabase.from("machines").insert(mRecord as any);
               if (error) {
                 console.error("Machine insert error:", error);
@@ -417,9 +446,15 @@ export default function ImportPage() {
 
       const totalCreated = res.rentersCreated + res.machinesCreated;
       const totalMatched = res.rentersMatched + res.machinesMatched;
-      toast.success(
-        `Imported ${totalCreated} records${totalMatched > 0 ? `, matched ${totalMatched} existing` : ""}${res.skipped > 0 ? `, ${res.skipped} skipped` : ""}`
-      );
+      if (totalCreated === 0 && res.skipped > 0) {
+        toast.error(
+          `Imported 0 records${totalMatched > 0 ? `, matched ${totalMatched} existing` : ""}, ${res.skipped} skipped. Check column mappings and required fields.`
+        );
+      } else {
+        toast.success(
+          `Imported ${totalCreated} records${totalMatched > 0 ? `, matched ${totalMatched} existing` : ""}${res.skipped > 0 ? `, ${res.skipped} skipped` : ""}`
+        );
+      }
     } catch (err: any) {
       toast.error(err.message || "Import failed");
     } finally {

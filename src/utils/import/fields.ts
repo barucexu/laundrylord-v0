@@ -5,14 +5,14 @@ export const RENTER_FIELDS: ImportField[] = [
     key: "name",
     label: "Name",
     placeholder: "No name yet",
-    synonyms: ["full name", "renter name", "customer name", "renter full name", "tenant name", "customer", "tenant", "client"],
+    synonyms: ["full name", "renter name", "customer name", "renter full name", "tenant name", "customer", "client", "client name"],
     group: "renter",
   },
   {
     key: "phone",
     label: "Phone",
     placeholder: "No phone yet",
-    synonyms: ["phone number", "mobile", "cell", "cell phone", "telephone", "tel", "contact"],
+    synonyms: ["phone number", "mobile", "cell", "cell phone", "telephone", "tel", "ph", "contact"],
     group: "renter",
   },
   {
@@ -26,7 +26,7 @@ export const RENTER_FIELDS: ImportField[] = [
     key: "address",
     label: "Address",
     placeholder: "No address yet",
-    synonyms: ["service address", "home address", "street address", "location"],
+    synonyms: ["service address", "home address", "street address", "location", "addr", "delivery address", "install address"],
     group: "renter",
   },
   {
@@ -68,7 +68,7 @@ export const RENTER_FIELDS: ImportField[] = [
     key: "monthly_rate",
     label: "Monthly Rate",
     placeholder: "",
-    synonyms: ["monthly rent", "rent", "rate", "monthly rate $", "monthly fee", "monthly", "rent/mo", "mo rate"],
+    synonyms: ["monthly rent", "rent", "rate", "monthly rate $", "monthly fee", "monthly", "mo rate", "rent/mo", "rent mo"],
     group: "renter",
   },
   {
@@ -140,7 +140,7 @@ export const MACHINE_FIELDS: ImportField[] = [
     key: "type",
     label: "Type",
     placeholder: "No type yet",
-    synonyms: ["machine type", "appliance type", "washer or dryer", "equipment type", "make", "appliance", "washer dryer", "w/d"],
+    synonyms: ["machine type", "appliance type", "washer or dryer", "equipment type", "make", "appliance", "w/d", "washer dryer"],
     group: "machine",
   },
   {
@@ -154,7 +154,7 @@ export const MACHINE_FIELDS: ImportField[] = [
     key: "serial",
     label: "Serial #",
     placeholder: "No serial yet",
-    synonyms: ["serial number", "serial #", "sn", "serial no", "serial num", "s/n", "serial#"],
+    synonyms: ["serial number", "serial #", "sn", "serial no", "serial num", "s/n", "ser", "serial#"],
     group: "machine",
   },
   {
@@ -168,14 +168,14 @@ export const MACHINE_FIELDS: ImportField[] = [
     key: "condition",
     label: "Condition",
     placeholder: "",
-    synonyms: ["machine condition", "state"],
+    synonyms: ["machine condition", "state", "cond"],
     group: "machine",
   },
   {
     key: "status",
     label: "Status",
     placeholder: "",
-    synonyms: ["machine status", "availability"],
+    synonyms: ["machine status", "availability", "avail", "in use"],
     group: "machine",
   },
   {

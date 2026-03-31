@@ -31,35 +31,30 @@ export function getTierForCount(totalRenters: number): PricingTier {
   return TIERS.find((t) => totalRenters >= t.min && totalRenters <= t.max) ?? TIERS[0];
 }
 
-/** Alias: returns the tier required by the current billable count. */
-export function getRequiredTierForCount(count: number): PricingTier {
-  return getTierForCount(count);
+export function getRequiredTierForCount(totalRenters: number): PricingTier {
+  return getTierForCount(totalRenters);
 }
 
-/** Lookup tier by Stripe product_id. Returns Free tier if not found. */
-export function getTierByProductId(productId: string | null): PricingTier {
-  if (!productId) return TIERS[0];
-  return TIERS.find((t) => t.product_id === productId) ?? TIERS[0];
+export function getTierByProductId(productId: string | null | undefined): PricingTier | null {
+  if (!productId) return null;
+  return TIERS.find((t) => t.product_id === productId) ?? null;
 }
 
-/**
- * Returns the next paid tier the operator should upgrade to.
- * If count is at or above the current tier's max, returns the next tier up.
- * Always returns a tier with a price_id (skips Free).
- */
-export function getNextUpgradeTierForCount(count: number): PricingTier {
-  const current = getTierForCount(count);
-  // If still under the current tier max and current tier is paid, that's the target
-  if (count < current.max && current.price_id) return current;
-  // Otherwise find the next tier above the current one
+export function getNextUpgradeTierForCount(totalRenters: number): PricingTier | null {
+  const current = getTierForCount(totalRenters);
   const idx = TIERS.indexOf(current);
+  if (idx === -1) return null;
+
+  // If currently within tier range and already paid, upgrading target is current tier (for unsubscribed flows).
+  if (totalRenters < current.max && current.price > 0) return current;
+
+  // At boundary or free tier, target next tier.
   const next = TIERS[idx + 1];
-  return next ?? current; // at top tier, return self
+  return next ?? current;
 }
 
-/** Whether a given renter count fits within a tier's range. */
-export function canFitTier(count: number, tier: PricingTier): boolean {
-  return count <= tier.max;
+export function canFitTier(totalRenters: number, tier: PricingTier): boolean {
+  return totalRenters <= tier.max;
 }
 
 /** Whether the operator is in a paid tier but may not be subscribed yet. */

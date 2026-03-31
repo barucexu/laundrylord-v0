@@ -62,15 +62,15 @@ serve(async (req) => {
     if (customers.data.length > 0) {
       customerId = customers.data[0].id;
 
-      // Check if customer already has an active SaaS subscription
-      // If so, redirect to the customer portal for plan changes instead of creating a duplicate
+      // Keep only one SaaS subscription by cancelling prior SaaS subscriptions immediately
+      // before starting checkout for the newly selected plan.
       const subscriptions = await stripe.subscriptions.list({
         customer: customerId,
         status: "active",
-        limit: 10,
+        limit: 50,
       });
 
-      const saasSubscription = subscriptions.data.find((sub) =>
+      const activeSaasSubs = subscriptions.data.filter((sub) =>
         sub.items.data.some((item) => {
           const productId = typeof item.price.product === "string"
             ? item.price.product
@@ -79,36 +79,11 @@ serve(async (req) => {
         })
       );
 
-      if (saasSubscription) {
-        // Check if the requested price is already the current price (no change needed)
-        const currentPriceId = saasSubscription.items.data[0]?.price?.id;
-        if (currentPriceId === price_id) {
-          logStep("Already on requested plan — redirecting to portal");
-          const portalSession = await stripe.billingPortal.sessions.create({
-            customer: customerId,
-            return_url: `${origin}/settings`,
-          });
-          return new Response(JSON.stringify({ url: portalSession.url }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-
-        // Update existing subscription to the new price directly via API
-        logStep("Updating existing subscription to new price", {
-          subscriptionId: saasSubscription.id,
-          fromPrice: currentPriceId,
-          toPrice: price_id,
-        });
-        const subscriptionItemId = saasSubscription.items.data[0].id;
-        await stripe.subscriptions.update(saasSubscription.id, {
-          items: [{ id: subscriptionItemId, price: price_id }],
-          proration_behavior: "always_invoice",
-        });
-        return new Response(JSON.stringify({
-          url: `${origin}/settings?subscription=updated`,
-          updated: true,
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+      for (const sub of activeSaasSubs) {
+        logStep("Cancelling existing SaaS subscription before new checkout", { subscriptionId: sub.id });
+        await stripe.subscriptions.cancel(sub.id, {
+          prorate: false,
+          invoice_now: false,
         });
       }
     }

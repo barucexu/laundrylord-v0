@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { useSubscription } from "@/hooks/useSubscription";
-import { needsSubscription, tierUpgradeLabel } from "@/lib/pricing-tiers";
+import { getNextUpgradeTierForCount, needsSubscription, tierUpgradeLabel } from "@/lib/pricing-tiers";
 import { X, Sparkles, ArrowUpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/hooks/use-toast";
-import { UpgradeConfirmDialog } from "@/components/UpgradeConfirmDialog";
 
 export function PlanBanner() {
   const { billableCount, subscribed, loading, upgradeTarget, currentBilledTier, checkout, initiateUpgrade, upgradeIntent, confirmUpgrade, cancelUpgrade, upgradeProcessing } = useSubscription();
   const [dismissed, setDismissed] = useState<string | null>(null);
+  const upgradeTarget = getNextUpgradeTierForCount(renterCount) || tier;
 
   if (loading) return null;
 
@@ -32,11 +31,8 @@ export function PlanBanner() {
   // Paid tier, not subscribed — upgrade nudge
   if (dismissed === upgradeTarget.name) return null;
 
-  const handleCheckout = () => {
-    if (upgradeTarget.price_id) {
-      initiateUpgrade(upgradeTarget.price_id);
-    }
-  };
+  // Determine if this is the first paid tier (Free → Starter)
+  const isFirstUpgrade = upgradeTarget.name === "Starter";
 
   return (
     <>
@@ -48,15 +44,16 @@ export function PlanBanner() {
             Nice — you've grown to {billableCount} billable renter{billableCount !== 1 ? "s" : ""}!
           </p>
           <p className="text-muted-foreground">
-            {tierUpgradeLabel(upgradeTarget)} to keep growing.
+            {isFirstUpgrade
+              ? <>{tierUpgradeLabel(upgradeTarget)} to keep growing. Adding a bank account is the easiest option.</>
+              : <>{tierUpgradeLabel(upgradeTarget)} to keep things running smoothly.</>
+            }
           </p>
         </div>
-        {upgradeTarget.price_id && (
-          <Button size="sm" onClick={handleCheckout} className="gap-1.5">
-            <ArrowUpCircle className="h-3.5 w-3.5" />
-            {tierUpgradeLabel(upgradeTarget)}
-          </Button>
-        )}
+        <Button size="sm" onClick={() => checkout(upgradeTarget.price_id)} className="gap-1.5" disabled={!upgradeTarget.price_id}>
+          <ArrowUpCircle className="h-3.5 w-3.5" />
+          {tierUpgradeLabel(upgradeTarget)}
+        </Button>
       </div>
       <button
         onClick={() => setDismissed(upgradeTarget.name)}

@@ -3,49 +3,23 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useRenters } from "@/hooks/useSupabaseData";
-import { useDemo } from "@/contexts/DemoContext";
-import {
-  getTierForCount,
-  getRequiredTierForCount,
-  getTierByProductId,
-  getNextUpgradeTierForCount,
-  TIERS,
-  type PricingTier,
-} from "@/lib/pricing-tiers";
-
-interface UpgradeIntent {
-  priceId: string;
-  tierName: string;
-  tierLabel: string;
-  isUpgrade: boolean;
-}
+import { getRequiredTierForCount, getTierByProductId, type PricingTier } from "@/lib/pricing-tiers";
 
 interface SubscriptionState {
-  tier: PricingTier;
+  tier: PricingTier; // Effective enforcement tier (kept for backwards compatibility)
+  renterCount: number; // Billable renter count (kept for backwards compatibility)
   activeOperationalCount: number;
   billableCount: number;
-  renterCount: number;
   requiredTier: PricingTier;
-  currentBilledTier: PricingTier;
+  currentBilledTier: PricingTier | null;
   effectiveTier: PricingTier;
-  upgradeTarget: PricingTier;
   subscribed: boolean;
   loading: boolean;
   subscriptionEnd: string | null;
   productId: string | null;
   canAddRenter: boolean;
-  /** Start checkout for a specific tier (or current required tier) */
+  /** Start checkout for current tier */
   checkout: (targetPriceId?: string) => Promise<void>;
-  /** Initiate upgrade with confirmation dialog */
-  initiateUpgrade: (targetPriceId: string) => void;
-  /** Current pending upgrade intent (for confirmation dialog) */
-  upgradeIntent: UpgradeIntent | null;
-  /** Confirm the pending upgrade */
-  confirmUpgrade: () => Promise<void>;
-  /** Cancel the pending upgrade */
-  cancelUpgrade: () => void;
-  /** Whether an upgrade is currently processing */
-  upgradeProcessing: boolean;
   /** Open customer portal */
   manageSubscription: () => Promise<void>;
   /** Refresh subscription status */
@@ -61,39 +35,16 @@ export function useSubscription(): SubscriptionState {
   const [loading, setLoading] = useState(true);
   const [subscriptionEnd, setSubscriptionEnd] = useState<string | null>(null);
   const [productId, setProductId] = useState<string | null>(null);
+  const [billableArchivedCount, setBillableArchivedCount] = useState(0);
   const aggressivePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const aggressiveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Active (non-archived) renter count
+  // Operational count uses non-archived renters (`useRenters` excludes archived).
   const activeOperationalCount = renters?.length ?? 0;
-
-  // Billable count: active + archived renters still in 30-day cooldown
-  const billableQuery = useQuery({
-    queryKey: ["renters", "billable-count"],
-    queryFn: async () => {
-      // Count archived renters whose billable_until is still in the future
-      const { count, error } = await supabase
-        .from("renters")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "archived")
-        .gt("billable_until", new Date().toISOString());
-      if (error) throw error;
-      return count ?? 0;
-    },
-    enabled: !demo?.isDemo && !!user,
-    staleTime: 30_000,
-  });
-
-  const archivedInCooldown = demo?.isDemo ? 0 : (billableQuery.data ?? 0);
-  const billableCount = activeOperationalCount + archivedInCooldown;
-
-  // Tiers
+  const billableCount = activeOperationalCount + billableArchivedCount;
   const requiredTier = getRequiredTierForCount(billableCount);
-  const currentBilledTier = getTierByProductId(productId);
-  const effectiveTier = subscribed ? currentBilledTier : requiredTier;
-  const upgradeTarget = getNextUpgradeTierForCount(billableCount);
-  // Legacy: tier based on billable count for enforcement
-  const tier = requiredTier;
+  const currentBilledTier = subscribed ? getTierByProductId(productId) : null;
+  const effectiveTier = currentBilledTier ?? requiredTier;
 
   const checkSubscription = useCallback(async () => {
     if (authLoading) return;
@@ -101,6 +52,7 @@ export function useSubscription(): SubscriptionState {
       setSubscribed(false);
       setProductId(null);
       setSubscriptionEnd(null);
+      setBillableArchivedCount(0);
       setLoading(false);
       return;
     }
@@ -112,9 +64,19 @@ export function useSubscription(): SubscriptionState {
       setSubscribed(data?.subscribed ?? false);
       setProductId(data?.product_id ?? null);
       setSubscriptionEnd(data?.subscription_end ?? null);
+
+      // Billable archived count: archived renters stay billable for 30 days while billable_until is in the future.
+      const nowIso = new Date().toISOString();
+      const { count } = await supabase
+        .from("renters")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "archived")
+        .gt("billable_until", nowIso);
+      setBillableArchivedCount(count ?? 0);
     } catch (e) {
       console.error("check-subscription error:", e);
       setSubscribed(false);
+      setBillableArchivedCount(0);
     } finally {
       setLoading(false);
     }
@@ -152,7 +114,7 @@ export function useSubscription(): SubscriptionState {
   }, [checkSubscription, queryClient]);
 
   const checkout = useCallback(async (targetPriceId?: string) => {
-    const priceId = targetPriceId ?? upgradeTarget.price_id ?? tier.price_id;
+    const priceId = targetPriceId ?? effectiveTier.price_id;
     if (!priceId) return;
     const { data, error } = await supabase.functions.invoke("create-checkout", {
       body: { price_id: priceId },
@@ -168,37 +130,7 @@ export function useSubscription(): SubscriptionState {
       window.open(data.url, "_blank");
       startAggressivePolling();
     }
-  }, [tier, upgradeTarget, startAggressivePolling, checkSubscription, queryClient]);
-
-  // Upgrade confirmation flow
-  const [upgradeIntent, setUpgradeIntent] = useState<UpgradeIntent | null>(null);
-  const [upgradeProcessing, setUpgradeProcessing] = useState(false);
-
-  const initiateUpgrade = useCallback((targetPriceId: string) => {
-    const targetTier = TIERS.find(t => t.price_id === targetPriceId);
-    if (!targetTier) return;
-    setUpgradeIntent({
-      priceId: targetPriceId,
-      tierName: targetTier.name,
-      tierLabel: targetTier.label,
-      isUpgrade: subscribed,
-    });
-  }, [subscribed]);
-
-  const confirmUpgrade = useCallback(async () => {
-    if (!upgradeIntent) return;
-    setUpgradeProcessing(true);
-    try {
-      await checkout(upgradeIntent.priceId);
-      setUpgradeIntent(null);
-    } finally {
-      setUpgradeProcessing(false);
-    }
-  }, [upgradeIntent, checkout]);
-
-  const cancelUpgrade = useCallback(() => {
-    setUpgradeIntent(null);
-  }, []);
+  }, [effectiveTier.price_id, startAggressivePolling]);
 
   const manageSubscription = useCallback(async () => {
     const { data, error } = await supabase.functions.invoke("customer-portal");
@@ -217,24 +149,25 @@ export function useSubscription(): SubscriptionState {
   const finalLoading = isDemo ? false : loading;
 
   const canAddRenter = (() => {
-    if (finalLoading) return false;
-    if (finalSubscribed) return billableCount < finalEffectiveTier.max;
-    return billableCount < TIERS[0].max;
+    if (loading) return false;
+    // Free tier: can add up to max (10)
+    if (requiredTier.price === 0) return billableCount < requiredTier.max;
+    // All paid tiers: must be subscribed and under the max
+    return subscribed && billableCount < effectiveTier.max;
   })();
 
   return {
-    tier,
+    tier: effectiveTier,
+    renterCount: billableCount,
     activeOperationalCount,
     billableCount,
-    renterCount: activeOperationalCount,
     requiredTier,
-    currentBilledTier: finalCurrentBilledTier,
-    effectiveTier: finalEffectiveTier,
-    upgradeTarget,
-    subscribed: finalSubscribed,
-    loading: finalLoading,
-    subscriptionEnd: isDemo ? null : subscriptionEnd,
-    productId: finalProductId,
+    currentBilledTier,
+    effectiveTier,
+    subscribed,
+    loading,
+    subscriptionEnd,
+    productId,
     canAddRenter,
     checkout,
     initiateUpgrade,
