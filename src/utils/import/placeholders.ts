@@ -1,8 +1,4 @@
-const RENTER_PLACEHOLDERS: Record<string, any> = {
-  name: "No name yet",
-  phone: "No phone yet",
-  email: "No email yet",
-  address: "No address yet",
+const RENTER_INSERT_DEFAULTS: Record<string, any> = {
   monthly_rate: 150,
   late_fee: 25,
   install_fee: 75,
@@ -14,10 +10,7 @@ const RENTER_PLACEHOLDERS: Record<string, any> = {
   status: "lead",
 };
 
-const MACHINE_PLACEHOLDERS: Record<string, any> = {
-  type: "No type yet",
-  model: "No model yet",
-  serial: "No serial yet",
+const MACHINE_INSERT_DEFAULTS: Record<string, any> = {
   status: "available",
 };
 
@@ -25,15 +18,15 @@ export function getPlaceholder(
   tab: "customers" | "machines",
   fieldKey: string,
 ): any | undefined {
-  const map = tab === "customers" ? RENTER_PLACEHOLDERS : MACHINE_PLACEHOLDERS;
+  const map = tab === "customers" ? RENTER_INSERT_DEFAULTS : MACHINE_INSERT_DEFAULTS;
   return map[fieldKey];
 }
 
-export function ensureRequiredFields(
+export function applyInsertDefaults(
   tab: "customers" | "machines",
   record: Record<string, any>,
 ): void {
-  const map = tab === "customers" ? RENTER_PLACEHOLDERS : MACHINE_PLACEHOLDERS;
+  const map = tab === "customers" ? RENTER_INSERT_DEFAULTS : MACHINE_INSERT_DEFAULTS;
   for (const [key, placeholder] of Object.entries(map)) {
     if (record[key] === undefined || record[key] === null || record[key] === "") {
       record[key] = placeholder;
@@ -46,7 +39,7 @@ export function ensureRequiredFieldsForGroup(
   group: "renter" | "machine",
   record: Record<string, any>,
 ): void {
-  const map = group === "renter" ? RENTER_PLACEHOLDERS : MACHINE_PLACEHOLDERS;
+  const map = group === "renter" ? RENTER_INSERT_DEFAULTS : MACHINE_INSERT_DEFAULTS;
   for (const [key, placeholder] of Object.entries(map)) {
     if (record[key] === undefined || record[key] === null || record[key] === "") {
       record[key] = placeholder;
