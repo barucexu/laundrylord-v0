@@ -147,7 +147,7 @@ export const MACHINE_FIELDS: ImportField[] = [
     key: "model",
     label: "Model",
     placeholder: "No model yet",
-    synonyms: ["model number", "model name", "model #"],
+    synonyms: ["model number", "model name", "model #", "model no", "model num", "brand"],
     group: "machine",
   },
   {
