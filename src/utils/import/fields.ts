@@ -175,7 +175,7 @@ export const MACHINE_FIELDS: ImportField[] = [
     key: "status",
     label: "Status",
     placeholder: "",
-    synonyms: ["machine status", "availability"],
+    synonyms: ["machine status", "availability", "avail", "in use"],
     group: "machine",
   },
   {
