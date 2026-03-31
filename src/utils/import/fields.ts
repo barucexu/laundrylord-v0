@@ -117,7 +117,7 @@ export const RENTER_FIELDS: ImportField[] = [
     key: "notes",
     label: "Notes",
     placeholder: "",
-    synonyms: ["renter notes", "customer notes", "comments"],
+    synonyms: ["renter notes", "customer notes", "comments", "comment"],
     group: "renter",
   },
   {
