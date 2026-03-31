@@ -156,13 +156,15 @@ export function useSubscription(): SubscriptionState {
     if (error) throw error;
     if (data?.updated) {
       await checkSubscription();
+      queryClient.invalidateQueries({ queryKey: ["renters"] });
+      queryClient.invalidateQueries({ queryKey: ["renters", "billable-count"] });
       return;
     }
     if (data?.url) {
       window.open(data.url, "_blank");
       startAggressivePolling();
     }
-  }, [tier, upgradeTarget, startAggressivePolling, checkSubscription]);
+  }, [tier, upgradeTarget, startAggressivePolling, checkSubscription, queryClient]);
 
   // Upgrade confirmation flow
   const [upgradeIntent, setUpgradeIntent] = useState<UpgradeIntent | null>(null);
