@@ -168,7 +168,7 @@ export const MACHINE_FIELDS: ImportField[] = [
     key: "condition",
     label: "Condition",
     placeholder: "",
-    synonyms: ["machine condition", "state"],
+    synonyms: ["machine condition", "state", "cond"],
     group: "machine",
   },
   {
