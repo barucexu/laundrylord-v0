@@ -54,7 +54,7 @@ export default function RentersList() {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="max-w-xs">
-              <p className="font-medium text-sm">You've grown to {billableCount} billable renter{billableCount !== 1 ? "s" : ""}!</p>
+              <p className="font-medium text-sm">You've grown to {renterCount} billable renter{renterCount !== 1 ? "s" : ""}!</p>
               <p className="text-xs text-muted-foreground mt-1">
                 {tierUpgradeLabel(upgradeTarget || tier)} to {tier.price === 0 ? "keep growing" : "add more renters"}.
               </p>
