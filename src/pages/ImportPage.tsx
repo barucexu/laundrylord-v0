@@ -338,14 +338,6 @@ export default function ImportPage() {
             else res.machinesCreated++;
           }
 
-          applyInsertDefaults("machines", record);
-
-          const reason = checkMinimumData("machines", record);
-          if (reason) { console.warn("Skipping machine row:", reason); res.skipped++; continue; }
-
-          const { error } = await supabase.from("machines").insert(record as any);
-          if (error) { console.error("Insert error:", error); res.skipped++; }
-          else res.machinesCreated++;
         }
       } else {
         // Combined mode

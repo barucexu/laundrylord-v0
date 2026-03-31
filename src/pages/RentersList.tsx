@@ -139,17 +139,6 @@ export default function RentersList() {
       )}
 
       <CreateRenterDialog open={dialogOpen} onOpenChange={setDialogOpen} canAddRenter={canAddRenter} />
-      {upgradeIntent && (
-        <UpgradeConfirmDialog
-          open={!!upgradeIntent}
-          onOpenChange={(open) => { if (!open) cancelUpgrade(); }}
-          tierName={upgradeIntent.tierName}
-          tierLabel={upgradeIntent.tierLabel}
-          isUpgrade={upgradeIntent.isUpgrade}
-          loading={upgradeProcessing}
-          onConfirm={confirmUpgrade}
-        />
-      )}
     </div>
   );
 }

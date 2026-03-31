@@ -126,17 +126,6 @@ export default function MachinesList() {
       {editMachine && (
         <EditMachineDialog open={!!editMachine} onOpenChange={(o) => { if (!o) setEditMachine(null); }} machine={editMachine} />
       )}
-      {upgradeIntent && (
-        <UpgradeConfirmDialog
-          open={!!upgradeIntent}
-          onOpenChange={(open) => { if (!open) cancelUpgrade(); }}
-          tierName={upgradeIntent.tierName}
-          tierLabel={upgradeIntent.tierLabel}
-          isUpgrade={upgradeIntent.isUpgrade}
-          loading={upgradeProcessing}
-          onConfirm={confirmUpgrade}
-        />
-      )}
     </div>
   );
 }
