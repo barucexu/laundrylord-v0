@@ -2,12 +2,13 @@ import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useDemo } from "@/contexts/DemoContext";
 import { useRenters } from "@/hooks/useSupabaseData";
-import { getRequiredTierForCount, getTierByProductId, type PricingTier } from "@/lib/pricing-tiers";
+import { getRequiredTierForCount, getTierByProductId, TIERS, type PricingTier } from "@/lib/pricing-tiers";
 
 interface SubscriptionState {
-  tier: PricingTier; // Effective enforcement tier (kept for backwards compatibility)
-  renterCount: number; // Billable renter count (kept for backwards compatibility)
+  tier: PricingTier;
+  renterCount: number;
   activeOperationalCount: number;
   billableCount: number;
   requiredTier: PricingTier;
@@ -18,19 +19,12 @@ interface SubscriptionState {
   subscriptionEnd: string | null;
   productId: string | null;
   canAddRenter: boolean;
-  /** Start checkout for current tier */
   checkout: (targetPriceId?: string) => Promise<void>;
-  /** Open customer portal */
   manageSubscription: () => Promise<void>;
-  /** Backwards-compatible alias used by older upgrade confirmation UIs */
   initiateUpgrade: (targetPriceId: string) => void;
-  /** Optional pending upgrade intent for legacy components */
   upgradeIntent: { priceId: string } | null;
-  /** Confirm pending upgrade intent (legacy support) */
   confirmUpgrade: () => Promise<void>;
-  /** Cancel pending upgrade intent (legacy support) */
   cancelUpgrade: () => void;
-  /** Refresh subscription status */
   refresh: () => Promise<void>;
 }
 
@@ -48,10 +42,36 @@ export function useSubscription(): SubscriptionState {
   const aggressivePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const aggressiveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Operational count uses non-archived renters (`useRenters` excludes archived).
   const activeOperationalCount = renters?.length ?? 0;
   const billableCount = activeOperationalCount + billableArchivedCount;
   const requiredTier = getRequiredTierForCount(billableCount);
+
+  // Demo mode: return mock Starter subscription
+  if (demo?.isDemo) {
+    const starterTier = TIERS.find(t => t.name === "Starter") ?? TIERS[1];
+    return {
+      tier: starterTier,
+      renterCount: activeOperationalCount,
+      activeOperationalCount,
+      billableCount: activeOperationalCount,
+      requiredTier,
+      currentBilledTier: starterTier,
+      effectiveTier: starterTier,
+      subscribed: true,
+      loading: false,
+      subscriptionEnd: null,
+      productId: starterTier.product_id ?? null,
+      canAddRenter: activeOperationalCount < starterTier.max,
+      checkout: async () => {},
+      manageSubscription: async () => {},
+      initiateUpgrade: () => {},
+      upgradeIntent: null,
+      confirmUpgrade: async () => {},
+      cancelUpgrade: () => {},
+      refresh: async () => {},
+    };
+  }
+
   const currentBilledTier = subscribed ? getTierByProductId(productId) : null;
   const effectiveTier = currentBilledTier ?? requiredTier;
 
@@ -74,7 +94,6 @@ export function useSubscription(): SubscriptionState {
       setProductId(data?.product_id ?? null);
       setSubscriptionEnd(data?.subscription_end ?? null);
 
-      // Billable archived count: archived renters stay billable for 30 days while billable_until is in the future.
       const nowIso = new Date().toISOString();
       const { count } = await supabase
         .from("renters")
@@ -139,7 +158,7 @@ export function useSubscription(): SubscriptionState {
       window.open(data.url, "_blank");
       startAggressivePolling();
     }
-  }, [effectiveTier.price_id, startAggressivePolling]);
+  }, [effectiveTier.price_id, checkSubscription, queryClient, startAggressivePolling]);
 
   const manageSubscription = useCallback(async () => {
     const { data, error } = await supabase.functions.invoke("customer-portal");
@@ -147,7 +166,6 @@ export function useSubscription(): SubscriptionState {
     if (data?.url) window.open(data.url, "_blank");
   }, []);
 
-  // Legacy compatibility: some UIs use an "initiate -> confirm/cancel" pattern.
   const initiateUpgrade = useCallback((targetPriceId: string) => {
     if (!targetPriceId) return;
     setUpgradeIntent({ priceId: targetPriceId });
@@ -163,13 +181,9 @@ export function useSubscription(): SubscriptionState {
     setUpgradeIntent(null);
   }, []);
 
-  // Compute whether the operator can add more renters
-  // HARD STOP: while loading, block additions to prevent race condition
   const canAddRenter = (() => {
     if (loading) return false;
-    // Free tier: can add up to max (10)
     if (requiredTier.price === 0) return billableCount < requiredTier.max;
-    // All paid tiers: must be subscribed and under the max
     return subscribed && billableCount < effectiveTier.max;
   })();
 
@@ -187,11 +201,6 @@ export function useSubscription(): SubscriptionState {
     productId,
     canAddRenter,
     checkout,
-    initiateUpgrade,
-    upgradeIntent,
-    confirmUpgrade,
-    cancelUpgrade,
-    upgradeProcessing,
     manageSubscription,
     initiateUpgrade,
     upgradeIntent,

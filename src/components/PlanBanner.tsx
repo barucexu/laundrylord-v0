@@ -5,9 +5,9 @@ import { X, Sparkles, ArrowUpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function PlanBanner() {
-  const { billableCount, subscribed, loading, upgradeTarget, currentBilledTier, checkout, initiateUpgrade, upgradeIntent, confirmUpgrade, cancelUpgrade, upgradeProcessing } = useSubscription();
+  const { billableCount, subscribed, loading, effectiveTier, currentBilledTier, checkout } = useSubscription();
   const [dismissed, setDismissed] = useState<string | null>(null);
-  const upgradeTarget = getNextUpgradeTierForCount(renterCount) || tier;
+  const upgradeTarget = getNextUpgradeTierForCount(billableCount);
 
   if (loading) return null;
 
@@ -17,11 +17,11 @@ export function PlanBanner() {
   if (!isPaid) return null;
 
   // Already subscribed — show a small status line
-  if (subscribed) {
+  if (subscribed && currentBilledTier) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-4 py-2 mb-4 text-xs text-muted-foreground">
         <Sparkles className="h-3.5 w-3.5 text-primary" />
-         <span>
+        <span>
           {currentBilledTier.name} plan · {billableCount} billable renter{billableCount !== 1 ? "s" : ""}
         </span>
       </div>
@@ -29,13 +29,11 @@ export function PlanBanner() {
   }
 
   // Paid tier, not subscribed — upgrade nudge
-  if (dismissed === tier.name) return null;
+  if (!upgradeTarget || dismissed === upgradeTarget.name) return null;
 
-  // Determine if this is the first paid tier (Free → Starter)
   const isFirstUpgrade = upgradeTarget.name === "Starter";
 
   return (
-    <>
     <div className="relative flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 px-5 py-4 mb-4">
       <Sparkles className="h-5 w-5 text-primary mt-0.5 shrink-0" />
       <div className="space-y-2">
@@ -63,17 +61,5 @@ export function PlanBanner() {
         <X className="h-4 w-4" />
       </button>
     </div>
-    {upgradeIntent && (
-      <UpgradeConfirmDialog
-        open={!!upgradeIntent}
-        onOpenChange={(open) => { if (!open) cancelUpgrade(); }}
-        tierName={upgradeIntent.tierName}
-        tierLabel={upgradeIntent.tierLabel}
-        isUpgrade={upgradeIntent.isUpgrade}
-        loading={upgradeProcessing}
-        onConfirm={confirmUpgrade}
-      />
-    )}
-    </>
   );
 }
