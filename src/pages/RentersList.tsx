@@ -17,7 +17,7 @@ export default function RentersList() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: renters = [], isLoading } = useRenters();
-  const { canAddRenter, tier, renterCount, checkout, loading: planLoading } = useSubscription();
+  const { canAddRenter, effectiveTier: tier, billableCount, renterCount, checkout, loading: planLoading } = useSubscription();
   const upgradeTarget = getNextUpgradeTierForCount(renterCount);
 
   const filtered = renters.filter(r => {
