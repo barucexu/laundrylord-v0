@@ -55,6 +55,7 @@ interface SubscriptionState {
 export function useSubscription(): SubscriptionState {
   const { user, session, loading: authLoading } = useAuth();
   const demo = useDemo();
+  const queryClient = useQueryClient();
   const { data: renters } = useRenters();
   const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(true);
