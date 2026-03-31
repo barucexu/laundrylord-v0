@@ -1,64 +1,63 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, CheckCircle, Mail, AlertTriangle, ChevronDown, Link2, User, Cpu } from "lucide-react";
+import { Upload, CheckCircle, Mail, AlertTriangle, User, Cpu } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { SupportFooter } from "@/components/SupportFooter";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useSubscription } from "@/hooks/useSubscription";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-import { ParsedData, ImportMode, ImportField } from "@/utils/import/types";
-import { RENTER_FIELDS, MACHINE_FIELDS, getCombinedFields, resolveFieldKey } from "@/utils/import/fields";
+import { ParsedData, ImportMode, ImportField, ClassifiedRow, RowStatus } from "@/utils/import/types";
+import { RENTER_FIELDS, MACHINE_FIELDS } from "@/utils/import/fields";
 import { parseCSV } from "@/utils/import/csv-parser";
 import { parseXLSX } from "@/utils/import/xlsx-parser";
 import { parseImage } from "@/utils/import/image-parser";
-import { autoMap, autoMapCombined } from "@/utils/import/auto-mapper";
-import { applyInsertDefaults, ensureRequiredFieldsForGroup, checkMinimumData } from "@/utils/import/placeholders";
+import { autoMap } from "@/utils/import/auto-mapper";
+import { applyInsertDefaults } from "@/utils/import/placeholders";
 
-type Step = "upload" | "map" | "preview" | "done";
+type Step = "upload" | "map" | "preview" | "duplicates" | "done";
 
-interface CombinedResult {
-  rentersCreated: number;
-  rentersMatched: number;
-  machinesCreated: number;
-  machinesMatched: number;
-  machinesLinked: number;
-  skipped: number;
+interface ImportResult {
+  imported: number;
+  duplicateImported: number;
+  duplicateSkipped: number;
+  emptySkipped: number;
   blockedByPlan: number;
+  insertErrors: number;
 }
+
+const ROWS_PER_PAGE = 25;
 
 export default function ImportPage() {
   const { user } = useAuth();
   const { tier, renterCount, subscribed, loading: planLoading } = useSubscription();
   const queryClient = useQueryClient();
-  const [importMode, setImportMode] = useState<ImportMode>("combined");
+
+  const [importMode, setImportMode] = useState<ImportMode>("customers");
   const [step, setStep] = useState<Step>("upload");
   const [rawData, setRawData] = useState<string[][]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [importing, setImporting] = useState(false);
-  const [result, setResult] = useState<CombinedResult | null>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
   const [dragging, setDragging] = useState(false);
   const [sourceType, setSourceType] = useState<ParsedData["sourceType"]>("csv");
   const [parsing, setParsing] = useState(false);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [classifiedRows, setClassifiedRows] = useState<ClassifiedRow[]>([]);
+  const [previewPage, setPreviewPage] = useState(0);
 
-  const combinedFields = getCombinedFields();
-
-  const getActiveFields = (): ImportField[] => {
-    if (importMode === "customers") return RENTER_FIELDS;
-    if (importMode === "machines") return MACHINE_FIELDS;
-    return combinedFields;
-  };
+  const activeFields = importMode === "customers" ? RENTER_FIELDS : MACHINE_FIELDS;
 
   const ACCEPTED_EXTENSIONS = [".csv", ".xlsx", ".png", ".jpg", ".jpeg"];
   const ACCEPT_STRING = ".csv,.xlsx,.png,.jpg,.jpeg";
+
+  // ─── File handling ───
 
   const processFile = useCallback(
     async (file: File) => {
@@ -67,32 +66,17 @@ export default function ImportPage() {
         toast.error("Unsupported file type. Use CSV, Excel, or image files.");
         return;
       }
-
       setParsing(true);
       try {
         let parsed: ParsedData;
-        if (ext === ".csv") {
-          parsed = await parseCSV(file);
-        } else if (ext === ".xlsx") {
-          parsed = await parseXLSX(file);
-        } else {
-          parsed = await parseImage(file);
-        }
+        if (ext === ".csv") parsed = await parseCSV(file);
+        else if (ext === ".xlsx") parsed = await parseXLSX(file);
+        else parsed = await parseImage(file);
 
         setHeaders(parsed.headers);
         setRawData(parsed.rows);
         setSourceType(parsed.sourceType);
-
-        // Auto-map based on current mode
-        const fields = importMode === "customers" ? RENTER_FIELDS
-          : importMode === "machines" ? MACHINE_FIELDS
-          : combinedFields;
-
-        const autoMapping = importMode === "combined"
-          ? autoMapCombined(parsed.headers, combinedFields)
-          : autoMap(parsed.headers, fields);
-
-        setMapping(autoMapping);
+        setMapping(autoMap(parsed.headers, activeFields));
         setStep("map");
       } catch (err: any) {
         toast.error(err.message || "Failed to parse file");
@@ -100,14 +84,13 @@ export default function ImportPage() {
         setParsing(false);
       }
     },
-    [importMode, combinedFields],
+    [activeFields],
   );
 
   const handleFileUpload = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
-      if (!file) return;
-      processFile(file);
+      if (file) processFile(file);
     },
     [processFile],
   );
@@ -115,59 +98,118 @@ export default function ImportPage() {
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      e.stopPropagation();
       setDragging(false);
       const file = e.dataTransfer.files?.[0];
-      if (!file) return;
-      processFile(file);
+      if (file) processFile(file);
     },
     [processFile],
   );
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
+  // ─── Row classification (shared by preview + import) ───
 
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragging(false);
-  }, []);
-
-  const getMappedValue = (row: string[], fieldKey: string) => {
-    const csvCol = mapping[fieldKey];
-    if (!csvCol) return "";
-    const idx = headers.indexOf(csvCol);
-    return idx >= 0 ? row[idx]?.trim() || "" : "";
-  };
-
-  // Build payload for a group from a single row
-  const buildPayload = (row: string[], fields: ImportField[]): { record: Record<string, any>; hasContent: boolean } => {
+  const getMappedRecord = (row: string[]): { record: Record<string, any>; hasContent: boolean } => {
     const record: Record<string, any> = {};
     let hasContent = false;
-
-    for (const f of fields) {
+    for (const f of activeFields) {
       const csvCol = mapping[f.key];
       if (!csvCol) continue;
-      const colIdx = headers.indexOf(csvCol);
-      if (colIdx < 0) continue;
-      const val = row[colIdx]?.trim() || "";
-      const dbKey = resolveFieldKey(f.key);
+      const idx = headers.indexOf(csvCol);
+      if (idx < 0) continue;
+      const val = row[idx]?.trim() || "";
       if (val) {
-        record[dbKey] = val;
+        record[f.key] = val;
         hasContent = true;
       }
     }
-
     return { record, hasContent };
   };
+
+  const classifyAllRows = async () => {
+    if (!user) return;
+
+    // Fetch existing records for dedup
+    let existingRecords: any[] = [];
+    if (importMode === "customers") {
+      const { data } = await supabase
+        .from("renters")
+        .select("id, name, email, phone")
+        .eq("user_id", user.id);
+      existingRecords = data || [];
+    } else {
+      const { data } = await supabase
+        .from("machines")
+        .select("id, serial, type, model")
+        .eq("user_id", user.id);
+      existingRecords = data || [];
+    }
+
+    const classified: ClassifiedRow[] = rawData.map((row, index) => {
+      const { record, hasContent } = getMappedRecord(row);
+
+      if (!hasContent) {
+        return { index, status: "empty" as RowStatus, record, importDecision: "import" as const };
+      }
+
+      // Check for likely duplicates
+      let duplicateOf: ClassifiedRow["duplicateOf"] = undefined;
+      if (importMode === "customers") {
+        for (const existing of existingRecords) {
+          if (record.email && existing.email && record.email.toLowerCase() === existing.email.toLowerCase()) {
+            duplicateOf = { id: existing.id, label: existing.name || existing.email };
+            break;
+          }
+          if (record.phone && existing.phone && record.phone.replace(/\D/g, "") === existing.phone.replace(/\D/g, "")) {
+            duplicateOf = { id: existing.id, label: existing.name || existing.phone };
+            break;
+          }
+        }
+      } else {
+        for (const existing of existingRecords) {
+          if (record.serial && existing.serial && record.serial.toLowerCase() === existing.serial.toLowerCase()) {
+            duplicateOf = { id: existing.id, label: `${existing.type || ""} ${existing.model || ""} (${existing.serial})`.trim() };
+            break;
+          }
+        }
+      }
+
+      const status: RowStatus = duplicateOf ? "likely_duplicate" : "has_data";
+      return { index, status, record, duplicateOf, importDecision: "import" as const };
+    });
+
+    setClassifiedRows(classified);
+    setPreviewPage(0);
+  };
+
+  const goToPreview = async () => {
+    setParsing(true);
+    try {
+      await classifyAllRows();
+      setStep("preview");
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  // ─── Duplicate decisions ───
+
+  const duplicateRows = useMemo(
+    () => classifiedRows.filter((r) => r.status === "likely_duplicate"),
+    [classifiedRows],
+  );
+
+  const setRowDecision = (index: number, decision: "import" | "skip") => {
+    setClassifiedRows((prev) =>
+      prev.map((r) => (r.index === index ? { ...r, importDecision: decision } : r)),
+    );
+  };
+
+  const setBulkDuplicateDecision = (decision: "import" | "skip") => {
+    setClassifiedRows((prev) =>
+      prev.map((r) => (r.status === "likely_duplicate" ? { ...r, importDecision: decision } : r)),
+    );
+  };
+
+  // ─── Parse helpers ───
 
   const parseRenterRecord = (record: Record<string, any>) => {
     for (const boolKey of ["install_fee_collected", "deposit_collected", "has_payment_method"]) {
@@ -187,73 +229,13 @@ export default function ImportPage() {
     if (record.cost_basis) record.cost_basis = parseFloat(record.cost_basis) || 0;
   };
 
-  const PLACEHOLDER_SET = new Set([
-    "no name yet",
-    "no phone yet",
-    "no email yet",
-    "no address yet",
-    "no type yet",
-    "no model yet",
-    "no serial yet",
-  ]);
-
-  const isMeaningfulValue = (value: unknown): boolean => {
-    if (value === undefined || value === null) return false;
-    const normalized = String(value).trim().toLowerCase();
-    if (!normalized) return false;
-    if (normalized === "skip" || normalized === "—") return false;
-    return !PLACEHOLDER_SET.has(normalized);
-  };
-
-  const hasAnyMappedField = () => Object.values(mapping).some((v) => v && v !== "skip");
-
-  const hasMinimumRenterData = (record: Record<string, any>) => isMeaningfulValue(record.name);
-  const hasMinimumMachineData = (record: Record<string, any>) =>
-    isMeaningfulValue(record.type) && isMeaningfulValue(record.model) && isMeaningfulValue(record.serial);
-
-  // Dedup: try to find existing renter by email or phone
-  const findExistingRenter = async (record: Record<string, any>): Promise<string | null> => {
-    if (!user) return null;
-    if (isMeaningfulValue(record.email)) {
-      const { data } = await supabase
-        .from("renters")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("email", record.email)
-        .limit(1);
-      if (data && data.length > 0) return data[0].id;
-    }
-    if (isMeaningfulValue(record.phone)) {
-      const { data } = await supabase
-        .from("renters")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("phone", record.phone)
-        .limit(1);
-      if (data && data.length > 0) return data[0].id;
-    }
-    return null;
-  };
-
-  // Dedup: try to find existing machine by serial (only meaningful values)
-  const findExistingMachine = async (record: Record<string, any>): Promise<string | null> => {
-    if (!user) return null;
-    if (isMeaningfulValue(record.serial)) {
-      const { data } = await supabase
-        .from("machines")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("serial", record.serial)
-        .limit(1);
-      if (data && data.length > 0) return data[0].id;
-    }
-    return null;
-  };
+  // ─── Import execution ───
 
   const handleImport = async () => {
     if (!user) return;
-    if (!hasAnyMappedField()) {
-      toast.error("No columns are mapped. Please map at least one column before importing.");
+    const hasMapped = Object.values(mapping).some((v) => v && v !== "skip");
+    if (!hasMapped) {
+      toast.error("No columns mapped. Map at least one column before importing.");
       return;
     }
     if (planLoading) {
@@ -262,190 +244,80 @@ export default function ImportPage() {
     }
     setImporting(true);
 
-    const slotsAvailable = (() => {
-      if (tier.price === 0) return Math.max(0, tier.max - renterCount);
-      if (!subscribed) return 0;
-      return Math.max(0, tier.max - renterCount);
-    })();
-    let rentersCreatedSoFar = 0;
-
-    const res: CombinedResult = {
-      rentersCreated: 0,
-      rentersMatched: 0,
-      machinesCreated: 0,
-      machinesMatched: 0,
-      machinesLinked: 0,
-      skipped: 0,
+    const res: ImportResult = {
+      imported: 0,
+      duplicateImported: 0,
+      duplicateSkipped: 0,
+      emptySkipped: 0,
       blockedByPlan: 0,
+      insertErrors: 0,
     };
 
+    // Plan limit for renters
+    const slotsAvailable = importMode === "customers"
+      ? (() => {
+          if (tier.price === 0) return Math.max(0, tier.max - renterCount);
+          if (!subscribed) return 0;
+          return Math.max(0, tier.max - renterCount);
+        })()
+      : Infinity;
+    let created = 0;
+
     try {
-      const activeFields = getActiveFields();
-      const renterFields = activeFields.filter((f) => f.group === "renter");
-      const machineFields = activeFields.filter((f) => f.group === "machine");
+      const tableName = importMode === "customers" ? "renters" : "machines";
 
-      if (importMode === "customers") {
-        // Customers-only mode
-        for (const row of rawData) {
-          const { record, hasContent } = buildPayload(row, renterFields);
-          if (!hasContent) { res.skipped++; continue; }
-          record.user_id = user.id;
+      for (const classified of classifiedRows) {
+        // Skip empty rows
+        if (classified.status === "empty") {
+          res.emptySkipped++;
+          continue;
+        }
+
+        // Skip operator-skipped duplicates
+        if (classified.status === "likely_duplicate" && classified.importDecision === "skip") {
+          res.duplicateSkipped++;
+          continue;
+        }
+
+        // Plan limit check (renters only)
+        if (importMode === "customers" && created >= slotsAvailable) {
+          res.blockedByPlan++;
+          continue;
+        }
+
+        // Build insert record
+        const record = { ...classified.record, user_id: user.id };
+        if (importMode === "customers") {
           parseRenterRecord(record);
-
-          // Dedup BEFORE applying defaults (no placeholder poisoning)
-          const existingId = await findExistingRenter(record);
-          if (existingId) {
-            res.rentersMatched++;
-            continue;
-          }
-
-          // Apply safe defaults only after dedup miss
           applyInsertDefaults("customers", record);
-
-          // Check minimum required data
-          const reason = checkMinimumData("customers", record);
-          if (reason) { console.warn("Skipping renter row:", reason); res.skipped++; continue; }
-
-          if (rentersCreatedSoFar >= slotsAvailable) {
-            res.blockedByPlan++;
-          } else if (!hasMinimumRenterData(record)) {
-            res.skipped++;
-          } else {
-            applyInsertDefaults("customers", record);
-            const { error } = await supabase.from("renters").insert(record as any);
-            if (error) { console.error("Insert error:", error); res.skipped++; }
-            else { res.rentersCreated++; rentersCreatedSoFar++; }
-          }
-        }
-      } else if (importMode === "machines") {
-        // Machines-only mode
-        for (const row of rawData) {
-          const { record, hasContent } = buildPayload(row, machineFields);
-          if (!hasContent) { res.skipped++; continue; }
-          record.user_id = user.id;
+        } else {
           parseMachineRecord(record);
-
-          // Dedup BEFORE applying defaults
-          const existingId = await findExistingMachine(record);
-          if (existingId) {
-            res.machinesMatched++;
-          } else if (!hasMinimumMachineData(record)) {
-            res.skipped++;
-          } else {
-            applyInsertDefaults("machines", record);
-            const { error } = await supabase.from("machines").insert(record as any);
-            if (error) { console.error("Insert error:", error); res.skipped++; }
-            else res.machinesCreated++;
-          }
-
+          applyInsertDefaults("machines", record);
         }
-      } else {
-        // Combined mode
-        for (const row of rawData) {
-          const renterResult = buildPayload(row, renterFields);
-          const machineResult = buildPayload(row, machineFields);
 
-          if (!renterResult.hasContent && !machineResult.hasContent) {
-            res.skipped++;
-            continue;
+        const { error } = await supabase.from(tableName).insert(record as any);
+        if (error) {
+          console.error("Insert error:", error);
+          res.insertErrors++;
+        } else {
+          if (classified.status === "likely_duplicate") {
+            res.duplicateImported++;
+          } else {
+            res.imported++;
           }
-
-          let renterId: string | null = null;
-
-          // Handle renter side
-          if (renterResult.hasContent) {
-            const rRecord = renterResult.record;
-            rRecord.user_id = user.id;
-            parseRenterRecord(rRecord);
-
-            // Dedup BEFORE defaults
-            const existingId = await findExistingRenter(rRecord);
-            if (existingId) {
-              renterId = existingId;
-              res.rentersMatched++;
-            } else if (rentersCreatedSoFar >= slotsAvailable) {
-              res.blockedByPlan++;
-            } else if (!hasMinimumRenterData(rRecord)) {
-              res.skipped++;
-            } else {
-              ensureRequiredFieldsForGroup("renter", rRecord);
-              const { data, error } = await supabase.from("renters").insert(rRecord as any).select("id").single();
-              if (error) {
-                console.error("Renter insert error:", error);
-                res.skipped++;
-              } else {
-                const { data, error } = await supabase.from("renters").insert(rRecord as any).select("id").single();
-                if (error) {
-                  console.error("Renter insert error:", error);
-                  res.skipped++;
-                } else {
-                  renterId = data.id;
-                  res.rentersCreated++;
-                  rentersCreatedSoFar++;
-                }
-              }
-            }
-          }
-
-          // Handle machine side
-          if (machineResult.hasContent) {
-            const mRecord = machineResult.record;
-            mRecord.user_id = user.id;
-            parseMachineRecord(mRecord);
-
-            // Link to renter if we have one
-            if (renterId) {
-              mRecord.assigned_renter_id = renterId;
-              mRecord.status = "assigned";
-            }
-
-            // Dedup BEFORE defaults
-            const existingId = await findExistingMachine(mRecord);
-            if (existingId) {
-              res.machinesMatched++;
-              // If machine exists and is unassigned, link it
-              if (renterId) {
-                await supabase
-                  .from("machines")
-                  .update({ assigned_renter_id: renterId, status: "assigned" } as any)
-                  .eq("id", existingId)
-                  .is("assigned_renter_id", null);
-                res.machinesLinked++;
-              }
-            } else {
-              if (!hasMinimumMachineData(mRecord)) {
-                res.skipped++;
-                continue;
-              }
-              ensureRequiredFieldsForGroup("machine", mRecord);
-              const { error } = await supabase.from("machines").insert(mRecord as any);
-              if (error) {
-                console.error("Machine insert error:", error);
-                res.skipped++;
-              } else {
-                res.machinesCreated++;
-                if (renterId) res.machinesLinked++;
-              }
-            }
-          }
+          created++;
         }
       }
 
       setResult(res);
       setStep("done");
-      queryClient.invalidateQueries({ queryKey: ["renters"] });
-      queryClient.invalidateQueries({ queryKey: ["machines"] });
+      queryClient.invalidateQueries({ queryKey: [importMode === "customers" ? "renters" : "machines"] });
 
-      const totalCreated = res.rentersCreated + res.machinesCreated;
-      const totalMatched = res.rentersMatched + res.machinesMatched;
-      if (totalCreated === 0 && res.skipped > 0) {
-        toast.error(
-          `Imported 0 records${totalMatched > 0 ? `, matched ${totalMatched} existing` : ""}, ${res.skipped} skipped. Check column mappings and required fields.`
-        );
+      const totalCreated = res.imported + res.duplicateImported;
+      if (totalCreated === 0) {
+        toast.error(`No records imported. ${res.insertErrors} errors, ${res.emptySkipped} empty rows skipped.`);
       } else {
-        toast.success(
-          `Imported ${totalCreated} records${totalMatched > 0 ? `, matched ${totalMatched} existing` : ""}${res.skipped > 0 ? `, ${res.skipped} skipped` : ""}`
-        );
+        toast.success(`Imported ${totalCreated} records.`);
       }
     } catch (err: any) {
       toast.error(err.message || "Import failed");
@@ -460,54 +332,45 @@ export default function ImportPage() {
     setHeaders([]);
     setMapping({});
     setResult(null);
+    setClassifiedRows([]);
     setSourceType("csv");
+    setPreviewPage(0);
   };
 
-  // Preview helpers
-  const getPreviewRowInfo = (row: string[]) => {
-    const activeFields = getActiveFields();
-    const renterFields = activeFields.filter((f) => f.group === "renter");
-    const machineFields = activeFields.filter((f) => f.group === "machine");
+  // ─── Warnings for preview ───
 
-    const renterData: { label: string; value: string; isPlaceholder: boolean }[] = [];
-    const machineData: { label: string; value: string; isPlaceholder: boolean }[] = [];
-
-    const collectFields = (fields: ImportField[], target: typeof renterData) => {
-      for (const f of fields) {
-        if (!mapping[f.key]) continue;
-        const val = getMappedValue(row, f.key);
-        target.push({
-          label: f.label,
-          value: val || f.placeholder || "—",
-          isPlaceholder: !val,
-        });
-      }
-    };
-
-    if (importMode !== "machines") collectFields(renterFields, renterData);
-    if (importMode !== "customers") collectFields(machineFields, machineData);
-
-    const hasRenter = renterData.some((d) => !d.isPlaceholder);
-    const hasMachine = machineData.some((d) => !d.isPlaceholder);
-
-    let linkResult = "";
-    if (importMode === "combined") {
-      if (hasRenter && hasMachine) linkResult = "Will create renter + machine and link them";
-      else if (hasRenter) linkResult = "Will create renter only";
-      else if (hasMachine) linkResult = "Will create machine only";
-      else linkResult = "Will be skipped (blank row)";
-    } else if (importMode === "customers") {
-      linkResult = hasRenter ? "Will create renter" : "Will be skipped";
+  const getRowWarnings = (record: Record<string, any>): string[] => {
+    const warnings: string[] = [];
+    if (importMode === "customers") {
+      if (!record.name) warnings.push("No name");
+      if (!record.phone && !record.email) warnings.push("No phone or email");
     } else {
-      linkResult = hasMachine ? "Will create machine" : "Will be skipped";
+      if (!record.serial) warnings.push("No serial #");
+      if (!record.type) warnings.push("No type");
     }
-
-    return { renterData, machineData, hasRenter, hasMachine, linkResult };
+    return warnings;
   };
 
-  const activeFields = getActiveFields();
-  const renterFieldsForMapping = activeFields.filter((f) => f.group === "renter");
-  const machineFieldsForMapping = activeFields.filter((f) => f.group === "machine");
+  // ─── Pagination helpers ───
+
+  const totalPages = Math.max(1, Math.ceil(classifiedRows.length / ROWS_PER_PAGE));
+  const pagedRows = classifiedRows.slice(previewPage * ROWS_PER_PAGE, (previewPage + 1) * ROWS_PER_PAGE);
+
+  const statusCounts = useMemo(() => {
+    const counts = { empty: 0, has_data: 0, likely_duplicate: 0 };
+    for (const r of classifiedRows) counts[r.status]++;
+    return counts;
+  }, [classifiedRows]);
+
+  // ─── Key field labels for preview table ───
+
+  const previewColumns = useMemo(() => {
+    return activeFields
+      .filter((f) => mapping[f.key])
+      .slice(0, 5); // Show up to 5 mapped columns
+  }, [activeFields, mapping]);
+
+  // ─── Render ───
 
   return (
     <div className="space-y-5">
@@ -532,17 +395,45 @@ export default function ImportPage() {
       </Card>
 
       <div className="space-y-4">
+        {/* ─── UPLOAD STEP ─── */}
         {step === "upload" && (
           <>
+            {/* Top-level mode selector */}
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-sm font-medium mb-3">What are you importing?</p>
+                <div className="flex gap-2">
+                  <Button
+                    variant={importMode === "customers" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setImportMode("customers")}
+                    className="gap-1.5"
+                  >
+                    <User className="h-3.5 w-3.5" />
+                    Renters
+                  </Button>
+                  <Button
+                    variant={importMode === "machines" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setImportMode("machines")}
+                    className="gap-1.5"
+                  >
+                    <Cpu className="h-3.5 w-3.5" />
+                    Machines
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardContent className="p-8">
                 <label
                   className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-12 cursor-pointer transition-colors ${
                     dragging ? "border-primary bg-primary/5" : "border-border hover:bg-muted/30"
                   } ${parsing ? "pointer-events-none opacity-60" : ""}`}
-                  onDragOver={handleDragOver}
-                  onDragEnter={handleDragEnter}
-                  onDragLeave={handleDragLeave}
+                  onDragOver={(e) => { e.preventDefault(); }}
+                  onDragEnter={(e) => { e.preventDefault(); setDragging(true); }}
+                  onDragLeave={(e) => { e.preventDefault(); setDragging(false); }}
                   onDrop={handleDrop}
                 >
                   <Upload className="h-8 w-8 text-muted-foreground mb-3" />
@@ -550,7 +441,7 @@ export default function ImportPage() {
                     {parsing ? "Parsing file..." : "Drop a CSV, Excel, or image file — or click to browse"}
                   </span>
                   <span className="text-xs text-muted-foreground mt-1">
-                    Supports .csv, .xlsx, .png, .jpg — renter data, machine data, or both
+                    Supports .csv, .xlsx, .png, .jpg
                   </span>
                   <input
                     type="file"
@@ -561,47 +452,16 @@ export default function ImportPage() {
                 </label>
               </CardContent>
             </Card>
-
-            <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground gap-1">
-                  <ChevronDown className={`h-3 w-3 transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
-                  Advanced options
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <Card className="mt-2">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-3">
-                      By default, the importer handles both customer and machine data. Narrow if needed:
-                    </p>
-                    <div className="flex gap-2">
-                      {(["combined", "customers", "machines"] as ImportMode[]).map((mode) => (
-                        <Button
-                          key={mode}
-                          variant={importMode === mode ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setImportMode(mode)}
-                          className="text-xs"
-                        >
-                          {mode === "combined" ? "Default (Both)" : mode === "customers" ? "Customers only" : "Machines only"}
-                        </Button>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </CollapsibleContent>
-            </Collapsible>
           </>
         )}
 
+        {/* ─── MAP STEP ─── */}
         {step === "map" && (
           <Card>
             <CardHeader>
               <CardTitle>Map Columns</CardTitle>
               <CardDescription>
                 Match your file columns to LaundryLord fields. {rawData.length} rows detected.
-                {importMode === "combined" && " Renter and machine fields are shown together."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -612,228 +472,281 @@ export default function ImportPage() {
                 </div>
               )}
 
-              {/* Column headers */}
               <div className="flex items-center gap-3 pb-2 border-b">
                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground w-44 shrink-0">
-                  LaundryLord's Label
+                  LaundryLord Field
                 </span>
                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex-1">
-                  Your Imported Data's Section Title
+                  Your Column
                 </span>
               </div>
 
-              {/* Renter fields section */}
-              {renterFieldsForMapping.length > 0 && (
-                <>
-                  <div className="flex items-center gap-2 pt-2">
-                    <User className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Renter Fields
-                    </span>
-                    <Separator className="flex-1" />
-                  </div>
-                  {renterFieldsForMapping.map((f) => (
-                    <div key={f.key} className="flex items-center gap-3">
-                      <span className="text-sm w-44 shrink-0">{f.label}</span>
-                      <Select
-                        value={mapping[f.key] || "skip"}
-                        onValueChange={(v) =>
-                          setMapping((m) => ({ ...m, [f.key]: v === "skip" ? "" : v }))
-                        }
-                      >
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder="Skip" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="skip">— Skip —</SelectItem>
-                          {headers.filter((h) => h !== "").map((h) => (
-                            <SelectItem key={h} value={h}>
-                              {h}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ))}
-                </>
-              )}
+              <div className="flex items-center gap-2 pt-2">
+                {importMode === "customers" ? (
+                  <User className="h-3.5 w-3.5 text-muted-foreground" />
+                ) : (
+                  <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
+                )}
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {importMode === "customers" ? "Renter" : "Machine"} Fields
+                </span>
+                <Separator className="flex-1" />
+              </div>
 
-              {/* Machine fields section */}
-              {machineFieldsForMapping.length > 0 && (
-                <>
-                  <div className="flex items-center gap-2 pt-4">
-                    <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Machine Fields
-                    </span>
-                    <Separator className="flex-1" />
-                  </div>
-                  {machineFieldsForMapping.map((f) => (
-                    <div key={f.key} className="flex items-center gap-3">
-                      <span className="text-sm w-44 shrink-0">{f.label}</span>
-                      <Select
-                        value={mapping[f.key] || "skip"}
-                        onValueChange={(v) =>
-                          setMapping((m) => ({ ...m, [f.key]: v === "skip" ? "" : v }))
-                        }
-                      >
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder="Skip" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="skip">— Skip —</SelectItem>
-                          {headers.filter((h) => h !== "").map((h) => (
-                            <SelectItem key={h} value={h}>
-                              {h}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ))}
-                </>
-              )}
+              {activeFields.map((f) => (
+                <div key={f.key} className="flex items-center gap-3">
+                  <span className="text-sm w-44 shrink-0">{f.label}</span>
+                  <Select
+                    value={mapping[f.key] || "skip"}
+                    onValueChange={(v) =>
+                      setMapping((m) => ({ ...m, [f.key]: v === "skip" ? "" : v }))
+                    }
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Skip" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="skip">— Skip —</SelectItem>
+                      {headers.filter((h) => h !== "").map((h) => (
+                        <SelectItem key={h} value={h}>{h}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
 
               <div className="flex gap-2 pt-4">
-                <Button variant="outline" onClick={reset}>
-                  Back
+                <Button variant="outline" onClick={reset}>Back</Button>
+                <Button onClick={goToPreview} disabled={parsing}>
+                  {parsing ? "Loading preview..." : "Preview Import"}
                 </Button>
-                <Button onClick={() => setStep("preview")}>Preview Import</Button>
               </div>
             </CardContent>
           </Card>
         )}
 
+        {/* ─── PREVIEW STEP ─── */}
         {step === "preview" && (
           <Card>
             <CardHeader>
-              <CardTitle>Preview</CardTitle>
+              <CardTitle>Preview — All {rawData.length} Rows</CardTitle>
+              <CardDescription className="flex flex-wrap gap-2 mt-1">
+                <Badge variant="outline" className="text-xs">{statusCounts.has_data} ready</Badge>
+                {statusCounts.likely_duplicate > 0 && (
+                  <Badge variant="outline" className="text-xs border-amber-300 text-amber-700">
+                    {statusCounts.likely_duplicate} likely duplicates
+                  </Badge>
+                )}
+                {statusCounts.empty > 0 && (
+                  <Badge variant="outline" className="text-xs text-muted-foreground">
+                    {statusCounts.empty} empty (will skip)
+                  </Badge>
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      {previewColumns.map((f) => (
+                        <TableHead key={f.key}>{f.label}</TableHead>
+                      ))}
+                      <TableHead className="w-32">Status</TableHead>
+                      <TableHead className="w-40">Warnings</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedRows.map((cr) => {
+                      const warnings = cr.status !== "empty" ? getRowWarnings(cr.record) : [];
+                      return (
+                        <TableRow
+                          key={cr.index}
+                          className={cr.status === "empty" ? "opacity-40" : ""}
+                        >
+                          <TableCell className="text-xs text-muted-foreground">{cr.index + 1}</TableCell>
+                          {previewColumns.map((f) => (
+                            <TableCell key={f.key} className="text-xs max-w-[200px] truncate">
+                              {cr.record[f.key] || "—"}
+                            </TableCell>
+                          ))}
+                          <TableCell>
+                            {cr.status === "empty" && (
+                              <Badge variant="outline" className="text-xs text-muted-foreground">Empty</Badge>
+                            )}
+                            {cr.status === "has_data" && (
+                              <Badge variant="outline" className="text-xs text-green-700 border-green-300">Ready</Badge>
+                            )}
+                            {cr.status === "likely_duplicate" && (
+                              <Badge variant="outline" className="text-xs text-amber-700 border-amber-300">
+                                Duplicate?
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {warnings.length > 0 && (
+                              <span className="text-xs text-amber-600">{warnings.join(", ")}</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-3">
+                  <span className="text-xs text-muted-foreground">
+                    Page {previewPage + 1} of {totalPages}
+                  </span>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={previewPage === 0}
+                      onClick={() => setPreviewPage((p) => p - 1)}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={previewPage >= totalPages - 1}
+                      onClick={() => setPreviewPage((p) => p + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-4">
+                <Button variant="outline" onClick={() => setStep("map")}>Back</Button>
+                {duplicateRows.length > 0 ? (
+                  <>
+                    <Button variant="outline" onClick={handleImport} disabled={importing}>
+                      {importing ? "Importing..." : "Skip Review & Import All"}
+                    </Button>
+                    <Button onClick={() => setStep("duplicates")}>
+                      Review {duplicateRows.length} Duplicates
+                    </Button>
+                  </>
+                ) : (
+                  <Button onClick={handleImport} disabled={importing}>
+                    {importing ? "Importing..." : `Import ${statusCounts.has_data} Rows`}
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ─── DUPLICATE REVIEW STEP ─── */}
+        {step === "duplicates" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Review Likely Duplicates</CardTitle>
               <CardDescription>
-                Showing first {Math.min(5, rawData.length)} of {rawData.length} rows.
-                {sourceType === "image" && " OCR results may need manual cleanup after import."}
+                {duplicateRows.length} rows matched existing records. Choose per row or use bulk actions.
+                Unreviewed rows will be imported by default.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {rawData.slice(0, 5).map((row, i) => {
-                const info = getPreviewRowInfo(row);
-                return (
-                  <Card key={i} className="border-border/50">
-                    <CardContent className="p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-muted-foreground">Row {i + 1}</span>
-                        <Badge variant="outline" className="text-xs font-normal">
-                          {info.linkResult}
-                        </Badge>
-                      </div>
-
-                      {info.renterData.length > 0 && info.hasRenter && (
-                        <div>
-                          <div className="flex items-center gap-1.5 mb-2">
-                            <User className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                              Renter Record
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                            {info.renterData.map((d) => (
-                              <div key={d.label} className="flex items-baseline gap-1.5 text-xs">
-                                <span className="text-muted-foreground shrink-0">{d.label}:</span>
-                                <span className={d.isPlaceholder ? "text-muted-foreground/50 italic" : ""}>
-                                  {d.value}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {info.machineData.length > 0 && info.hasMachine && (
-                        <div>
-                          {info.hasRenter && <Separator className="my-2" />}
-                          <div className="flex items-center gap-1.5 mb-2">
-                            <Cpu className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                              Machine Record
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                            {info.machineData.map((d) => (
-                              <div key={d.label} className="flex items-baseline gap-1.5 text-xs">
-                                <span className="text-muted-foreground shrink-0">{d.label}:</span>
-                                <span className={d.isPlaceholder ? "text-muted-foreground/50 italic" : ""}>
-                                  {d.value}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {importMode === "combined" && info.hasRenter && info.hasMachine && (
-                        <>
-                          <Separator className="my-1" />
-                          <div className="flex items-center gap-1.5 text-xs text-primary">
-                            <Link2 className="h-3 w-3" />
-                            <span>Machine will be linked to renter</span>
-                          </div>
-                        </>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-
-              <div className="flex gap-2 pt-2">
-                <Button variant="outline" onClick={() => setStep("map")}>
-                  Back
+              <div className="flex gap-2 mb-4">
+                <Button variant="outline" size="sm" onClick={() => setBulkDuplicateDecision("import")}>
+                  Select All: Import
                 </Button>
+                <Button variant="outline" size="sm" onClick={() => setBulkDuplicateDecision("skip")}>
+                  Select All: Skip
+                </Button>
+              </div>
+
+              {duplicateRows.map((cr) => (
+                <Card key={cr.index} className="border-amber-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 space-y-2">
+                        <div className="text-xs font-medium text-muted-foreground">
+                          Row {cr.index + 1} — Incoming
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                          {activeFields.filter((f) => cr.record[f.key]).map((f) => (
+                            <div key={f.key} className="text-xs">
+                              <span className="text-muted-foreground">{f.label}: </span>
+                              <span>{cr.record[f.key]}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {cr.duplicateOf && (
+                          <div className="text-xs text-amber-700 mt-1">
+                            Matches existing: <span className="font-medium">{cr.duplicateOf.label}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        <Button
+                          variant={cr.importDecision === "import" ? "default" : "outline"}
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => setRowDecision(cr.index, "import")}
+                        >
+                          Import
+                        </Button>
+                        <Button
+                          variant={cr.importDecision === "skip" ? "destructive" : "outline"}
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => setRowDecision(cr.index, "skip")}
+                        >
+                          Skip
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+
+              <div className="flex gap-2 pt-4">
+                <Button variant="outline" onClick={() => setStep("preview")}>Back</Button>
                 <Button onClick={handleImport} disabled={importing}>
-                  {importing ? "Importing..." : `Import ${rawData.length} rows`}
+                  {importing ? "Importing..." : "Confirm & Import"}
                 </Button>
               </div>
             </CardContent>
           </Card>
         )}
 
+        {/* ─── DONE STEP ─── */}
         {step === "done" && result && (
           <Card>
             <CardContent className="p-8 text-center space-y-4">
               <CheckCircle className="h-12 w-12 text-primary mx-auto" />
-              <div className="space-y-1">
-                {(result.rentersCreated > 0 || result.rentersMatched > 0) && (
-                  <div className="text-sm">
-                    <span className="font-semibold">{result.rentersCreated}</span> renters created
-                    {result.rentersMatched > 0 && (
-                      <span className="text-muted-foreground"> · {result.rentersMatched} matched existing</span>
-                    )}
-                  </div>
+              <div className="space-y-1 text-sm">
+                {result.imported > 0 && (
+                  <div><span className="font-semibold">{result.imported}</span> {importMode === "customers" ? "renters" : "machines"} imported</div>
                 )}
-                {(result.machinesCreated > 0 || result.machinesMatched > 0) && (
-                  <div className="text-sm">
-                    <span className="font-semibold">{result.machinesCreated}</span> machines created
-                    {result.machinesMatched > 0 && (
-                      <span className="text-muted-foreground"> · {result.machinesMatched} matched existing</span>
-                    )}
-                  </div>
+                {result.duplicateImported > 0 && (
+                  <div><span className="font-semibold">{result.duplicateImported}</span> duplicate rows imported (by your choice)</div>
                 )}
-                {result.machinesLinked > 0 && (
-                  <div className="text-sm text-primary">
-                    <Link2 className="h-3 w-3 inline mr-1" />
-                    {result.machinesLinked} machines linked to renters
-                  </div>
+                {result.duplicateSkipped > 0 && (
+                  <div className="text-muted-foreground">{result.duplicateSkipped} duplicate rows skipped (by your choice)</div>
                 )}
-                {result.skipped > 0 && (
-                  <div className="text-sm text-muted-foreground">
-                    {result.skipped} rows skipped
-                    {(result.rentersCreated + result.machinesCreated + result.rentersMatched + result.machinesMatched) === 0
-                      ? " — check that your columns are mapped correctly"
-                      : " (blank or failed)"}
-                  </div>
+                {result.emptySkipped > 0 && (
+                  <div className="text-muted-foreground">{result.emptySkipped} empty rows skipped</div>
                 )}
                 {result.blockedByPlan > 0 && (
-                  <div className="text-sm text-destructive font-medium">
-                    {result.blockedByPlan} renters blocked by plan limit — upgrade to import more
+                  <div className="text-destructive font-medium">
+                    {result.blockedByPlan} rows blocked by plan limit — upgrade to import more
                   </div>
+                )}
+                {result.insertErrors > 0 && (
+                  <div className="text-destructive">{result.insertErrors} rows failed to insert (check console for details)</div>
+                )}
+                {result.imported + result.duplicateImported === 0 && result.insertErrors === 0 && (
+                  <div className="text-muted-foreground">No records were imported. Check your column mappings.</div>
                 )}
               </div>
               <Button onClick={reset}>Import More</Button>

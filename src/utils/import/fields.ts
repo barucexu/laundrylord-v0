@@ -4,28 +4,28 @@ export const RENTER_FIELDS: ImportField[] = [
   {
     key: "name",
     label: "Name",
-    placeholder: "No name yet",
+    placeholder: "",
     synonyms: ["full name", "renter name", "customer name", "renter full name", "tenant name", "customer", "client", "client name"],
     group: "renter",
   },
   {
     key: "phone",
     label: "Phone",
-    placeholder: "No phone yet",
+    placeholder: "",
     synonyms: ["phone number", "mobile", "cell", "cell phone", "telephone", "tel", "ph", "contact"],
     group: "renter",
   },
   {
     key: "email",
     label: "Email",
-    placeholder: "No email yet",
+    placeholder: "",
     synonyms: ["email address", "e-mail", "email addr"],
     group: "renter",
   },
   {
     key: "address",
     label: "Address",
-    placeholder: "No address yet",
+    placeholder: "",
     synonyms: ["service address", "home address", "street address", "location", "addr", "delivery address", "install address"],
     group: "renter",
   },
@@ -139,21 +139,21 @@ export const MACHINE_FIELDS: ImportField[] = [
   {
     key: "type",
     label: "Type",
-    placeholder: "No type yet",
+    placeholder: "",
     synonyms: ["machine type", "appliance type", "washer or dryer", "equipment type", "make", "appliance", "w/d", "washer dryer"],
     group: "machine",
   },
   {
     key: "model",
     label: "Model",
-    placeholder: "No model yet",
+    placeholder: "",
     synonyms: ["model number", "model name", "model #", "model no", "model num"],
     group: "machine",
   },
   {
     key: "serial",
     label: "Serial #",
-    placeholder: "No serial yet",
+    placeholder: "",
     synonyms: ["serial number", "serial #", "sn", "serial no", "serial num", "s/n", "ser", "serial#"],
     group: "machine",
   },
@@ -200,39 +200,3 @@ export const MACHINE_FIELDS: ImportField[] = [
     group: "machine",
   },
 ];
-
-// Combined fields with prefixed keys for disambiguation
-export function getCombinedFields(): ImportField[] {
-  const COLLIDING_KEYS = ["status", "notes"];
-
-  const renterCombined = RENTER_FIELDS.map((f) => {
-    if (COLLIDING_KEYS.includes(f.key)) {
-      return {
-        ...f,
-        key: `renter.${f.key}`,
-        label: f.key === "status" ? "Renter Status" : "Renter Notes",
-      };
-    }
-    return { ...f };
-  });
-
-  const machineCombined = MACHINE_FIELDS.map((f) => {
-    if (COLLIDING_KEYS.includes(f.key)) {
-      return {
-        ...f,
-        key: `machine.${f.key}`,
-        label: f.key === "status" ? "Machine Status" : "Machine Notes",
-      };
-    }
-    return { ...f };
-  });
-
-  return [...renterCombined, ...machineCombined];
-}
-
-// Resolve a combined prefixed key back to the real DB column name
-export function resolveFieldKey(prefixedKey: string): string {
-  if (prefixedKey.startsWith("renter.")) return prefixedKey.slice(7);
-  if (prefixedKey.startsWith("machine.")) return prefixedKey.slice(8);
-  return prefixedKey;
-}
