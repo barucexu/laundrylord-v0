@@ -275,7 +275,6 @@ export default function ImportPage() {
           if (!hasContent) { res.skipped++; continue; }
           record.user_id = user.id;
           parseRenterRecord(record);
-          ensureRequiredFields("customers", record);
 
           const existingId = await findExistingRenter(record);
           if (existingId) {
@@ -283,6 +282,7 @@ export default function ImportPage() {
           } else if (rentersCreatedSoFar >= slotsAvailable) {
             res.blockedByPlan++;
           } else {
+            ensureRequiredFields("customers", record);
             const { error } = await supabase.from("renters").insert(record as any);
             if (error) { console.error("Insert error:", error); res.skipped++; }
             else { res.rentersCreated++; rentersCreatedSoFar++; }
