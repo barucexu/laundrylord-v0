@@ -696,8 +696,8 @@ export default function ImportPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            {warnings.length > 0 && (
-                              <span className="text-xs text-amber-600">{warnings.join(", ")}</span>
+                            {cr.warnings.length > 0 && (
+                              <span className="text-xs text-amber-600">{cr.warnings.join(", ")}</span>
                             )}
                           </TableCell>
                         </TableRow>
