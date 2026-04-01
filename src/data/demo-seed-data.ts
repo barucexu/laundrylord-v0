@@ -141,6 +141,7 @@ function generateRenters(): RenterRow[] {
       dryer_outlet: i % 3 === 0 ? "4-prong" : "3-prong",
       notes: i === 0 ? "Great tenant, always pays on time." : i === 10 ? "Sent reminder last week." : null,
       secondary_contact: i === 2 ? `Robert Brown - (212) 555-0199` : null,
+      laundrylord_email: "demo@laundrylord.com",
       archived_at: null,
       billable_until: null,
       created_at: new Date(new Date(leaseStart).getTime() - 7 * 86400000).toISOString(),
@@ -174,6 +175,7 @@ function generateMachines(renters: RenterRow[]): MachineRow[] {
       prong: i % 3 === 0 ? "4-prong" : "3-prong",
       sourced_from: pick(["Home Depot", "Lowe's", "Wholesale", "Direct"], i * 13),
       notes: null,
+      laundrylord_email: "demo@laundrylord.com",
       created_at: r.created_at,
       updated_at: NOW,
     });
@@ -198,6 +200,7 @@ function generateMachines(renters: RenterRow[]): MachineRow[] {
       prong: i % 2 === 0 ? "3-prong" : "4-prong",
       sourced_from: pick(["Home Depot", "Lowe's", "Wholesale"], i * 7),
       notes: isRetired ? "Retired due to age / excessive repair cost." : null,
+      laundrylord_email: "demo@laundrylord.com",
       created_at: dateOffset(pickRange(60, 200, i * 11)) + "T00:00:00.000Z",
       updated_at: NOW,
     });
