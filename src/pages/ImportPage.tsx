@@ -255,10 +255,14 @@ export default function ImportPage() {
 
     const classified: ClassifiedRow[] = rawData.map((row, index) => {
       const { record, hasContent } = getMappedRecord(row);
+      const warnings: string[] = [];
 
       if (!hasContent) {
-        return { index, status: "empty" as RowStatus, record, importDecision: "import" as const };
+        return { index, status: "empty" as RowStatus, record, importDecision: "import" as const, warnings };
       }
+
+      // Normalize constrained values BEFORE dedup and preview
+      normalizeRecord(record, warnings);
 
       // Check for likely duplicates
       let duplicateOf: ClassifiedRow["duplicateOf"] = undefined;
@@ -282,8 +286,17 @@ export default function ImportPage() {
         }
       }
 
+      // Add missing-field warnings (non-blocking)
+      if (importMode === "customers") {
+        if (!record.name) warnings.push("No name");
+        if (!record.phone && !record.email) warnings.push("No phone or email");
+      } else {
+        if (!record.serial) warnings.push("No serial #");
+        if (!record.type) warnings.push("No type");
+      }
+
       const status: RowStatus = duplicateOf ? "likely_duplicate" : "has_data";
-      return { index, status, record, duplicateOf, importDecision: "import" as const };
+      return { index, status, record, duplicateOf, importDecision: "import" as const, warnings };
     });
 
     setClassifiedRows(classified);
