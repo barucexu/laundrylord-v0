@@ -175,6 +175,7 @@ function generateMachines(renters: RenterRow[]): MachineRow[] {
       prong: i % 3 === 0 ? "4-prong" : "3-prong",
       sourced_from: pick(["Home Depot", "Lowe's", "Wholesale", "Direct"], i * 13),
       notes: null,
+      laundrylord_email: "demo@laundrylord.com",
       created_at: r.created_at,
       updated_at: NOW,
     });
