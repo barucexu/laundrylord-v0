@@ -422,6 +422,7 @@ export default function ImportPage() {
         const { error } = await supabase.from(tableName).insert(record as any);
         if (error) {
           console.error("Insert error:", error);
+          if (!res.firstError) res.firstError = error.message;
           res.insertErrors++;
         } else {
           if (classified.status === "likely_duplicate") {
