@@ -853,7 +853,12 @@ export default function ImportPage() {
                   </div>
                 )}
                 {result.insertErrors > 0 && (
-                  <div className="text-destructive">{result.insertErrors} rows failed to insert (check console for details)</div>
+                  <div className="text-destructive">
+                    {result.insertErrors} rows failed to insert
+                    {result.firstError && (
+                      <span className="block text-xs mt-0.5 opacity-80">Error: {result.firstError}</span>
+                    )}
+                  </div>
                 )}
                 {result.imported + result.duplicateImported === 0 && result.insertErrors === 0 && (
                   <div className="text-muted-foreground">No records were imported. Check your column mappings.</div>
