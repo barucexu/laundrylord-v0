@@ -30,6 +30,7 @@ interface ImportResult {
   emptySkipped: number;
   blockedByPlan: number;
   insertErrors: number;
+  firstError?: string;
 }
 
 const ROWS_PER_PAGE = 25;
