@@ -699,8 +699,7 @@ export default function ImportPage() {
                             )}
                           </TableCell>
                         </TableRow>
-                      );
-                    })}
+                    ))}
                   </TableBody>
                 </Table>
               </div>
