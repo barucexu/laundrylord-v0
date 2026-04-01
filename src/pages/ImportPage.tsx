@@ -105,6 +105,116 @@ export default function ImportPage() {
     [processFile],
   );
 
+  // ─── Normalization maps for constrained DB values ───
+
+  const RENTER_STATUS_MAP: Record<string, string> = {
+    "active": "active",
+    "lead": "lead",
+    "scheduled": "scheduled",
+    "late": "late",
+    "maintenance": "maintenance",
+    "termination_requested": "termination_requested",
+    "termination requested": "termination_requested",
+    "pickup_scheduled": "pickup_scheduled",
+    "pickup scheduled": "pickup_scheduled",
+    "closed": "closed",
+    "defaulted": "defaulted",
+    "archived": "archived",
+    // Common external synonyms
+    "former customer": "archived",
+    "former": "archived",
+    "inactive": "archived",
+    "cancelled": "closed",
+    "canceled": "closed",
+    "new": "lead",
+    "pending": "scheduled",
+    "current": "active",
+    "delinquent": "late",
+    "past due": "late",
+    "overdue": "late",
+  };
+
+  const MACHINE_STATUS_MAP: Record<string, string> = {
+    "available": "available",
+    "assigned": "assigned",
+    "maintenance": "maintenance",
+    "retired": "retired",
+    "in use": "assigned",
+    "in-use": "assigned",
+    "active": "assigned",
+    "broken": "maintenance",
+    "repair": "maintenance",
+    "decommissioned": "retired",
+    "out of service": "retired",
+  };
+
+  const MACHINE_TYPE_MAP: Record<string, string> = {
+    "washer": "Washer",
+    "dryer": "Dryer",
+    "w": "Washer",
+    "d": "Dryer",
+    "washing machine": "Washer",
+    "wash": "Washer",
+    "dry": "Dryer",
+  };
+
+  const MACHINE_PRONG_MAP: Record<string, string> = {
+    "3-prong": "3-prong",
+    "4-prong": "4-prong",
+    "3 prong": "3-prong",
+    "4 prong": "4-prong",
+    "3": "3-prong",
+    "4": "4-prong",
+  };
+
+  const normalizeRecord = (record: Record<string, any>, warnings: string[]) => {
+    if (importMode === "customers") {
+      if (record.status) {
+        const raw = record.status;
+        const normalized = RENTER_STATUS_MAP[raw.toLowerCase().trim()];
+        if (normalized) {
+          if (normalized !== raw) {
+            warnings.push(`Status: "${raw}" → ${normalized}`);
+          }
+          record.status = normalized;
+        } else {
+          warnings.push(`Unknown status "${raw}" → using lead`);
+          delete record.status; // let applyInsertDefaults set "lead"
+        }
+      }
+    } else {
+      if (record.status) {
+        const raw = record.status;
+        const normalized = MACHINE_STATUS_MAP[raw.toLowerCase().trim()];
+        if (normalized) {
+          if (normalized !== raw) warnings.push(`Status: "${raw}" → ${normalized}`);
+          record.status = normalized;
+        } else {
+          warnings.push(`Unknown status "${raw}" → using available`);
+          delete record.status;
+        }
+      }
+      if (record.type) {
+        const raw = record.type;
+        const normalized = MACHINE_TYPE_MAP[raw.toLowerCase().trim()];
+        if (normalized) {
+          record.type = normalized;
+        }
+        // If not recognized, keep original — no DB constraint on type text
+      }
+      if (record.prong) {
+        const raw = record.prong;
+        const normalized = MACHINE_PRONG_MAP[raw.toLowerCase().trim()];
+        if (normalized) {
+          record.prong = normalized;
+        } else {
+          warnings.push(`Unknown prong "${raw}" → cleared`);
+          delete record.prong;
+        }
+      }
+    }
+  };
+
   // ─── Row classification (shared by preview + import) ───
 
   const getMappedRecord = (row: string[]): { record: Record<string, any>; hasContent: boolean } => {
