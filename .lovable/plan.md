@@ -1,157 +1,65 @@
 
+Do I know what the issue is? Yes.
 
-# Plan: Simplified Import (Single-Entity, Full Preview, Operator-Controlled Dedup) + DB Ownership Clarity
+What’s wrong right now
+- This is not RLS and not plan-gating. The logs show a PostgreSQL `23514` check-constraint failure on `renters_status_check`.
+- In `src/pages/ImportPage.tsx`, the importer currently:
+  - copies the mapped spreadsheet value directly into `record.status` (`getMappedRecord`)
+  - never normalizes renter status in `parseRenterRecord`
+  - inserts that raw value as-is in `handleImport`
+- `applyInsertDefaults()` only fills `status: "lead"` when status is blank, so it does nothing when the sheet already contains a status.
+- Your uploaded XLSX maps `Customer Status` to renter status, and that sheet contains values like `Active` and `Former Customer`.
+- The database only accepts canonical internal renter statuses: `lead`, `scheduled`, `active`, `late`, `maintenance`, `termination_requested`, `pickup_scheduled`, `closed`, `defaulted`, `archived`.
+- So:
+  - `Active` fails because the check is case-sensitive
+  - `Former Customer` fails because it is not a valid internal status at all
+- That explains why all 47 rows failed together.
+- Preview still looks “Ready” because the current row classification only checks `empty / has_data / likely_duplicate`. It does not validate or sanitize constrained values, so preview and insert are out of sync.
 
-## Overview
+Smallest safe fix
+1. Keep the new preview / duplicate-review UI.
+2. Do not loosen the database constraint. The rest of the app already uses the canonical internal status set, so changing the DB to accept external labels would create contract drift.
+3. Add one shared normalization step that runs before both preview and insert:
+   - renter status examples:
+     - `Active` -> `active`
+     - `Former Customer` -> `archived`
+     - known synonyms -> matching internal status
+     - unknown status text -> remove the invalid status and let the default `lead` apply, with a visible warning
+4. Use that same normalized record in preview and in `handleImport`, so a row marked “Ready” is actually insertable.
+5. Show row warnings in preview for transformed values, for example:
+   - `Status normalized: Former Customer -> archived`
+   - `Unrecognized status "X" -> using lead`
+6. Improve the done-state error messaging so the first real DB error is surfaced in the UI if anything still fails.
 
-Rewrite ImportPage.tsx from ~848 lines to ~600 lines. Remove combined mode entirely. Add full-row preview with pagination, a duplicate-review step, and remove all required-field blocking. Add DB migration for nullable columns + ownership views.
+Files to change
+- `src/pages/ImportPage.tsx`
+  - add a tiny `normalizeImportedRecord()` helper
+  - call it during row classification
+  - store normalized warnings/results per row
+  - import the normalized record instead of rebuilding a different one later
+- `src/utils/import/types.ts`
+  - extend `ClassifiedRow` with normalized warnings and/or prepared record fields so preview/import truly share one path
 
----
+Edge cases I would harden in the same pass
+- Machine import should get the same treatment for constrained values so the next blanket failure doesn’t happen there:
+  - machine `status` -> `available | assigned | maintenance | retired`
+  - machine `prong` -> `3-prong | 4-prong`, otherwise `null`
+  - machine `type` normalize obvious washer/dryer variants if that DB constraint still applies
+- Blank status should keep working via existing defaults.
+- Unknown external labels should warn, not hard-fail the whole batch.
 
-## A) Database Migration
+Why this is the right fix
+- It fixes the actual blocker shown in the logs.
+- It preserves the UI you like.
+- It keeps the database and app contracts clean.
+- It removes the current preview/import contradiction without redesigning the importer again.
 
-**New migration file:** `supabase/migrations/<timestamp>_import_nullable_and_ownership.sql`
-
-1. **Relax NOT NULL constraints** on identity columns:
-   - `ALTER TABLE renters ALTER COLUMN name DROP NOT NULL;`
-   - `ALTER TABLE machines ALTER COLUMN type DROP NOT NULL;`
-   - `ALTER TABLE machines ALTER COLUMN model DROP NOT NULL;`
-   - `ALTER TABLE machines ALTER COLUMN serial DROP NOT NULL;`
-
-2. **Add `owner_email` to `operator_settings`** (if not exists):
-   - `ALTER TABLE operator_settings ADD COLUMN IF NOT EXISTS owner_email text;`
-   - Backfill: `UPDATE operator_settings SET owner_email = u.email FROM auth.users u WHERE u.id = operator_settings.user_id AND operator_settings.owner_email IS NULL;`
-
-3. **Create debug views** (with RLS-compatible security definer functions or simple views):
-   ```sql
-   CREATE OR REPLACE VIEW v_renters_with_owner AS
-   SELECT r.*, os.owner_email, os.business_name
-   FROM renters r
-   LEFT JOIN operator_settings os ON os.user_id = r.user_id;
-
-   CREATE OR REPLACE VIEW v_machines_with_owner AS
-   SELECT m.*, os.owner_email, os.business_name
-   FROM machines m
-   LEFT JOIN operator_settings os ON os.user_id = m.user_id;
-   ```
-
----
-
-## B) Type Changes
-
-**File: `src/utils/import/types.ts`**
-
-- Remove `"combined"` from `ImportMode` → `"customers" | "machines"`
-- Add row classification type:
-  ```ts
-  export type RowStatus = "empty" | "has_data" | "likely_duplicate";
-  export type ClassifiedRow = {
-    index: number;
-    status: RowStatus;
-    record: Record<string, any>;
-    duplicateOf?: { id: string; label: string };
-    importDecision: "import" | "skip"; // default "import"
-  };
-  ```
-
----
-
-## C) Placeholders Simplification
-
-**File: `src/utils/import/placeholders.ts`**
-
-- Keep `applyInsertDefaults` for safe numeric/boolean defaults (monthly_rate, status, etc.)
-- **Remove** `checkMinimumData`, `checkMinimumDataForGroup`, `ensureRequiredFields`, `ensureRequiredFieldsForGroup` — no more required-field gating
-- Keep `getPlaceholder` for UI display only
-
----
-
-## D) Fields & Auto-Mapper Cleanup
-
-**File: `src/utils/import/fields.ts`**
-
-- Remove `getCombinedFields()` and `resolveFieldKey()` (no more combined mode)
-
-**File: `src/utils/import/auto-mapper.ts`**
-
-- Remove `autoMapCombined()` export
-
----
-
-## E) ImportPage.tsx Rewrite
-
-**File: `src/pages/ImportPage.tsx`**
-
-### Steps flow: `upload → map → preview → duplicates → done`
-
-### Upload step:
-- **Top-level visible mode selector** (not hidden in Advanced):
-  - Two buttons: "Renters" / "Machines" — immediately visible above the drop zone
-- Remove the Collapsible/Advanced section entirely
-
-### Map step:
-- Same as today but only show renter OR machine fields (never both)
-
-### Preview step (full rows + pagination):
-- **Classify all rows** using one shared function:
-  ```ts
-  classifyRows(rawData, mapping, headers, fields, existingRecords) → ClassifiedRow[]
-  ```
-  - `empty`: all mapped values are empty/whitespace
-  - `likely_duplicate`: matched by email/phone (renters) or serial (machines) against existing DB records
-  - `has_data`: everything else
-- Fetch existing records once (all renters or all machines for the operator) before classification
-- Show **all rows** in a paginated table (25 rows/page) with:
-  - Row number, key mapped values, status badge (empty/duplicate/ready)
-  - Empty rows shown grayed out with "Will skip" badge
-  - Duplicate rows shown with warning badge
-- Warnings (non-blocking) for rows missing key info (name for renters, serial for machines)
-- "Continue to Import" button (or "Review Duplicates" if any exist)
-
-### Duplicate review step (new):
-- Only shown if `likely_duplicate` rows exist
-- For each duplicate row, show side-by-side:
-  - Incoming data (left)
-  - Existing record (right)
-- Per-row toggle: "Import anyway" (default) / "Skip"
-- "Select All: Import" / "Select All: Skip" bulk buttons
-- "Confirm & Import" button
-- If user clicks "Skip Review" or goes straight to import, all flagged rows import by default
-
-### Import execution:
-- Simple loop: for each non-empty, non-operator-skipped row:
-  - `applyInsertDefaults` for safe numeric defaults
-  - Insert into `renters` or `machines`
-  - If insert fails, count as error
-- No dedup logic during insert (already handled in preview/review)
-- Plan limit check: count renters created so far, block if over cap
-
-### Done step:
-- Clear counts: imported, duplicate-imported, duplicate-skipped, empty-skipped, blocked-by-plan, insert-errors
-
----
-
-## Files Changed
-
-| File | Change |
-|------|--------|
-| `supabase/migrations/…` | Relax NOT NULL on name/type/model/serial; add owner_email; create views |
-| `src/utils/import/types.ts` | Remove "combined"; add ClassifiedRow types |
-| `src/utils/import/fields.ts` | Remove getCombinedFields, resolveFieldKey |
-| `src/utils/import/auto-mapper.ts` | Remove autoMapCombined |
-| `src/utils/import/placeholders.ts` | Remove checkMinimumData and ensureRequiredFields functions |
-| `src/pages/ImportPage.tsx` | Full rewrite: visible mode selector, full preview with pagination, duplicate review step, simplified import loop |
-
----
-
-## QA Checklist
-
-1. Renters-only import with partial rows (missing name, phone) → imports with warnings, no blocks
-2. Machines-only import with partial rows (missing serial) → imports with warnings, no blocks
-3. Full preview with 50+ rows → paginated, all visible
-4. Duplicate review: skip some, import others → correct counts
-5. Skip duplicate review entirely → all flagged rows import
-6. Empty rows → auto-skipped, shown grayed in preview
-7. Plan limit → blocks renters beyond cap, shows count
-8. Query `v_renters_with_owner` and `v_machines_with_owner` → shows owner_email + business_name
-
+Manual QA after implementation
+- Re-import the same XLSX with `Customer Status` mapped:
+  - `Active` rows import
+  - `Former Customer` rows import
+  - no `renters_status_check` errors
+- Confirm preview shows normalization warnings before import.
+- Confirm duplicate review behavior is unchanged.
+- Confirm skipping the status column still imports renters with default `lead`.
+- Smoke-test one machine import with odd status/prong labels to make sure raw constrained text no longer causes a blanket failure.
