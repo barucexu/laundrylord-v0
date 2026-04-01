@@ -21,6 +21,7 @@ export type ClassifiedRow = {
   status: RowStatus;
   record: Record<string, any>;
   duplicateOf?: { id: string; label: string };
-  importDecision: "import" | "skip";
+  importDecision: "import" | "skip" | "deleted";
   warnings: string[];
+  nullCells: string[];
 };
