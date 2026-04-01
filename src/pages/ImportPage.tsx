@@ -670,7 +670,7 @@ export default function ImportPage() {
                   </TableHeader>
                   <TableBody>
                     {pagedRows.map((cr) => {
-                      const warnings = cr.status !== "empty" ? getRowWarnings(cr.record) : [];
+                      return (
                       return (
                         <TableRow
                           key={cr.index}
