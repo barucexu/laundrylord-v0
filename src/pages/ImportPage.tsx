@@ -669,9 +669,7 @@ export default function ImportPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pagedRows.map((cr) => {
-                      return (
-                      return (
+                    {pagedRows.map((cr) => (
                         <TableRow
                           key={cr.index}
                           className={cr.status === "empty" ? "opacity-40" : ""}
