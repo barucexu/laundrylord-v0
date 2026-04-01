@@ -460,19 +460,7 @@ export default function ImportPage() {
     setPreviewPage(0);
   };
 
-  // ─── Warnings for preview ───
-
-  const getRowWarnings = (record: Record<string, any>): string[] => {
-    const warnings: string[] = [];
-    if (importMode === "customers") {
-      if (!record.name) warnings.push("No name");
-      if (!record.phone && !record.email) warnings.push("No phone or email");
-    } else {
-      if (!record.serial) warnings.push("No serial #");
-      if (!record.type) warnings.push("No type");
-    }
-    return warnings;
-  };
+  // Warnings are now computed during classification (normalizeRecord + missing-field checks)
 
   // ─── Pagination helpers ───
 
