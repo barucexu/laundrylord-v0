@@ -150,7 +150,6 @@ export type Database = {
           cost_basis: number | null
           created_at: string
           id: string
-          laundrylord_email: string | null
           model: string | null
           notes: string | null
           prong: string | null
@@ -167,7 +166,6 @@ export type Database = {
           cost_basis?: number | null
           created_at?: string
           id?: string
-          laundrylord_email?: string | null
           model?: string | null
           notes?: string | null
           prong?: string | null
@@ -184,7 +182,6 @@ export type Database = {
           cost_basis?: number | null
           created_at?: string
           id?: string
-          laundrylord_email?: string | null
           model?: string | null
           notes?: string | null
           prong?: string | null
@@ -443,7 +440,6 @@ export type Database = {
           install_notes: string | null
           language: string | null
           late_fee: number
-          laundrylord_email: string | null
           lease_start_date: string | null
           machine_id: string | null
           min_term_end_date: string | null
@@ -479,7 +475,6 @@ export type Database = {
           install_notes?: string | null
           language?: string | null
           late_fee?: number
-          laundrylord_email?: string | null
           lease_start_date?: string | null
           machine_id?: string | null
           min_term_end_date?: string | null
@@ -515,7 +510,6 @@ export type Database = {
           install_notes?: string | null
           language?: string | null
           late_fee?: number
-          laundrylord_email?: string | null
           lease_start_date?: string | null
           machine_id?: string | null
           min_term_end_date?: string | null
