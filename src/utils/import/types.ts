@@ -22,4 +22,5 @@ export type ClassifiedRow = {
   record: Record<string, any>;
   duplicateOf?: { id: string; label: string };
   importDecision: "import" | "skip";
+  warnings: string[];
 };
