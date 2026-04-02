@@ -200,6 +200,7 @@ function generateMachines(renters: RenterRow[]): MachineRow[] {
       prong: i % 2 === 0 ? "3-prong" : "4-prong",
       sourced_from: pick(["Home Depot", "Lowe's", "Wholesale"], i * 7),
       notes: isRetired ? "Retired due to age / excessive repair cost." : null,
+      laundrylord_email: null,
       created_at: dateOffset(pickRange(60, 200, i * 11)) + "T00:00:00.000Z",
       updated_at: NOW,
     });
