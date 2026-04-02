@@ -4,7 +4,9 @@ export type ParsedData = {
   sourceType: "csv" | "xlsx" | "image";
 };
 
-export type ImportMode = "customers" | "machines";
+export type ImportMode = "renters" | "machines";
+
+export type ImportFieldValueType = "string" | "number" | "date" | "boolean" | "enum";
 
 export type ImportField = {
   key: string;
@@ -12,15 +14,39 @@ export type ImportField = {
   placeholder?: string;
   synonyms?: string[];
   group?: "renter" | "machine";
+  valueType?: ImportFieldValueType;
+  enumMap?: Record<string, string>;
+  reviewWhenBlank?: boolean;
 };
 
-export type RowStatus = "empty" | "has_data" | "likely_duplicate";
+export type PreviewRowStatus = "ready" | "review_needed" | "skipped_empty" | "deleted_by_operator";
+
+export type ImportExecutionStatus =
+  | "imported"
+  | "blocked_by_plan"
+  | "failed_insert"
+  | "skipped_empty"
+  | "deleted_by_operator";
 
 export type ClassifiedRow = {
   index: number;
-  status: RowStatus;
+  baseStatus: Exclude<PreviewRowStatus, "deleted_by_operator">;
+  decision: "active" | "deleted_by_operator";
+  hasAnyContent: boolean;
+  hasMappedContent: boolean;
+  source: Record<string, string>;
+  mapped: Record<string, string>;
   record: Record<string, any>;
-  duplicateOf?: { id: string; label: string };
-  importDecision: "import" | "skip";
+  extrasPreview: string[];
   warnings: string[];
+};
+
+export type ImportSummary = Record<ImportExecutionStatus, number> & {
+  firstError?: string;
+};
+
+export type ImportRowResult = {
+  index: number;
+  status: ImportExecutionStatus;
+  error?: string;
 };

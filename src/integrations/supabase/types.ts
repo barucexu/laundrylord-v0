@@ -150,6 +150,7 @@ export type Database = {
           cost_basis: number | null
           created_at: string
           id: string
+          laundrylord_email: string | null
           model: string | null
           notes: string | null
           prong: string | null
@@ -166,6 +167,7 @@ export type Database = {
           cost_basis?: number | null
           created_at?: string
           id?: string
+          laundrylord_email?: string | null
           model?: string | null
           notes?: string | null
           prong?: string | null
@@ -182,6 +184,7 @@ export type Database = {
           cost_basis?: number | null
           created_at?: string
           id?: string
+          laundrylord_email?: string | null
           model?: string | null
           notes?: string | null
           prong?: string | null
@@ -438,6 +441,7 @@ export type Database = {
           install_fee: number
           install_fee_collected: boolean
           install_notes: string | null
+          laundrylord_email: string | null
           language: string | null
           late_fee: number
           lease_start_date: string | null
@@ -473,6 +477,7 @@ export type Database = {
           install_fee?: number
           install_fee_collected?: boolean
           install_notes?: string | null
+          laundrylord_email?: string | null
           language?: string | null
           late_fee?: number
           lease_start_date?: string | null
@@ -508,6 +513,7 @@ export type Database = {
           install_fee?: number
           install_fee_collected?: boolean
           install_notes?: string | null
+          laundrylord_email?: string | null
           language?: string | null
           late_fee?: number
           lease_start_date?: string | null
@@ -644,6 +650,7 @@ export type Database = {
           cost_basis: number | null
           created_at: string | null
           id: string | null
+          laundrylord_email: string | null
           model: string | null
           notes: string | null
           owner_email: string | null
@@ -690,6 +697,7 @@ export type Database = {
           install_fee: number | null
           install_fee_collected: boolean | null
           install_notes: string | null
+          laundrylord_email: string | null
           language: string | null
           late_fee: number | null
           lease_start_date: string | null

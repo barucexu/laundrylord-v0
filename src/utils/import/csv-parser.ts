@@ -11,7 +11,7 @@ export function parseCSV(file: File): Promise<ParsedData> {
           return;
         }
         const headers = data[0].map((h) => h.trim());
-        const rows = data.slice(1).filter((row) => row.some((c) => c.trim()));
+        const rows = data.slice(1).map((row) => row.map((cell) => String(cell ?? "")));
         resolve({ headers, rows, sourceType: "csv" });
       },
       error: () => reject(new Error("Failed to parse CSV")),
