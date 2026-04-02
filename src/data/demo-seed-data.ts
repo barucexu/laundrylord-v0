@@ -141,6 +141,7 @@ function generateRenters(): RenterRow[] {
       dryer_outlet: i % 3 === 0 ? "4-prong" : "3-prong",
       notes: i === 0 ? "Great tenant, always pays on time." : i === 10 ? "Sent reminder last week." : null,
       secondary_contact: i === 2 ? `Robert Brown - (212) 555-0199` : null,
+      laundrylord_email: null,
       archived_at: null,
       billable_until: null,
       created_at: new Date(new Date(leaseStart).getTime() - 7 * 86400000).toISOString(),
