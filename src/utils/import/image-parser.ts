@@ -21,9 +21,7 @@ export async function parseImage(file: File): Promise<ParsedData> {
 
   return {
     headers: headers.map((h: string) => String(h).trim()),
-    rows: rows
-      .map((r: string[]) => r.map((c: string) => String(c)))
-      .filter((row: string[]) => row.some((c: string) => c.trim())),
+    rows: rows.map((r: string[]) => r.map((c: string) => String(c))),
     sourceType: "image",
   };
 }

@@ -1,5 +1,68 @@
 import { ImportField } from "./types";
 
+const RENTER_STATUS_MAP: Record<string, string> = {
+  active: "active",
+  lead: "lead",
+  scheduled: "scheduled",
+  late: "late",
+  maintenance: "maintenance",
+  termination_requested: "termination_requested",
+  "termination requested": "termination_requested",
+  pickup_scheduled: "pickup_scheduled",
+  "pickup scheduled": "pickup_scheduled",
+  closed: "closed",
+  defaulted: "defaulted",
+  archived: "archived",
+  "former customer": "archived",
+  former: "archived",
+  inactive: "archived",
+  cancelled: "closed",
+  canceled: "closed",
+  new: "lead",
+  pending: "scheduled",
+  current: "active",
+  delinquent: "late",
+  "past due": "late",
+  overdue: "late",
+};
+
+const MACHINE_STATUS_MAP: Record<string, string> = {
+  available: "available",
+  assigned: "assigned",
+  maintenance: "maintenance",
+  retired: "retired",
+  "in use": "assigned",
+  "in-use": "assigned",
+  active: "assigned",
+  broken: "maintenance",
+  repair: "maintenance",
+  decommissioned: "retired",
+  "out of service": "retired",
+};
+
+const MACHINE_TYPE_MAP: Record<string, string> = {
+  washer: "washer",
+  dryer: "dryer",
+  set: "set",
+  w: "washer",
+  d: "dryer",
+  "washing machine": "washer",
+  wash: "washer",
+  dry: "dryer",
+  "washer/dryer": "set",
+  "washer dryer": "set",
+  combo: "set",
+};
+
+const PRONG_MAP: Record<string, string> = {
+  "3-prong": "3-prong",
+  "4-prong": "4-prong",
+  "3 prong": "3-prong",
+  "4 prong": "4-prong",
+  "3": "3-prong",
+  "4": "4-prong",
+};
+
 export const RENTER_FIELDS: ImportField[] = [
   {
     key: "name",
@@ -7,6 +70,7 @@ export const RENTER_FIELDS: ImportField[] = [
     placeholder: "",
     synonyms: ["full name", "renter name", "customer name", "renter full name", "tenant name", "customer", "client", "client name"],
     group: "renter",
+    reviewWhenBlank: true,
   },
   {
     key: "phone",
@@ -20,6 +84,13 @@ export const RENTER_FIELDS: ImportField[] = [
     label: "Email",
     placeholder: "",
     synonyms: ["email address", "e-mail", "email addr"],
+    group: "renter",
+  },
+  {
+    key: "laundrylord_email",
+    label: "LaundryLord Email",
+    placeholder: "",
+    synonyms: ["owner email", "operator email", "account email", "laundrylord email"],
     group: "renter",
   },
   {
@@ -56,6 +127,8 @@ export const RENTER_FIELDS: ImportField[] = [
     placeholder: "",
     synonyms: ["renter status", "customer status", "account status"],
     group: "renter",
+    valueType: "enum",
+    enumMap: RENTER_STATUS_MAP,
   },
   {
     key: "lease_start_date",
@@ -63,6 +136,7 @@ export const RENTER_FIELDS: ImportField[] = [
     placeholder: "",
     synonyms: ["start date", "lease begins", "lease date", "move in date", "install date"],
     group: "renter",
+    valueType: "date",
   },
   {
     key: "monthly_rate",
@@ -70,6 +144,7 @@ export const RENTER_FIELDS: ImportField[] = [
     placeholder: "",
     synonyms: ["monthly rent", "rent", "rate", "monthly rate $", "monthly fee", "monthly", "mo rate", "rent/mo", "rent mo"],
     group: "renter",
+    valueType: "number",
   },
   {
     key: "late_fee",
@@ -77,6 +152,7 @@ export const RENTER_FIELDS: ImportField[] = [
     placeholder: "",
     synonyms: ["late fee $", "late charge", "penalty"],
     group: "renter",
+    valueType: "number",
   },
   {
     key: "install_fee",
@@ -84,6 +160,7 @@ export const RENTER_FIELDS: ImportField[] = [
     placeholder: "",
     synonyms: ["install fee $", "installation fee", "setup fee"],
     group: "renter",
+    valueType: "number",
   },
   {
     key: "deposit_amount",
@@ -91,6 +168,7 @@ export const RENTER_FIELDS: ImportField[] = [
     placeholder: "",
     synonyms: ["deposit $", "security deposit", "deposit amount"],
     group: "renter",
+    valueType: "number",
   },
   {
     key: "install_fee_collected",
@@ -98,6 +176,7 @@ export const RENTER_FIELDS: ImportField[] = [
     placeholder: "",
     synonyms: ["install fee paid", "install collected"],
     group: "renter",
+    valueType: "boolean",
   },
   {
     key: "deposit_collected",
@@ -105,6 +184,7 @@ export const RENTER_FIELDS: ImportField[] = [
     placeholder: "",
     synonyms: ["deposit paid", "deposit received"],
     group: "renter",
+    valueType: "boolean",
   },
   {
     key: "install_notes",
@@ -132,6 +212,7 @@ export const RENTER_FIELDS: ImportField[] = [
       "card on file",
     ],
     group: "renter",
+    valueType: "boolean",
   },
 ];
 
@@ -142,6 +223,9 @@ export const MACHINE_FIELDS: ImportField[] = [
     placeholder: "",
     synonyms: ["machine type", "appliance type", "washer or dryer", "equipment type", "make", "appliance", "w/d", "washer dryer"],
     group: "machine",
+    valueType: "enum",
+    enumMap: MACHINE_TYPE_MAP,
+    reviewWhenBlank: true,
   },
   {
     key: "model",
@@ -149,6 +233,7 @@ export const MACHINE_FIELDS: ImportField[] = [
     placeholder: "",
     synonyms: ["model number", "model name", "model #", "model no", "model num"],
     group: "machine",
+    reviewWhenBlank: true,
   },
   {
     key: "serial",
@@ -156,6 +241,7 @@ export const MACHINE_FIELDS: ImportField[] = [
     placeholder: "",
     synonyms: ["serial number", "serial #", "sn", "serial no", "serial num", "s/n", "ser", "serial#"],
     group: "machine",
+    reviewWhenBlank: true,
   },
   {
     key: "prong",
@@ -163,6 +249,8 @@ export const MACHINE_FIELDS: ImportField[] = [
     placeholder: "",
     synonyms: ["prong type", "cord type", "plug type"],
     group: "machine",
+    valueType: "enum",
+    enumMap: PRONG_MAP,
   },
   {
     key: "condition",
@@ -177,6 +265,8 @@ export const MACHINE_FIELDS: ImportField[] = [
     placeholder: "",
     synonyms: ["machine status", "availability", "avail", "in use"],
     group: "machine",
+    valueType: "enum",
+    enumMap: MACHINE_STATUS_MAP,
   },
   {
     key: "cost_basis",
@@ -184,12 +274,20 @@ export const MACHINE_FIELDS: ImportField[] = [
     placeholder: "",
     synonyms: ["cost", "cost basis $", "purchase price", "price", "acquisition cost"],
     group: "machine",
+    valueType: "number",
   },
   {
     key: "sourced_from",
     label: "Sourced From",
     placeholder: "",
     synonyms: ["source", "acquired from", "vendor", "supplier", "purchased from"],
+    group: "machine",
+  },
+  {
+    key: "laundrylord_email",
+    label: "LaundryLord Email",
+    placeholder: "",
+    synonyms: ["owner email", "operator email", "account email", "laundrylord email"],
     group: "machine",
   },
   {

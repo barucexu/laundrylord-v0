@@ -24,8 +24,8 @@ export function parseXLSX(file: File): Promise<ParsedData> {
           return;
         }
         const headers = raw[0].map((h) => String(h).trim());
-        const rows = raw.slice(1).filter((row) => row.some((c) => String(c).trim()));
-        resolve({ headers, rows: rows.map((r) => r.map((c) => String(c))), sourceType: "xlsx" });
+        const rows = raw.slice(1).map((r) => r.map((c) => String(c)));
+        resolve({ headers, rows, sourceType: "xlsx" });
       } catch {
         reject(new Error("Failed to parse Excel file"));
       }
