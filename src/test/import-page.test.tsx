@@ -6,7 +6,7 @@ import ImportPage from "@/pages/ImportPage";
 
 const mockParseCSV = vi.fn();
 const mockInsert = vi.fn();
-const mockFrom = vi.fn(() => ({ insert: mockInsert }));
+const mockFrom = vi.fn((_table: string) => ({ insert: mockInsert }));
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
 
