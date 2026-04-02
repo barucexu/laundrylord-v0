@@ -37,7 +37,7 @@ vi.mock("@/utils/import/image-parser", () => ({
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    from: (...args: unknown[]) => mockFrom(...(args as [string])),
+    from: (table: string) => mockFrom(table),
   },
 }));
 
