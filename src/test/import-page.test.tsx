@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ImportPage from "@/pages/ImportPage";
 
 const mockParseCSV = vi.fn();
 const mockInsert = vi.fn();
-const mockFrom = vi.fn(() => ({ insert: mockInsert }));
+const mockFrom = vi.fn((_table: string) => ({ insert: mockInsert }));
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
 
@@ -36,7 +37,7 @@ vi.mock("@/utils/import/image-parser", () => ({
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    from: (...args: unknown[]) => mockFrom(...args),
+    from: (table: string) => mockFrom(table),
   },
 }));
 

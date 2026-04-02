@@ -67,7 +67,7 @@ describe("import engine", () => {
       mode: "machines",
     });
 
-    const insertRow = vi.fn(async () => ({ error: null }));
+    const insertRow = vi.fn<(tableName: "renters" | "machines", record: Record<string, unknown>) => Promise<{ error: null }>>(async () => ({ error: null }));
     const { summary, results } = await executeImport({
       rows,
       mode: "machines",
@@ -148,7 +148,7 @@ describe("import engine", () => {
       0,
     );
 
-    const insertRow = vi.fn(async () => ({ error: null }));
+    const insertRow = vi.fn<(tableName: "renters" | "machines", record: Record<string, unknown>) => Promise<{ error: null }>>(async () => ({ error: null }));
     const { summary } = await executeImport({
       rows,
       mode: "renters",
