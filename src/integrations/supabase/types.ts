@@ -51,6 +51,13 @@ export type Database = {
             foreignKeyName: "billing_reminders_renter_id_fkey"
             columns: ["renter_id"]
             isOneToOne: false
+            referencedRelation: "v_renters_for_admin"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_reminders_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
             referencedRelation: "v_renters_with_owner"
             referencedColumns: ["id"]
           },
@@ -207,6 +214,13 @@ export type Database = {
             foreignKeyName: "machines_assigned_renter_id_fkey"
             columns: ["assigned_renter_id"]
             isOneToOne: false
+            referencedRelation: "v_renters_for_admin"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machines_assigned_renter_id_fkey"
+            columns: ["assigned_renter_id"]
+            isOneToOne: false
             referencedRelation: "v_renters_with_owner"
             referencedColumns: ["id"]
           },
@@ -278,6 +292,13 @@ export type Database = {
             columns: ["renter_id"]
             isOneToOne: false
             referencedRelation: "renters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_logs_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_renters_for_admin"
             referencedColumns: ["id"]
           },
           {
@@ -419,6 +440,13 @@ export type Database = {
             foreignKeyName: "payments_renter_id_fkey"
             columns: ["renter_id"]
             isOneToOne: false
+            referencedRelation: "v_renters_for_admin"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
             referencedRelation: "v_renters_with_owner"
             referencedColumns: ["id"]
           },
@@ -441,9 +469,9 @@ export type Database = {
           install_fee: number
           install_fee_collected: boolean
           install_notes: string | null
-          laundrylord_email: string | null
           language: string | null
           late_fee: number
+          laundrylord_email: string | null
           lease_start_date: string | null
           machine_id: string | null
           min_term_end_date: string | null
@@ -477,9 +505,9 @@ export type Database = {
           install_fee?: number
           install_fee_collected?: boolean
           install_notes?: string | null
-          laundrylord_email?: string | null
           language?: string | null
           late_fee?: number
+          laundrylord_email?: string | null
           lease_start_date?: string | null
           machine_id?: string | null
           min_term_end_date?: string | null
@@ -513,9 +541,9 @@ export type Database = {
           install_fee?: number
           install_fee_collected?: boolean
           install_notes?: string | null
-          laundrylord_email?: string | null
           language?: string | null
           late_fee?: number
+          laundrylord_email?: string | null
           lease_start_date?: string | null
           machine_id?: string | null
           min_term_end_date?: string | null
@@ -635,6 +663,13 @@ export type Database = {
             foreignKeyName: "timeline_events_renter_id_fkey"
             columns: ["renter_id"]
             isOneToOne: false
+            referencedRelation: "v_renters_for_admin"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_events_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
             referencedRelation: "v_renters_with_owner"
             referencedColumns: ["id"]
           },
@@ -650,7 +685,6 @@ export type Database = {
           cost_basis: number | null
           created_at: string | null
           id: string | null
-          laundrylord_email: string | null
           model: string | null
           notes: string | null
           owner_email: string | null
@@ -674,7 +708,140 @@ export type Database = {
             foreignKeyName: "machines_assigned_renter_id_fkey"
             columns: ["assigned_renter_id"]
             isOneToOne: false
+            referencedRelation: "v_renters_for_admin"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machines_assigned_renter_id_fkey"
+            columns: ["assigned_renter_id"]
+            isOneToOne: false
             referencedRelation: "v_renters_with_owner"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_renters_for_admin: {
+        Row: {
+          address: string | null
+          archived_at: string | null
+          balance: number | null
+          billable_until: string | null
+          created_at: string | null
+          days_late: number | null
+          deposit_amount: number | null
+          deposit_collected: boolean | null
+          dryer_outlet: string | null
+          email: string | null
+          has_payment_method: boolean | null
+          id: string | null
+          install_fee: number | null
+          install_fee_collected: boolean | null
+          install_notes: string | null
+          language: string | null
+          late_fee: number | null
+          laundrylord_email: string | null
+          lease_start_date: string | null
+          machine_id: string | null
+          min_term_end_date: string | null
+          monthly_rate: number | null
+          name: string | null
+          next_due_date: string | null
+          notes: string | null
+          paid_through_date: string | null
+          phone: string | null
+          rent_collected: number | null
+          secondary_contact: string | null
+          status: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          address?: string | null
+          archived_at?: string | null
+          balance?: number | null
+          billable_until?: string | null
+          created_at?: string | null
+          days_late?: number | null
+          deposit_amount?: number | null
+          deposit_collected?: boolean | null
+          dryer_outlet?: string | null
+          email?: string | null
+          has_payment_method?: boolean | null
+          id?: string | null
+          install_fee?: number | null
+          install_fee_collected?: boolean | null
+          install_notes?: string | null
+          language?: string | null
+          late_fee?: number | null
+          laundrylord_email?: string | null
+          lease_start_date?: string | null
+          machine_id?: string | null
+          min_term_end_date?: string | null
+          monthly_rate?: number | null
+          name?: string | null
+          next_due_date?: string | null
+          notes?: string | null
+          paid_through_date?: string | null
+          phone?: string | null
+          rent_collected?: number | null
+          secondary_contact?: string | null
+          status?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          address?: string | null
+          archived_at?: string | null
+          balance?: number | null
+          billable_until?: string | null
+          created_at?: string | null
+          days_late?: number | null
+          deposit_amount?: number | null
+          deposit_collected?: boolean | null
+          dryer_outlet?: string | null
+          email?: string | null
+          has_payment_method?: boolean | null
+          id?: string | null
+          install_fee?: number | null
+          install_fee_collected?: boolean | null
+          install_notes?: string | null
+          language?: string | null
+          late_fee?: number | null
+          laundrylord_email?: string | null
+          lease_start_date?: string | null
+          machine_id?: string | null
+          min_term_end_date?: string | null
+          monthly_rate?: number | null
+          name?: string | null
+          next_due_date?: string | null
+          notes?: string | null
+          paid_through_date?: string | null
+          phone?: string | null
+          rent_collected?: number | null
+          secondary_contact?: string | null
+          status?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_renters_machine"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_renters_machine"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_machines_with_owner"
             referencedColumns: ["id"]
           },
         ]
@@ -697,7 +864,6 @@ export type Database = {
           install_fee: number | null
           install_fee_collected: boolean | null
           install_notes: string | null
-          laundrylord_email: string | null
           language: string | null
           late_fee: number | null
           lease_start_date: string | null
