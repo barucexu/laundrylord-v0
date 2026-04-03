@@ -326,6 +326,9 @@ export type Database = {
           reminder_failed_enabled: boolean
           reminder_latefee_enabled: boolean
           reminder_upcoming_enabled: boolean
+          saas_product_id: string | null
+          saas_subscribed: boolean
+          saas_subscription_end: string | null
           template_failed_body: string | null
           template_failed_subject: string | null
           template_latefee_body: string | null
@@ -350,6 +353,9 @@ export type Database = {
           reminder_failed_enabled?: boolean
           reminder_latefee_enabled?: boolean
           reminder_upcoming_enabled?: boolean
+          saas_product_id?: string | null
+          saas_subscribed?: boolean
+          saas_subscription_end?: string | null
           template_failed_body?: string | null
           template_failed_subject?: string | null
           template_latefee_body?: string | null
@@ -374,6 +380,9 @@ export type Database = {
           reminder_failed_enabled?: boolean
           reminder_latefee_enabled?: boolean
           reminder_upcoming_enabled?: boolean
+          saas_product_id?: string | null
+          saas_subscribed?: boolean
+          saas_subscription_end?: string | null
           template_failed_body?: string | null
           template_failed_subject?: string | null
           template_latefee_body?: string | null
