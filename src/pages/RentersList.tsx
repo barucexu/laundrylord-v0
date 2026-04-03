@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useRenters } from "@/hooks/useSupabaseData";
 import { useSubscription } from "@/hooks/useSubscription";
-import { getNextUpgradeTierForCount, tierUpgradeLabel } from "@/lib/pricing-tiers";
+import { tierUpgradeLabel } from "@/lib/pricing-tiers";
 import { Search, Plus } from "lucide-react";
 import { CreateRenterDialog } from "@/components/CreateRenterDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -17,8 +17,7 @@ export default function RentersList() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: renters = [], isLoading } = useRenters();
-  const { canAddRenter, effectiveTier: tier, billableCount, renterCount, checkout, loading: planLoading } = useSubscription();
-  const upgradeTarget = getNextUpgradeTierForCount(renterCount);
+  const { canAddRenter, billableCount, capacityTier, nextUpgradeTier, checkout, loading: planLoading } = useSubscription();
 
   const filtered = renters.filter(r => {
     const matchesSearch = r.name.toLowerCase().includes(search.toLowerCase()) || (r.phone || "").includes(search);
@@ -54,13 +53,13 @@ export default function RentersList() {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="max-w-xs">
-              <p className="font-medium text-sm">You've grown to {renterCount} billable renter{renterCount !== 1 ? "s" : ""}!</p>
+              <p className="font-medium text-sm">You've grown to {billableCount} billable renter{billableCount !== 1 ? "s" : ""}!</p>
               <p className="text-xs text-muted-foreground mt-1">
-                {tierUpgradeLabel(upgradeTarget || tier)} to {tier.price === 0 ? "keep growing" : "add more renters"}.
+                {nextUpgradeTier ? tierUpgradeLabel(nextUpgradeTier) : `You've reached the ${capacityTier.name} plan limit`} to {capacityTier.price === 0 ? "keep growing" : "add more renters"}.
               </p>
-              {upgradeTarget?.price_id && (
-                <Button size="sm" className="w-full mt-3" onClick={() => checkout(upgradeTarget.price_id)}>
-                  {tierUpgradeLabel(upgradeTarget)}
+              {nextUpgradeTier?.price_id && (
+                <Button size="sm" className="w-full mt-3" onClick={() => checkout(nextUpgradeTier.price_id)}>
+                  {tierUpgradeLabel(nextUpgradeTier)}
                 </Button>
               )}
             </PopoverContent>

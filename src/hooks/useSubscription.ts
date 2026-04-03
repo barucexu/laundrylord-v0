@@ -1,10 +1,45 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useDemo } from "@/contexts/DemoContext";
 import { useRenters } from "@/hooks/useSupabaseData";
-import { getRequiredTierForCount, getTierByProductId, TIERS, type PricingTier } from "@/lib/pricing-tiers";
+import { getNextUpgradeTierForCount, getRequiredTierForCount, getTierByProductId, TIERS, type PricingTier } from "@/lib/pricing-tiers";
+
+export interface SubscriptionCapacityState {
+  requiredTier: PricingTier;
+  currentBilledTier: PricingTier | null;
+  effectiveTier: PricingTier;
+  capacityTier: PricingTier;
+  nextUpgradeTier: PricingTier | null;
+  canAddRenter: boolean;
+}
+
+export function resolveSubscriptionCapacity({
+  billableCount,
+  subscribed,
+  currentBilledTier,
+  requiredTier,
+}: {
+  billableCount: number;
+  subscribed: boolean;
+  currentBilledTier: PricingTier | null;
+  requiredTier: PricingTier;
+}): SubscriptionCapacityState {
+  const effectiveTier = currentBilledTier ?? requiredTier;
+  const capacityTier = subscribed ? (currentBilledTier ?? requiredTier) : requiredTier;
+  const canAddRenter = billableCount < capacityTier.max;
+  const nextUpgradeTier = canAddRenter ? null : getNextUpgradeTierForCount(capacityTier.max);
+
+  return {
+    requiredTier,
+    currentBilledTier,
+    effectiveTier,
+    capacityTier,
+    nextUpgradeTier,
+    canAddRenter,
+  };
+}
 
 interface SubscriptionState {
   tier: PricingTier;
@@ -14,6 +49,8 @@ interface SubscriptionState {
   requiredTier: PricingTier;
   currentBilledTier: PricingTier | null;
   effectiveTier: PricingTier;
+  capacityTier: PricingTier;
+  nextUpgradeTier: PricingTier | null;
   subscribed: boolean;
   loading: boolean;
   subscriptionEnd: string | null;
@@ -49,19 +86,27 @@ export function useSubscription(): SubscriptionState {
   // Demo mode: return mock Starter subscription
   if (demo?.isDemo) {
     const starterTier = TIERS.find(t => t.name === "Starter") ?? TIERS[1];
+    const capacity = resolveSubscriptionCapacity({
+      billableCount: activeOperationalCount,
+      subscribed: true,
+      currentBilledTier: starterTier,
+      requiredTier,
+    });
     return {
-      tier: starterTier,
+      tier: capacity.effectiveTier,
       renterCount: activeOperationalCount,
       activeOperationalCount,
       billableCount: activeOperationalCount,
-      requiredTier,
-      currentBilledTier: starterTier,
-      effectiveTier: starterTier,
+      requiredTier: capacity.requiredTier,
+      currentBilledTier: capacity.currentBilledTier,
+      effectiveTier: capacity.effectiveTier,
+      capacityTier: capacity.capacityTier,
+      nextUpgradeTier: capacity.nextUpgradeTier,
       subscribed: true,
       loading: false,
       subscriptionEnd: null,
       productId: starterTier.product_id ?? null,
-      canAddRenter: activeOperationalCount < starterTier.max,
+      canAddRenter: capacity.canAddRenter,
       checkout: async () => {},
       manageSubscription: async () => {},
       initiateUpgrade: () => {},
@@ -73,7 +118,12 @@ export function useSubscription(): SubscriptionState {
   }
 
   const currentBilledTier = subscribed ? getTierByProductId(productId) : null;
-  const effectiveTier = currentBilledTier ?? requiredTier;
+  const capacity = resolveSubscriptionCapacity({
+    billableCount,
+    subscribed,
+    currentBilledTier,
+    requiredTier,
+  });
 
   const checkSubscription = useCallback(async () => {
     if (authLoading) return;
@@ -142,7 +192,7 @@ export function useSubscription(): SubscriptionState {
   }, [checkSubscription, queryClient]);
 
   const checkout = useCallback(async (targetPriceId?: string) => {
-    const priceId = targetPriceId ?? effectiveTier.price_id;
+    const priceId = targetPriceId ?? capacity.effectiveTier.price_id;
     if (!priceId) return;
     const { data, error } = await supabase.functions.invoke("create-checkout", {
       body: { price_id: priceId },
@@ -158,7 +208,7 @@ export function useSubscription(): SubscriptionState {
       window.open(data.url, "_blank");
       startAggressivePolling();
     }
-  }, [effectiveTier.price_id, checkSubscription, queryClient, startAggressivePolling]);
+  }, [capacity.effectiveTier.price_id, checkSubscription, queryClient, startAggressivePolling]);
 
   const manageSubscription = useCallback(async () => {
     const { data, error } = await supabase.functions.invoke("customer-portal");
@@ -181,20 +231,23 @@ export function useSubscription(): SubscriptionState {
     setUpgradeIntent(null);
   }, []);
 
-  const canAddRenter = (() => {
-    if (loading) return false;
-    if (requiredTier.price === 0) return billableCount < requiredTier.max;
-    return subscribed && billableCount < effectiveTier.max;
-  })();
+  const canAddRenter = loading ? false : capacity.canAddRenter;
+  const refresh = useCallback(async () => {
+    await checkSubscription();
+    queryClient.invalidateQueries({ queryKey: ["renters"] });
+    queryClient.invalidateQueries({ queryKey: ["renters", "billable-count"] });
+  }, [checkSubscription, queryClient]);
 
   return {
-    tier: effectiveTier,
+    tier: capacity.effectiveTier,
     renterCount: billableCount,
     activeOperationalCount,
     billableCount,
-    requiredTier,
-    currentBilledTier,
-    effectiveTier,
+    requiredTier: capacity.requiredTier,
+    currentBilledTier: capacity.currentBilledTier,
+    effectiveTier: capacity.effectiveTier,
+    capacityTier: capacity.capacityTier,
+    nextUpgradeTier: capacity.nextUpgradeTier,
     subscribed,
     loading,
     subscriptionEnd,
@@ -206,6 +259,6 @@ export function useSubscription(): SubscriptionState {
     upgradeIntent,
     confirmUpgrade,
     cancelUpgrade,
-    refresh: checkSubscription,
+    refresh,
   };
 }
