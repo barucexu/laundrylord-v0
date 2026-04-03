@@ -39,6 +39,11 @@ serve(async (req) => {
       });
     }
 
+    const serviceClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
+
     // Use anon key + forwarded auth header so getUser works correctly
     const userClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -56,11 +61,38 @@ serve(async (req) => {
     }
     logStep("User authenticated", { userId: user.id, email: user.email });
 
+    const syncOperatorPlanState = async ({
+      subscribed,
+      productId,
+      subscriptionEnd,
+    }: {
+      subscribed: boolean;
+      productId: string | null;
+      subscriptionEnd: string | null;
+    }) => {
+      const { error: syncError } = await serviceClient
+        .from("operator_settings")
+        .upsert(
+          {
+            user_id: user.id,
+            saas_subscribed: subscribed,
+            saas_product_id: productId,
+            saas_subscription_end: subscriptionEnd,
+          },
+          { onConflict: "user_id" },
+        );
+
+      if (syncError) {
+        throw new Error(`Failed to sync operator plan state: ${syncError.message}`);
+      }
+    };
+
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
 
     if (customers.data.length === 0) {
       logStep("No Stripe customer found — not subscribed");
+      await syncOperatorPlanState({ subscribed: false, productId: null, subscriptionEnd: null });
       return new Response(JSON.stringify({ subscribed: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -77,6 +109,7 @@ serve(async (req) => {
 
     if (subscriptions.data.length === 0) {
       logStep("No active subscription");
+      await syncOperatorPlanState({ subscribed: false, productId: null, subscriptionEnd: null });
       return new Response(JSON.stringify({ subscribed: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -99,6 +132,7 @@ serve(async (req) => {
     }
 
     logStep("Active subscription found", { subscriptionId: sub.id, productId, subscriptionEnd });
+    await syncOperatorPlanState({ subscribed: true, productId, subscriptionEnd });
 
     return new Response(
       JSON.stringify({ subscribed: true, product_id: productId, subscription_end: subscriptionEnd }),

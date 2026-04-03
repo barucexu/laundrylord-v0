@@ -136,6 +136,36 @@ describe("import engine", () => {
     expect(results.map((row) => row.status)).toEqual(["imported", "failed_insert", "imported"]);
   });
 
+  it("reclassifies backend plan-limit insert errors and stops inserting later renter rows", async () => {
+    const rows = classifyImportRows({
+      headers: ["Name"],
+      rows: [["Alice"], ["Bob"], ["Chris"]],
+      mapping: { name: "Name" },
+      fields: RENTER_FIELDS,
+      mode: "renters",
+    });
+
+    const insertRow = vi
+      .fn()
+      .mockResolvedValueOnce({ error: null })
+      .mockResolvedValueOnce({ error: { message: "Plan limit reached. Subscribe to add more renters." } });
+
+    const { summary, results } = await executeImport({
+      rows,
+      mode: "renters",
+      userId: "user-1",
+      renterSlotsAvailable: 10,
+      insertRow,
+    });
+
+    expect(insertRow).toHaveBeenCalledTimes(2);
+    expect(summary.imported).toBe(1);
+    expect(summary.blocked_by_plan).toBe(2);
+    expect(summary.failed_insert).toBe(0);
+    expect(summary.firstError).toBe("Plan limit reached. Subscribe to add more renters.");
+    expect(results.map((row) => row.status)).toEqual(["imported", "blocked_by_plan", "blocked_by_plan"]);
+  });
+
   it("omits deleted rows from the import payload and counts them separately", async () => {
     const rows = toggleRowDeleted(
       classifyImportRows({
