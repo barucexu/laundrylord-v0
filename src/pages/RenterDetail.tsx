@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { PaymentSourceBadge } from "@/components/PaymentSourceBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { useRenter, useMachinesForRenter, useMachines, useUpdateRenter, useUpdateMachine, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection } from "@/hooks/useSupabaseData";
+import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil, Plus, X, Globe, Plug, Archive, ArchiveRestore } from "lucide-react";
 import { toast } from "sonner";
@@ -283,6 +284,7 @@ export default function RenterDetail() {
                     Send Payment Setup Link
                   </Button>
                   <p className="text-xs text-muted-foreground">→ Send a secure link for the renter to add a payment method</p>
+                  <p className="text-xs text-muted-foreground">{BANK_ACCOUNT_RECOMMENDATION}</p>
                 </>
               )}
 
@@ -303,6 +305,7 @@ export default function RenterDetail() {
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">→ Payment method on file ✓ — Start auto-charging ${Number(renter.monthly_rate).toFixed(2)}/mo</p>
+                  <p className="text-xs text-muted-foreground">{BANK_ACCOUNT_RECOMMENDATION}</p>
                 </>
               )}
 
@@ -319,6 +322,7 @@ export default function RenterDetail() {
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">Auto-billing ${Number(renter.monthly_rate).toFixed(2)}/mo • Next due: {renter.next_due_date || "—"}</p>
+                  <p className="text-xs text-muted-foreground">{BANK_ACCOUNT_RECOMMENDATION}</p>
                 </>
               )}
             </CardContent>

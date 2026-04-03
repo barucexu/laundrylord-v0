@@ -8,6 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
 import { Loader2 } from "lucide-react";
 
 interface UpgradeConfirmDialogProps {
@@ -50,6 +51,9 @@ export function UpgradeConfirmDialog({
                 Your payment method on file will be charged immediately.
               </p>
             )}
+            <p>
+              {BANK_ACCOUNT_RECOMMENDATION}
+            </p>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

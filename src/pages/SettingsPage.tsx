@@ -16,6 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSubscription } from "@/hooks/useSubscription";
 import { TIERS, canFitTier, tierUpgradeLabel } from "@/lib/pricing-tiers";
+import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
 import { useSearchParams } from "react-router-dom";
 
 const DEFAULT_TEMPLATES = {
@@ -246,13 +247,16 @@ export default function SettingsPage() {
                               {subscription.billableCount} billable renters exceeds max {t.max}
                             </p>
                           ) : t.price_id ? (
-                            <Button
-                              size="sm"
-                              className="h-7 text-xs"
-                              onClick={() => subscription.checkout(t.price_id)}
-                            >
-                              {tierUpgradeLabel(t)}
-                            </Button>
+                            <>
+                              <Button
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => subscription.checkout(t.price_id)}
+                              >
+                                {tierUpgradeLabel(t)}
+                              </Button>
+                              <p className="text-[11px] text-muted-foreground">{BANK_ACCOUNT_RECOMMENDATION}</p>
+                            </>
                           ) : (
                             <p className="text-[11px] text-muted-foreground">Free tier available when no paid subscription is active.</p>
                           )}

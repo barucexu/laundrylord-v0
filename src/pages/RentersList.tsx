@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useRenters } from "@/hooks/useSupabaseData";
 import { useSubscription } from "@/hooks/useSubscription";
 import { tierUpgradeLabel } from "@/lib/pricing-tiers";
+import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
 import { Search, Plus } from "lucide-react";
 import { CreateRenterDialog } from "@/components/CreateRenterDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -57,6 +58,7 @@ export default function RentersList() {
               <p className="text-xs text-muted-foreground mt-1">
                 {nextUpgradeTier ? tierUpgradeLabel(nextUpgradeTier) : `You've reached the ${capacityTier.name} plan limit`} to {capacityTier.price === 0 ? "keep growing" : "add more renters"}.
               </p>
+              <p className="text-xs text-muted-foreground mt-2">{BANK_ACCOUNT_RECOMMENDATION}</p>
               {nextUpgradeTier?.price_id && (
                 <Button size="sm" className="w-full mt-3" onClick={() => checkout(nextUpgradeTier.price_id)}>
                   {tierUpgradeLabel(nextUpgradeTier)}
