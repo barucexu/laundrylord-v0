@@ -10,13 +10,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useStripeConnection, useOperatorSettings, useSaveOperatorSettings } from "@/hooks/useSupabaseData";
 import { CheckCircle, AlertTriangle, Loader2, ExternalLink, Eye, EyeOff, ChevronDown, Mail, RotateCcw, Sparkles, CreditCard, Info } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSubscription } from "@/hooks/useSubscription";
 import { TIERS, canFitTier, tierUpgradeLabel } from "@/lib/pricing-tiers";
+import { useSearchParams } from "react-router-dom";
 
 const DEFAULT_TEMPLATES = {
   template_upcoming_subject: "Payment Reminder",
@@ -31,9 +31,9 @@ export default function SettingsPage() {
   const { data: stripe, isLoading: stripeLoading } = useStripeConnection();
   const { data: settings, isLoading: settingsLoading } = useOperatorSettings();
   const saveSettings = useSaveOperatorSettings();
-  const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [form, setForm] = useState({
     default_monthly_rate: "150",
@@ -139,6 +139,37 @@ export default function SettingsPage() {
   };
 
   const subscription = useSubscription();
+
+  useEffect(() => {
+    if (searchParams.get("subscription") !== "success") return;
+
+    let cancelled = false;
+
+    const syncSubscription = async () => {
+      try {
+        await subscription.refresh();
+        queryClient.invalidateQueries({ queryKey: ["renters"] });
+        queryClient.invalidateQueries({ queryKey: ["renters", "billable-count"] });
+        if (!cancelled) {
+          toast.success("Plan updated");
+        }
+      } catch (err) {
+        console.error("subscription refresh failed after checkout:", err);
+      } finally {
+        if (!cancelled) {
+          const nextParams = new URLSearchParams(searchParams);
+          nextParams.delete("subscription");
+          setSearchParams(nextParams, { replace: true });
+        }
+      }
+    };
+
+    void syncSubscription();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [queryClient, searchParams, setSearchParams, subscription]);
 
   return (
     <div className="space-y-3">

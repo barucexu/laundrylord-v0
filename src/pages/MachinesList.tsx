@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useMachines, useRenters, type MachineRow } from "@/hooks/useSupabaseData";
 import { useSubscription } from "@/hooks/useSubscription";
-import { getNextUpgradeTierForCount, tierUpgradeLabel } from "@/lib/pricing-tiers";
+import { tierUpgradeLabel } from "@/lib/pricing-tiers";
 import { Link } from "react-router-dom";
 import { Plus, Pencil } from "lucide-react";
 import { CreateMachineDialog } from "@/components/CreateMachineDialog";
@@ -16,8 +16,7 @@ export default function MachinesList() {
   const { data: renters = [] } = useRenters();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editMachine, setEditMachine] = useState<MachineRow | null>(null);
-  const { canAddRenter, effectiveTier: tier, billableCount, renterCount, checkout, loading: planLoading } = useSubscription();
-  const upgradeTarget = getNextUpgradeTierForCount(renterCount);
+  const { canAddRenter, billableCount, capacityTier, nextUpgradeTier, checkout, loading: planLoading } = useSubscription();
 
   const getRenterForMachine = (machine: MachineRow) => {
     if (!machine.assigned_renter_id) return undefined;
@@ -47,13 +46,13 @@ export default function MachinesList() {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="max-w-xs">
-              <p className="font-medium text-sm">You've grown to {renterCount} billable renter{renterCount !== 1 ? "s" : ""}!</p>
+              <p className="font-medium text-sm">You've grown to {billableCount} billable renter{billableCount !== 1 ? "s" : ""}!</p>
               <p className="text-xs text-muted-foreground mt-1">
-                {tierUpgradeLabel(upgradeTarget || tier)} to add more machines.
+                {nextUpgradeTier ? tierUpgradeLabel(nextUpgradeTier) : `You've reached the ${capacityTier.name} plan limit`} to add more machines.
               </p>
-              {upgradeTarget?.price_id && (
-                <Button size="sm" className="w-full mt-3" onClick={() => checkout(upgradeTarget.price_id)}>
-                  {tierUpgradeLabel(upgradeTarget)}
+              {nextUpgradeTier?.price_id && (
+                <Button size="sm" className="w-full mt-3" onClick={() => checkout(nextUpgradeTier.price_id)}>
+                  {tierUpgradeLabel(nextUpgradeTier)}
                 </Button>
               )}
             </PopoverContent>
