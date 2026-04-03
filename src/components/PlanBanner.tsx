@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { getNextUpgradeTierForCount, needsSubscription, tierUpgradeLabel } from "@/lib/pricing-tiers";
+import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
 import { X, Sparkles, ArrowUpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -43,10 +44,11 @@ export function PlanBanner() {
           </p>
           <p className="text-muted-foreground">
             {isFirstUpgrade
-              ? <>{tierUpgradeLabel(upgradeTarget)} to keep growing. Adding a bank account is the easiest option.</>
+              ? <>{tierUpgradeLabel(upgradeTarget)} to keep growing.</>
               : <>{tierUpgradeLabel(upgradeTarget)} to keep things running smoothly.</>
             }
           </p>
+          <p className="text-muted-foreground">{BANK_ACCOUNT_RECOMMENDATION}</p>
         </div>
         <Button size="sm" onClick={() => checkout(upgradeTarget.price_id)} className="gap-1.5" disabled={!upgradeTarget.price_id}>
           <ArrowUpCircle className="h-3.5 w-3.5" />

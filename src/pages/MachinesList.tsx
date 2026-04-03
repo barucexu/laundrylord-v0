@@ -5,6 +5,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useMachines, useRenters, type MachineRow } from "@/hooks/useSupabaseData";
 import { useSubscription } from "@/hooks/useSubscription";
 import { tierUpgradeLabel } from "@/lib/pricing-tiers";
+import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
 import { Link } from "react-router-dom";
 import { Plus, Pencil } from "lucide-react";
 import { CreateMachineDialog } from "@/components/CreateMachineDialog";
@@ -50,6 +51,7 @@ export default function MachinesList() {
               <p className="text-xs text-muted-foreground mt-1">
                 {nextUpgradeTier ? tierUpgradeLabel(nextUpgradeTier) : `You've reached the ${capacityTier.name} plan limit`} to add more machines.
               </p>
+              <p className="text-xs text-muted-foreground mt-2">{BANK_ACCOUNT_RECOMMENDATION}</p>
               {nextUpgradeTier?.price_id && (
                 <Button size="sm" className="w-full mt-3" onClick={() => checkout(nextUpgradeTier.price_id)}>
                   {tierUpgradeLabel(nextUpgradeTier)}
