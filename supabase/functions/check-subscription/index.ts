@@ -4,7 +4,8 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 const logStep = (step: string, details?: unknown) => {
@@ -39,14 +40,19 @@ serve(async (req) => {
       });
     }
 
-    // Use anon key + forwarded auth header so getUser works correctly
-    const userClient = createClient(
+    const serviceClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } },
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    const { data: { user }, error: userError } = await userClient.auth.getUser(token);
+    const userClient = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const {
+      data: { user },
+      error: userError,
+    } = await userClient.auth.getUser(token);
     if (userError || !user?.email) {
       const authMessage = userError?.message ?? "User not authenticated or email not available";
       return new Response(JSON.stringify({ error: `Auth error: ${authMessage}` }), {
@@ -56,11 +62,36 @@ serve(async (req) => {
     }
     logStep("User authenticated", { userId: user.id, email: user.email });
 
+    const syncOperatorPlanState = async ({
+      subscribed,
+      productId,
+      subscriptionEnd,
+    }: {
+      subscribed: boolean;
+      productId: string | null;
+      subscriptionEnd: string | null;
+    }) => {
+      const { error: syncError } = await serviceClient.from("operator_settings").upsert(
+        {
+          user_id: user.id,
+          saas_subscribed: subscribed,
+          saas_product_id: productId,
+          saas_subscription_end: subscriptionEnd,
+        },
+        { onConflict: "user_id" },
+      );
+
+      if (syncError) {
+        throw new Error(`Failed to sync operator plan state: ${syncError.message}`);
+      }
+    };
+
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
 
     if (customers.data.length === 0) {
       logStep("No Stripe customer found — not subscribed");
+      await syncOperatorPlanState({ subscribed: false, productId: null, subscriptionEnd: null });
       return new Response(JSON.stringify({ subscribed: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -77,6 +108,7 @@ serve(async (req) => {
 
     if (subscriptions.data.length === 0) {
       logStep("No active subscription");
+      await syncOperatorPlanState({ subscribed: false, productId: null, subscriptionEnd: null });
       return new Response(JSON.stringify({ subscribed: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -85,7 +117,6 @@ serve(async (req) => {
     const sub = subscriptions.data[0];
     const productId = sub.items.data[0]?.price?.product ?? null;
 
-    // Defensive: current_period_end could be number (unix) or string
     let subscriptionEnd: string | null = null;
     try {
       const endVal = sub.current_period_end;
@@ -99,6 +130,7 @@ serve(async (req) => {
     }
 
     logStep("Active subscription found", { subscriptionId: sub.id, productId, subscriptionEnd });
+    await syncOperatorPlanState({ subscribed: true, productId, subscriptionEnd });
 
     return new Response(
       JSON.stringify({ subscribed: true, product_id: productId, subscription_end: subscriptionEnd }),
