@@ -167,6 +167,33 @@ export async function executeImport(args: ExecuteImportArgs): Promise<{
     const { error } = await insertRow(tableName, payload);
 
     if (error) {
+      if (mode === "renters" && isPlanLimitError(error.message)) {
+        summary.blocked_by_plan++;
+        if (!summary.firstError) summary.firstError = error.message;
+        results.push({ index: row.index, status: "blocked_by_plan", error: error.message });
+
+        for (const remainingRow of rows.slice(results.length)) {
+          const remainingStatus = getPreviewStatus(remainingRow);
+
+          if (remainingStatus === "skipped_empty") {
+            summary.skipped_empty++;
+            results.push({ index: remainingRow.index, status: "skipped_empty" });
+            continue;
+          }
+
+          if (remainingStatus === "deleted_by_operator") {
+            summary.deleted_by_operator++;
+            results.push({ index: remainingRow.index, status: "deleted_by_operator" });
+            continue;
+          }
+
+          summary.blocked_by_plan++;
+          results.push({ index: remainingRow.index, status: "blocked_by_plan", error: error.message });
+        }
+
+        break;
+      }
+
       summary.failed_insert++;
       if (!summary.firstError) summary.firstError = error.message;
       results.push({ index: row.index, status: "failed_insert", error: error.message });
@@ -217,6 +244,11 @@ export function appendImportedExtras(existingNotes: string | null | undefined, e
 
   const extrasBlock = `Imported extras: ${cleanExtras.join(" | ")}`;
   return cleanNotes ? `${cleanNotes}\n\n${extrasBlock}` : extrasBlock;
+}
+
+function isPlanLimitError(message: string | null | undefined): boolean {
+  const normalized = normalizeCell(message ?? "").toLowerCase();
+  return normalized.includes("plan limit reached") || normalized.includes("subscribe to add more renters");
 }
 
 function collectSourceValues(headers: string[], row: string[]): Record<string, string> {

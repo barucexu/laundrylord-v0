@@ -9,18 +9,19 @@ const mockInsert = vi.fn();
 const mockFrom = vi.fn((_table: string) => ({ insert: mockInsert }));
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
+const mockSubscriptionState = {
+  tier: { max: 10, price: 0 },
+  renterCount: 0,
+  subscribed: false,
+  loading: false,
+};
 
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({ user: { id: "user-1" } }),
 }));
 
 vi.mock("@/hooks/useSubscription", () => ({
-  useSubscription: () => ({
-    tier: { max: 10, price: 0 },
-    renterCount: 0,
-    subscribed: false,
-    loading: false,
-  }),
+  useSubscription: () => mockSubscriptionState,
 }));
 
 vi.mock("@/utils/import/csv-parser", () => ({
@@ -84,6 +85,10 @@ describe("ImportPage", () => {
     mockToastError.mockReset();
     mockToastSuccess.mockReset();
     mockInsert.mockResolvedValue({ error: null });
+    mockSubscriptionState.tier = { max: 10, price: 0 };
+    mockSubscriptionState.renterCount = 0;
+    mockSubscriptionState.subscribed = false;
+    mockSubscriptionState.loading = false;
   });
 
   it("shows the preview notice and paginates all non-empty rows", async () => {
@@ -160,5 +165,24 @@ describe("ImportPage", () => {
     await waitFor(() => {
       expect(mockToastError).not.toHaveBeenCalled();
     });
+  });
+
+  it("shows a blocked-by-plan preview message when the free tier is already full", async () => {
+    mockSubscriptionState.renterCount = 10;
+
+    mockParseCSV.mockResolvedValue({
+      headers: ["Name"],
+      rows: [["Alice"], ["Bob"]],
+      sourceType: "csv",
+    });
+
+    const { container } = renderPage();
+    await uploadCsv(container);
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview Import" }));
+
+    expect(
+      await screen.findByText("Your plan has no renter slots remaining. All renter rows in this import will be blocked by plan."),
+    ).toBeInTheDocument();
   });
 });

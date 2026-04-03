@@ -71,15 +71,18 @@ serve(async (req) => {
       productId: string | null;
       subscriptionEnd: string | null;
     }) => {
-      const { error: syncError } = await serviceClient.from("operator_settings").upsert(
-        {
-          user_id: user.id,
-          saas_subscribed: subscribed,
-          saas_product_id: productId,
-          saas_subscription_end: subscriptionEnd,
-        },
-        { onConflict: "user_id" },
-      );
+<<<<<<< HEAD
+      const { error: syncError } = await serviceClient
+        .from("operator_settings")
+        .upsert(
+          {
+            user_id: user.id,
+            saas_subscribed: subscribed,
+            saas_product_id: productId,
+            saas_subscription_end: subscriptionEnd,
+          },
+          { onConflict: "user_id" },
+        );
 
       if (syncError) {
         throw new Error(`Failed to sync operator plan state: ${syncError.message}`);
