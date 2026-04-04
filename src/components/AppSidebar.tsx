@@ -61,10 +61,12 @@ export function AppSidebar() {
                     <NavLink
                       to={item.url}
                       end={item.url === "/"}
-                      className="rounded-xl border border-transparent px-3 py-3 text-sidebar-foreground transition-all hover:border-sidebar-border/70 hover:bg-sidebar-accent/80"
-                      activeClassName="border-sidebar-border/70 bg-sidebar-accent text-primary font-semibold shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45)]"
+                      className="rounded-xl border border-transparent px-3 py-2.5 text-sidebar-foreground transition-all hover:border-sidebar-border/70 hover:bg-sidebar-accent/80"
+                      activeClassName="border-sidebar-border/70 bg-sidebar-accent text-primary font-semibold shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45)] [&_.sidebar-nav-icon]:border-primary/15 [&_.sidebar-nav-icon]:bg-primary/10 [&_.sidebar-nav-icon]:text-primary"
                     >
-                      <item.icon className="h-4 w-4" />
+                      <span className="sidebar-nav-icon inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-background/20 text-muted-foreground transition-colors">
+                        <item.icon className="h-4 w-4" />
+                      </span>
                       {!collapsed && <span className="text-sm tracking-[-0.01em]">{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
@@ -76,15 +78,15 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border/70 p-3">
         {!collapsed ? (
-          <div className="space-y-3 rounded-[1.25rem] border border-sidebar-border/70 bg-sidebar-accent/55 p-3">
+          <div className="space-y-2 rounded-[1.1rem] border border-sidebar-border/70 bg-sidebar-accent/45 p-2.5">
             <div>
               <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Signed in</div>
-              <div className="mt-1 truncate font-mono text-[11px] text-muted-foreground">{user?.email}</div>
+              <div className="mt-1 truncate font-mono text-[10px] text-muted-foreground">{user?.email}</div>
             </div>
-            <Button variant="ghost" size="sm" className="w-full justify-start gap-2 rounded-xl text-muted-foreground hover:bg-background/80 hover:text-foreground" onClick={signOut}>
+            <Button variant="ghost" size="sm" className="h-8 w-full justify-start gap-2 rounded-lg px-2.5 text-muted-foreground hover:bg-background/80 hover:text-foreground" onClick={signOut}>
               <LogOut className="h-3.5 w-3.5" /> Sign Out
             </Button>
-            <div className="px-1 text-[10px] text-muted-foreground/70">
+            <div className="px-1 text-[9px] text-muted-foreground/65">
               <Mail className="inline h-2.5 w-2.5 mr-0.5" />
               <a href="mailto:don.brucexu@gmail.com" className="hover:text-muted-foreground">don.brucexu@gmail.com</a>
             </div>

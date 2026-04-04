@@ -170,7 +170,9 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+              <IconBadge>
+                <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+              </IconBadge>
               Due today and overdue
             </CardTitle>
           </CardHeader>
@@ -210,7 +212,12 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Recent payments</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <IconBadge>
+                <DollarSign className="h-3.5 w-3.5 text-primary" />
+              </IconBadge>
+              Recent payments
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {recentPayments.length === 0 ? (
@@ -239,7 +246,10 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <Wrench className="h-4 w-4" /> Open maintenance
+              <IconBadge>
+                <Wrench className="h-3.5 w-3.5 text-foreground" />
+              </IconBadge>
+              Open maintenance
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -266,7 +276,10 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <Box className="h-4 w-4" /> Inventory snapshot
+              <IconBadge>
+                <Box className="h-3.5 w-3.5 text-foreground" />
+              </IconBadge>
+              Inventory snapshot
             </CardTitle>
           </CardHeader>
           <CardContent className="pb-6 pt-0">
@@ -323,7 +336,7 @@ function KpiCard({
       <CardContent className="p-4">
         <div className="flex items-center justify-between gap-2">
           <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{label}</span>
-          {icon}
+          <IconBadge>{icon}</IconBadge>
         </div>
         <div className={`mt-3 text-2xl font-mono font-semibold tracking-tight ${className}`}>{value}</div>
       </CardContent>
@@ -337,5 +350,13 @@ function HeroStat({ label, value }: { label: string; value: string }) {
       <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{label}</div>
       <div className="mt-2 text-xl font-mono font-semibold tracking-tight text-foreground">{value}</div>
     </div>
+  );
+}
+
+function IconBadge({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 bg-background/70 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45)]">
+      {children}
+    </span>
   );
 }
