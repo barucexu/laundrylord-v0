@@ -85,29 +85,78 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="flex flex-col items-center px-4 py-12">
-        {/* Auth section */}
-        <div className="w-full max-w-[400px]">
-          <div className="text-center mb-8">
-            <img src={logoImg} alt="LaundryLord" className="mx-auto mb-4 h-16 w-16 rounded-xl object-contain" />
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              {mode === "forgot" ? "Reset Password" : mode === "login" ? "Welcome to the Club" : "Create account"}
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              {mode === "forgot"
-                ? "Enter your email and we'll send a reset link"
-                : mode === "login"
-                  ? "Sign in to your LaundryLord account"
-                  : "Set up your operator account"}
-            </p>
-          </div>
+    <div className="min-h-screen bg-transparent">
+      <div className="mx-auto grid min-h-screen w-full max-w-[1400px] gap-8 px-4 py-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-6 lg:py-8">
+        <section className="relative overflow-hidden rounded-[2rem] border border-border/70 bg-[linear-gradient(180deg,hsl(var(--card)),hsl(var(--accent)/0.38))] px-6 py-8 shadow-[0_30px_80px_-40px_rgba(27,36,30,0.45)] lg:px-10 lg:py-10">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.13),transparent_32%),radial-gradient(circle_at_80%_18%,hsl(var(--warning)/0.14),transparent_22%)]" />
+          <div className="relative flex h-full flex-col justify-between gap-10">
+            <div className="space-y-8">
+              <div className="inline-flex items-center gap-3 rounded-full border border-border/70 bg-background/70 px-4 py-2 backdrop-blur-sm">
+                <img src={logoImg} alt="LaundryLord" className="h-9 w-9 rounded-2xl border border-border/60 bg-white/80 object-contain p-1" />
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground">LaundryLord</div>
+                  <div className="text-sm font-extrabold tracking-[-0.04em] text-foreground">Premium software for laundry operators</div>
+                </div>
+              </div>
 
-          <Card>
-            <CardContent className="p-6 space-y-4">
+              <div className="max-w-2xl space-y-4">
+                <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-primary">Operations, billing, and renter visibility</div>
+                <h1 className="max-w-2xl text-4xl font-extrabold tracking-[-0.06em] text-foreground sm:text-5xl">
+                  Run a cleaner rental business with calmer software.
+                </h1>
+                <p className="max-w-xl text-base leading-7 text-muted-foreground">
+                  Track renters, collect payments, manage machines, and stay ahead of issues in one polished control center built for real operators.
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="rounded-[1.4rem] border border-border/70 bg-background/75 p-4 backdrop-blur-sm">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">Cash flow</div>
+                  <div className="mt-3 text-3xl font-extrabold tracking-[-0.05em] text-foreground">$12.4k</div>
+                  <div className="mt-1 text-sm text-muted-foreground">processed this month</div>
+                </div>
+                <div className="rounded-[1.4rem] border border-border/70 bg-background/75 p-4 backdrop-blur-sm">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">On-time rate</div>
+                  <div className="mt-3 text-3xl font-extrabold tracking-[-0.05em] text-foreground">96%</div>
+                  <div className="mt-1 text-sm text-muted-foreground">autopay-driven collections</div>
+                </div>
+                <div className="rounded-[1.4rem] border border-border/70 bg-background/75 p-4 backdrop-blur-sm">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">Machine fleet</div>
+                  <div className="mt-3 text-3xl font-extrabold tracking-[-0.05em] text-foreground">128</div>
+                  <div className="mt-1 text-sm text-muted-foreground">tracked with full visibility</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
+              <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">Automated billing activation</div>
+              <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">Cleaner renter records and timelines</div>
+              <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">Machine assignment and maintenance tracking</div>
+            </div>
+          </div>
+        </section>
+
+        <section className="flex flex-col justify-center">
+          <div className="mx-auto w-full max-w-[460px] space-y-6">
+            <div className="px-1">
+              <div className="text-[11px] font-bold uppercase tracking-[0.26em] text-primary">Account access</div>
+              <h2 className="mt-3 text-3xl font-extrabold tracking-[-0.05em] text-foreground">
+                {mode === "forgot" ? "Reset password" : mode === "login" ? "Welcome back" : "Create your account"}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {mode === "forgot"
+                  ? "Enter your email and we’ll send a secure password reset link."
+                  : mode === "login"
+                    ? "Sign in to access your renters, billing, and machine operations."
+                    : "Set up your operator account and start organizing your business."}
+              </p>
+            </div>
+
+            <Card className="overflow-hidden bg-card/92">
+              <CardContent className="space-y-5 p-7">
               {mode !== "forgot" && (
                 <>
-                  <Button variant="outline" className="w-full gap-2 h-10" onClick={handleGoogleSignIn} disabled={loading}>
+                  <Button variant="outline" className="h-11 w-full gap-2" onClick={handleGoogleSignIn} disabled={loading}>
                     <svg className="h-4 w-4" viewBox="0 0 24 24">
                       <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
                       <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
@@ -125,14 +174,14 @@ export default function AuthPage() {
               )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="email" className="text-xs font-medium">Email</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Email</Label>
                   <Input id="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
                 </div>
                 {mode !== "forgot" && (
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="password" className="text-xs font-medium">Password</Label>
+                      <Label htmlFor="password" className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Password</Label>
                       {mode === "login" && (
                         <button type="button" onClick={() => setMode("forgot")} className="text-[11px] text-muted-foreground hover:text-primary transition-colors">
                           Forgot password?
@@ -142,12 +191,12 @@ export default function AuthPage() {
                     <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
                   </div>
                 )}
-                <Button type="submit" className="w-full" disabled={loading}>
+                <Button type="submit" className="mt-2 h-11 w-full" disabled={loading}>
                   {loading ? "Loading..." : mode === "forgot" ? "Send Reset Link" : mode === "login" ? "Sign In" : "Create Account"}
                 </Button>
               </form>
 
-              <div className="text-center text-sm text-muted-foreground pt-2">
+              <div className="border-t border-border/70 pt-4 text-center text-sm text-muted-foreground">
                 {mode === "forgot" ? (
                   <button onClick={() => setMode("login")} className="text-primary hover:underline font-medium text-xs">Back to sign in</button>
                 ) : mode === "login" ? (
@@ -165,8 +214,7 @@ export default function AuthPage() {
             </CardContent>
           </Card>
 
-          {/* Explore Demo CTA */}
-          <div className="mt-6 text-center space-y-2">
+          <div className="space-y-2 text-center">
             <Button
               variant="outline"
               size="lg"
@@ -180,11 +228,13 @@ export default function AuthPage() {
               No signup required — see LaundryLord with sample data
             </p>
           </div>
-        </div>
+          </div>
+        </section>
 
-        {/* Pricing Calculator */}
-        <div className="w-full max-w-3xl mt-16">
-          <PricingCalculator />
+        <div className="lg:col-span-2">
+          <div className="rounded-[2rem] border border-border/70 bg-card/70 px-6 py-8 shadow-[0_24px_70px_-38px_rgba(27,36,30,0.4)] backdrop-blur-sm sm:px-8">
+            <PricingCalculator />
+          </div>
         </div>
       </div>
     </div>

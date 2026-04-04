@@ -2,31 +2,31 @@ import { cn } from "@/lib/utils";
 
 const statusStyles: Record<string, string> = {
   // Renter statuses
-  lead: "bg-muted text-muted-foreground",
-  scheduled: "bg-primary/10 text-primary",
-  active: "bg-success/10 text-success",
-  late: "bg-destructive/10 text-destructive",
-  maintenance: "bg-warning/10 text-warning",
-  termination_requested: "bg-destructive/10 text-destructive",
-  pickup_scheduled: "bg-warning/10 text-warning",
-  closed: "bg-muted text-muted-foreground",
-  defaulted: "bg-destructive/15 text-destructive",
+  lead: "border border-border/70 bg-muted/80 text-muted-foreground",
+  scheduled: "border border-primary/15 bg-primary/10 text-primary",
+  active: "border border-success/15 bg-success/10 text-success",
+  late: "border border-destructive/15 bg-destructive/10 text-destructive",
+  maintenance: "border border-warning/15 bg-warning/12 text-warning",
+  termination_requested: "border border-destructive/15 bg-destructive/10 text-destructive",
+  pickup_scheduled: "border border-warning/15 bg-warning/12 text-warning",
+  closed: "border border-border/70 bg-muted/80 text-muted-foreground",
+  defaulted: "border border-destructive/15 bg-destructive/15 text-destructive",
   // Payment statuses
-  upcoming: "bg-muted text-muted-foreground",
-  due_soon: "bg-warning/10 text-warning",
-  overdue: "bg-destructive/10 text-destructive",
-  failed: "bg-destructive/15 text-destructive",
-  paid: "bg-success/10 text-success",
+  upcoming: "border border-border/70 bg-muted/80 text-muted-foreground",
+  due_soon: "border border-warning/15 bg-warning/12 text-warning",
+  overdue: "border border-destructive/15 bg-destructive/10 text-destructive",
+  failed: "border border-destructive/15 bg-destructive/15 text-destructive",
+  paid: "border border-success/15 bg-success/10 text-success",
   // Machine statuses
-  available: "bg-success/10 text-success",
-  assigned: "bg-primary/10 text-primary",
-  retired: "bg-muted text-muted-foreground",
+  available: "border border-success/15 bg-success/10 text-success",
+  assigned: "border border-primary/15 bg-primary/10 text-primary",
+  retired: "border border-border/70 bg-muted/80 text-muted-foreground",
   // Maintenance statuses
-  reported: "bg-warning/10 text-warning",
-  in_progress: "bg-primary/10 text-primary",
-  resolved: "bg-success/10 text-success",
+  reported: "border border-warning/15 bg-warning/12 text-warning",
+  in_progress: "border border-primary/15 bg-primary/10 text-primary",
+  resolved: "border border-success/15 bg-success/10 text-success",
   // Archive status
-  archived: "bg-muted text-muted-foreground",
+  archived: "border border-border/70 bg-muted/80 text-muted-foreground",
 };
 
 const statusLabels: Record<string, string> = {
@@ -55,11 +55,13 @@ const statusLabels: Record<string, string> = {
 
 export function StatusBadge({ status, className }: { status: string; className?: string }) {
   return (
-    <span className={cn(
-      "inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold uppercase tracking-wide whitespace-nowrap",
-      statusStyles[status] || "bg-muted text-muted-foreground",
-      className
-    )}>
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] whitespace-nowrap",
+        statusStyles[status] || "border border-border/70 bg-muted/80 text-muted-foreground",
+        className,
+      )}
+    >
       {statusLabels[status] || status}
     </span>
   );

@@ -1,18 +1,18 @@
 const SOURCE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  stripe: { bg: "bg-purple-100 dark:bg-purple-900/30", text: "text-purple-700 dark:text-purple-300", label: "Stripe" },
-  square: { bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-700 dark:text-blue-300", label: "Square" },
-  zelle: { bg: "bg-indigo-100 dark:bg-indigo-900/30", text: "text-indigo-700 dark:text-indigo-300", label: "Zelle" },
-  venmo: { bg: "bg-cyan-100 dark:bg-cyan-900/30", text: "text-cyan-700 dark:text-cyan-300", label: "Venmo" },
-  cashapp: { bg: "bg-green-100 dark:bg-green-900/30", text: "text-green-700 dark:text-green-300", label: "CashApp" },
-  apple_pay: { bg: "bg-gray-100 dark:bg-gray-800/50", text: "text-gray-700 dark:text-gray-300", label: "Apple Pay" },
-  cash: { bg: "bg-amber-100 dark:bg-amber-900/30", text: "text-amber-700 dark:text-amber-300", label: "Cash" },
-  other: { bg: "bg-muted", text: "text-muted-foreground", label: "Other" },
+  stripe: { bg: "border border-primary/15 bg-primary/10", text: "text-primary", label: "Stripe" },
+  square: { bg: "border border-sky-500/15 bg-sky-500/10", text: "text-sky-700 dark:text-sky-300", label: "Square" },
+  zelle: { bg: "border border-violet-500/15 bg-violet-500/10", text: "text-violet-700 dark:text-violet-300", label: "Zelle" },
+  venmo: { bg: "border border-cyan-500/15 bg-cyan-500/10", text: "text-cyan-700 dark:text-cyan-300", label: "Venmo" },
+  cashapp: { bg: "border border-success/15 bg-success/10", text: "text-success", label: "CashApp" },
+  apple_pay: { bg: "border border-border/70 bg-muted/80", text: "text-foreground/80", label: "Apple Pay" },
+  cash: { bg: "border border-warning/15 bg-warning/12", text: "text-warning", label: "Cash" },
+  other: { bg: "border border-border/70 bg-muted/80", text: "text-muted-foreground", label: "Other" },
 };
 
 export function PaymentSourceBadge({ source }: { source: string | null }) {
   const s = SOURCE_STYLES[source || "stripe"] || SOURCE_STYLES.other;
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider ${s.bg} ${s.text}`}>
+    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${s.bg} ${s.text}`}>
       {s.label}
     </span>
   );
