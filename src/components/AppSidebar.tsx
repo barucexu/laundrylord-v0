@@ -40,9 +40,10 @@ export function AppSidebar() {
           <div className="rounded-[1.4rem] border border-sidebar-border/70 bg-[linear-gradient(180deg,hsl(var(--sidebar-background)),hsl(var(--sidebar-accent)/0.7))] p-3 shadow-[0_24px_50px_-35px_rgba(27,36,30,0.45)]">
             <div className="flex items-center gap-3">
               <img src={logoImg} alt="LaundryLord" className="h-10 w-10 rounded-2xl border border-sidebar-border/60 bg-white/70 object-contain p-1.5 shadow-sm" />
-              <div className="min-w-0">
-                <span className="block text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground">LaundryLord</span>
-                <span className="block truncate text-base font-extrabold tracking-[-0.04em] text-foreground">Operator console</span>
+              <div className="min-w-0 flex-1">
+                <span className="block whitespace-nowrap text-[clamp(0.8rem,1.4vw,0.95rem)] font-extrabold uppercase tracking-[0.24em] text-foreground">
+                  LaundryLord
+                </span>
               </div>
               <SidebarTrigger className="ml-auto h-9 w-9 rounded-xl border border-sidebar-border/70 bg-background/70 text-muted-foreground hover:text-foreground" />
             </div>
@@ -62,9 +63,9 @@ export function AppSidebar() {
                       to={item.url}
                       end={item.url === "/"}
                       className="rounded-xl border border-transparent px-3 py-2.5 text-sidebar-foreground transition-all hover:border-sidebar-border/70 hover:bg-sidebar-accent/80"
-                      activeClassName="border-sidebar-border/70 bg-sidebar-accent text-primary font-semibold shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45)] [&_.sidebar-nav-icon]:border-primary/15 [&_.sidebar-nav-icon]:bg-primary/10 [&_.sidebar-nav-icon]:text-primary"
+                      activeClassName="border-sidebar-border/70 bg-sidebar-accent text-primary font-semibold shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45)] [&_.sidebar-nav-icon]:h-10 [&_.sidebar-nav-icon]:w-10 [&_.sidebar-nav-icon]:rounded-full [&_.sidebar-nav-icon]:border-primary/20 [&_.sidebar-nav-icon]:bg-primary/10 [&_.sidebar-nav-icon]:text-primary"
                     >
-                      <span className="sidebar-nav-icon inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-background/20 text-muted-foreground transition-colors">
+                      <span className="sidebar-nav-icon inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-transparent bg-background/20 text-muted-foreground transition-all">
                         <item.icon className="h-4 w-4" />
                       </span>
                       {!collapsed && <span className="text-sm tracking-[-0.01em]">{item.title}</span>}

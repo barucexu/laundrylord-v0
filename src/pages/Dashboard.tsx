@@ -77,8 +77,7 @@ export default function Dashboard() {
     return (
       <div className="space-y-6">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-primary">Mission control</p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-[-0.05em]">Operator dashboard</h1>
+          <h1 className="text-2xl font-extrabold tracking-[-0.05em] text-foreground">Dashboard</h1>
         </div>
         <div className="flex items-center justify-center rounded-[1.75rem] border border-border/70 bg-card/80 py-12">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -89,27 +88,10 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[2rem] border border-border/70 bg-[linear-gradient(180deg,hsl(var(--card)),hsl(var(--accent)/0.32))] p-6 shadow-[0_28px_70px_-42px_rgba(27,36,30,0.45)]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.14),transparent_30%),radial-gradient(circle_at_85%_20%,hsl(var(--warning)/0.12),transparent_18%)]" />
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl">
-            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-primary">Mission control</p>
-            <h1 className="mt-3 text-3xl font-extrabold tracking-[-0.06em] text-foreground sm:text-4xl">
-              Keep collections sharp and operations calm.
-            </h1>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
-              Track revenue, late accounts, machine activity, and maintenance from one polished command surface built
-              for day-to-day operator decisions.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <HeroStat label="Monthly recurring revenue" value={`$${kpis.mrr.toLocaleString()}`} />
-            <HeroStat label="Collected revenue" value={`$${kpis.totalRevenue.toLocaleString()}`} />
-            <HeroStat label="Late balance" value={`$${kpis.overdueBalance.toLocaleString()}`} />
-            <HeroStat label="On-time rate" value={`${kpis.onTimeRate}%`} />
-          </div>
-        </div>
-      </section>
+      <div>
+        <h1 className="text-2xl font-extrabold tracking-[-0.05em] text-foreground">Dashboard</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Revenue, renter health, and machine operations at a glance.</p>
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <KpiCard icon={<Users className="h-4 w-4 text-primary" />} value={kpis.activeRenters} label="Active renters" />
@@ -341,15 +323,6 @@ function KpiCard({
         <div className={`mt-3 text-2xl font-mono font-semibold tracking-tight ${className}`}>{value}</div>
       </CardContent>
     </Card>
-  );
-}
-
-function HeroStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[1.3rem] border border-border/70 bg-background/70 px-4 py-3 backdrop-blur-sm">
-      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{label}</div>
-      <div className="mt-2 text-xl font-mono font-semibold tracking-tight text-foreground">{value}</div>
-    </div>
   );
 }
 
