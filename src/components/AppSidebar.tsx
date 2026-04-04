@@ -63,14 +63,28 @@ export function AppSidebar() {
             <SidebarMenu className="space-y-1">
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.title} className={collapsed ? "" : "px-1"}>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton asChild tooltip={collapsed ? item.title : undefined}>
                     <NavLink
                       to={item.url}
                       end={item.url === "/"}
-                      className="rounded-xl border border-transparent px-3 py-2.5 text-sidebar-foreground transition-all hover:border-sidebar-border/70 hover:bg-sidebar-accent/80"
-                      activeClassName="border-sidebar-border/70 bg-sidebar-accent text-primary font-semibold shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45)] [&_.sidebar-nav-icon]:h-10 [&_.sidebar-nav-icon]:w-10 [&_.sidebar-nav-icon]:rounded-full [&_.sidebar-nav-icon]:border-primary/20 [&_.sidebar-nav-icon]:bg-primary/10 [&_.sidebar-nav-icon]:text-primary"
+                      className={
+                        collapsed
+                          ? "rounded-2xl border border-transparent p-0 text-sidebar-foreground transition-all hover:border-sidebar-border/70 hover:bg-sidebar-accent/80"
+                          : "rounded-xl border border-transparent px-3 py-2.5 text-sidebar-foreground transition-all hover:border-sidebar-border/70 hover:bg-sidebar-accent/80"
+                      }
+                      activeClassName={
+                        collapsed
+                          ? "border-sidebar-border/70 bg-sidebar-accent text-primary shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45)] [&_.sidebar-nav-icon]:h-10 [&_.sidebar-nav-icon]:w-10 [&_.sidebar-nav-icon]:rounded-full [&_.sidebar-nav-icon]:border-primary/20 [&_.sidebar-nav-icon]:bg-primary/10 [&_.sidebar-nav-icon]:text-primary"
+                          : "border-sidebar-border/70 bg-sidebar-accent text-primary font-semibold shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45)] [&_.sidebar-nav-icon]:h-10 [&_.sidebar-nav-icon]:w-10 [&_.sidebar-nav-icon]:rounded-full [&_.sidebar-nav-icon]:border-primary/20 [&_.sidebar-nav-icon]:bg-primary/10 [&_.sidebar-nav-icon]:text-primary"
+                      }
                     >
-                      <span className="sidebar-nav-icon inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-transparent bg-background/20 text-muted-foreground transition-all">
+                      <span
+                        className={
+                          collapsed
+                            ? "sidebar-nav-icon inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-transparent bg-background/10 text-muted-foreground transition-all"
+                            : "sidebar-nav-icon inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-transparent bg-background/20 text-muted-foreground transition-all"
+                        }
+                      >
                         <item.icon className="h-4 w-4" />
                       </span>
                       {!collapsed && <span className="text-sm tracking-[-0.01em]">{item.title}</span>}
