@@ -34,26 +34,31 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border/70 bg-sidebar/90 backdrop-blur-xl">
-      <SidebarHeader className="px-4 py-5">
+    <Sidebar
+      collapsible="icon"
+      className="border-r border-sidebar-border/70 bg-sidebar/90 backdrop-blur-xl [--sidebar-width:17rem] [--sidebar-width-icon:4.5rem]"
+    >
+      <SidebarHeader className={collapsed ? "px-2 py-4" : "px-4 py-5"}>
         {!collapsed ? (
           <div className="rounded-[1.4rem] border border-sidebar-border/70 bg-[linear-gradient(180deg,hsl(var(--sidebar-background)),hsl(var(--sidebar-accent)/0.7))] p-3 shadow-[0_24px_50px_-35px_rgba(27,36,30,0.45)]">
-            <div className="flex items-center gap-3">
-              <img src={logoImg} alt="LaundryLord" className="h-10 w-10 rounded-2xl border border-sidebar-border/60 bg-white/70 object-contain p-1.5 shadow-sm" />
+            <div className="flex items-center gap-2.5">
+              <img src={logoImg} alt="LaundryLord" className="h-9 w-9 rounded-2xl border border-sidebar-border/60 bg-white/70 object-contain p-1.5 shadow-sm" />
               <div className="min-w-0 flex-1">
-                <span className="block whitespace-nowrap text-[clamp(0.8rem,1.4vw,0.95rem)] font-extrabold uppercase tracking-[0.24em] text-foreground">
+                <span className="block whitespace-nowrap text-[0.82rem] font-extrabold uppercase tracking-[0.18em] text-foreground">
                   LaundryLord
                 </span>
               </div>
-              <SidebarTrigger className="ml-auto h-9 w-9 rounded-xl border border-sidebar-border/70 bg-background/70 text-muted-foreground hover:text-foreground" />
+              <SidebarTrigger className="ml-auto h-8 w-8 shrink-0 rounded-xl border border-sidebar-border/70 bg-background/70 text-muted-foreground hover:text-foreground" />
             </div>
           </div>
         ) : (
-          <SidebarTrigger className="mx-auto h-9 w-9 rounded-xl border border-sidebar-border/70 bg-background/70 text-muted-foreground hover:text-foreground" />
+          <div className="flex justify-center">
+            <SidebarTrigger className="h-10 w-10 rounded-2xl border border-sidebar-border/70 bg-background/70 text-muted-foreground hover:text-foreground" />
+          </div>
         )}
       </SidebarHeader>
-      <SidebarContent className="px-3">
-        <SidebarGroup>
+      <SidebarContent className={collapsed ? "px-2" : "px-3"}>
+        <SidebarGroup className={collapsed ? "px-1 py-2" : undefined}>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
               {navItems.map((item) => (
@@ -77,7 +82,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="border-t border-sidebar-border/70 p-3">
+      <SidebarFooter className={collapsed ? "border-t border-sidebar-border/70 p-2" : "border-t border-sidebar-border/70 p-3"}>
         {!collapsed ? (
           <div className="space-y-2 rounded-[1.1rem] border border-sidebar-border/70 bg-sidebar-accent/45 p-2.5">
             <div>
@@ -93,7 +98,7 @@ export function AppSidebar() {
             </div>
           </div>
         ) : (
-          <Button variant="ghost" size="icon" className="mx-auto rounded-xl text-muted-foreground hover:bg-sidebar-accent hover:text-foreground" onClick={signOut}>
+          <Button variant="ghost" size="icon" className="mx-auto h-10 w-10 rounded-2xl text-muted-foreground hover:bg-sidebar-accent hover:text-foreground" onClick={signOut}>
             <LogOut className="h-3.5 w-3.5" />
           </Button>
         )}
