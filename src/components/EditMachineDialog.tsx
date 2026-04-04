@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useUpdateMachine, type MachineRow } from "@/hooks/useSupabaseData";
+import { Separator } from "@/components/ui/separator";
+import { useEntityCustomFields, useUpdateMachine, useUpsertCustomFieldValues, type MachineRow } from "@/hooks/useSupabaseData";
 import { toast } from "sonner";
 
 interface EditMachineDialogProps {
@@ -16,6 +17,8 @@ interface EditMachineDialogProps {
 
 export function EditMachineDialog({ open, onOpenChange, machine }: EditMachineDialogProps) {
   const updateMachine = useUpdateMachine();
+  const upsertCustomFieldValues = useUpsertCustomFieldValues("machine");
+  const { data: customFields = [] } = useEntityCustomFields("machine", open ? machine.id : undefined);
   const [form, setForm] = useState({
     type: machine.type,
     model: machine.model,
@@ -27,6 +30,7 @@ export function EditMachineDialog({ open, onOpenChange, machine }: EditMachineDi
     cost_basis: String((machine as any).cost_basis || 0),
     sourced_from: (machine as any).sourced_from || "",
   });
+  const [customFieldForm, setCustomFieldForm] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (open) {
@@ -43,6 +47,14 @@ export function EditMachineDialog({ open, onOpenChange, machine }: EditMachineDi
       });
     }
   }, [open, machine]);
+
+  useEffect(() => {
+    if (open) {
+      setCustomFieldForm(
+        Object.fromEntries(customFields.map((field) => [field.field_definition_id, field.value])),
+      );
+    }
+  }, [open, customFields]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +75,13 @@ export function EditMachineDialog({ open, onOpenChange, machine }: EditMachineDi
         cost_basis: parseFloat(form.cost_basis) || 0,
         sourced_from: form.sourced_from,
       } as any);
+      await upsertCustomFieldValues.mutateAsync({
+        entityId: machine.id,
+        values: customFields.map((field) => ({
+          field_definition_id: field.field_definition_id,
+          value: customFieldForm[field.field_definition_id] ?? "",
+        })),
+      });
       toast.success("Machine updated");
       onOpenChange(false);
     } catch (err: any) {
@@ -148,10 +167,37 @@ export function EditMachineDialog({ open, onOpenChange, machine }: EditMachineDi
             <Label>Notes</Label>
             <Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} />
           </div>
+          {customFields.length > 0 && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <div>
+                  <Label>Custom Fields</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Imported custom fields stay separate from Notes.
+                  </p>
+                </div>
+                {customFields.map((field) => (
+                  <div key={field.field_definition_id} className="space-y-2">
+                    <Label>{field.label}</Label>
+                    <Input
+                      value={customFieldForm[field.field_definition_id] ?? ""}
+                      onChange={(e) =>
+                        setCustomFieldForm((current) => ({
+                          ...current,
+                          [field.field_definition_id]: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={updateMachine.isPending}>
-              {updateMachine.isPending ? "Saving..." : "Save Changes"}
+            <Button type="submit" disabled={updateMachine.isPending || upsertCustomFieldValues.isPending}>
+              {updateMachine.isPending || upsertCustomFieldValues.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </form>

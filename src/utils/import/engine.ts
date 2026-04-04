@@ -1,4 +1,5 @@
 import { format, isValid, parse } from "date-fns";
+import { normalizeCustomFieldKey } from "@/lib/custom-fields";
 import type { ClassifiedRow, ImportField, ImportMode, ImportRowResult, ImportSummary, PreviewRowStatus } from "./types";
 
 type ExecuteImportArgs = {
@@ -6,7 +7,23 @@ type ExecuteImportArgs = {
   mode: ImportMode;
   userId: string;
   renterSlotsAvailable: number;
-  insertRow: (tableName: "renters" | "machines", record: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+  insertRow: (
+    tableName: "renters" | "machines",
+    record: Record<string, unknown>,
+  ) => Promise<{ data: { id: string } | null; error: { message: string } | null }>;
+  ensureCustomFieldDefinition: (args: {
+    userId: string;
+    entityType: "renter" | "machine";
+    key: string;
+    label: string;
+  }) => Promise<{ data: { id: string } | null; error: { message: string } | null }>;
+  upsertCustomFieldValue: (args: {
+    userId: string;
+    entityType: "renter" | "machine";
+    entityId: string;
+    fieldDefinitionId: string;
+    value: string;
+  }) => Promise<{ error: { message: string } | null }>;
 };
 
 const DATE_PATTERNS = [
@@ -53,6 +70,7 @@ export function classifyImportRows(args: {
         mapped: {},
         record: {},
         extrasPreview: [],
+        customFields: [],
         warnings: [],
       };
     }
@@ -60,6 +78,7 @@ export function classifyImportRows(args: {
     const mapped: Record<string, string> = {};
     const record: Record<string, unknown> = {};
     const extras: string[] = [];
+    const customFields: { key: string; label: string; value: string }[] = [];
     const warnings: string[] = [];
     let mappedNotes = "";
     let hasMappedContent = false;
@@ -96,11 +115,15 @@ export function classifyImportRows(args: {
       const rawValue = normalizeCell(row[headerIndex]);
       if (!rawValue) continue;
       extras.push(`${header}: ${rawValue}`);
+      customFields.push({
+        key: normalizeCustomFieldKey(header),
+        label: header,
+        value: rawValue,
+      });
     }
 
-    const notes = appendImportedExtras(mappedNotes, extras);
-    if (notes) {
-      record.notes = notes;
+    if (mappedNotes) {
+      record.notes = mappedNotes;
     }
 
     if (mode === "machines") {
@@ -114,7 +137,7 @@ export function classifyImportRows(args: {
     }
 
     if (!hasMappedContent) {
-      warnings.push("Only unknown columns contained data");
+      warnings.push("Only custom columns contained data");
     }
 
     return {
@@ -127,6 +150,7 @@ export function classifyImportRows(args: {
       mapped,
       record,
       extrasPreview: extras,
+      customFields,
       warnings,
     };
   });
@@ -136,11 +160,13 @@ export async function executeImport(args: ExecuteImportArgs): Promise<{
   results: ImportRowResult[];
   summary: ImportSummary;
 }> {
-  const { rows, mode, userId, renterSlotsAvailable, insertRow } = args;
+  const { rows, mode, userId, renterSlotsAvailable, insertRow, ensureCustomFieldDefinition, upsertCustomFieldValue } = args;
   const tableName = mode === "renters" ? "renters" : "machines";
+  const entityType = mode === "renters" ? "renter" : "machine";
   const summary = createEmptySummary();
   const results: ImportRowResult[] = [];
   let importedRenters = 0;
+  const definitionCache = new Map<string, string>();
 
   for (const row of rows) {
     const previewStatus = getPreviewStatus(row);
@@ -164,7 +190,7 @@ export async function executeImport(args: ExecuteImportArgs): Promise<{
     }
 
     const payload = prepareInsertPayload(row.record, userId);
-    const { error } = await insertRow(tableName, payload);
+    const { data, error } = await insertRow(tableName, payload);
 
     if (error) {
       if (mode === "renters" && isPlanLimitError(error.message)) {
@@ -200,6 +226,58 @@ export async function executeImport(args: ExecuteImportArgs): Promise<{
       continue;
     }
 
+    if (!data?.id) {
+      const message = "Insert completed without returning a record ID.";
+      summary.failed_insert++;
+      if (!summary.firstError) summary.firstError = message;
+      results.push({ index: row.index, status: "failed_insert", error: message });
+      continue;
+    }
+
+    let customFieldError: string | null = null;
+
+    for (const customField of row.customFields) {
+      const cacheKey = `${entityType}:${customField.key}`;
+      let fieldDefinitionId = definitionCache.get(cacheKey);
+
+      if (!fieldDefinitionId) {
+        const definitionResult = await ensureCustomFieldDefinition({
+          userId,
+          entityType,
+          key: customField.key,
+          label: customField.label,
+        });
+
+        if (definitionResult.error || !definitionResult.data?.id) {
+          customFieldError = definitionResult.error?.message || "Failed to create custom field definition.";
+          break;
+        }
+
+        fieldDefinitionId = definitionResult.data.id;
+        definitionCache.set(cacheKey, fieldDefinitionId);
+      }
+
+      const valueResult = await upsertCustomFieldValue({
+        userId,
+        entityType,
+        entityId: data.id,
+        fieldDefinitionId,
+        value: customField.value,
+      });
+
+      if (valueResult.error) {
+        customFieldError = valueResult.error.message;
+        break;
+      }
+    }
+
+    if (customFieldError) {
+      summary.failed_insert++;
+      if (!summary.firstError) summary.firstError = customFieldError;
+      results.push({ index: row.index, status: "failed_insert", error: customFieldError });
+      continue;
+    }
+
     summary.imported++;
     if (mode === "renters") importedRenters++;
     results.push({ index: row.index, status: "imported" });
@@ -232,18 +310,6 @@ export function createEmptySummary(): ImportSummary {
     skipped_empty: 0,
     deleted_by_operator: 0,
   };
-}
-
-export function appendImportedExtras(existingNotes: string | null | undefined, extras: string[]): string | null {
-  const cleanNotes = normalizeCell(existingNotes ?? "");
-  const cleanExtras = extras.map(normalizeCell).filter(Boolean);
-
-  if (cleanExtras.length === 0) {
-    return cleanNotes || null;
-  }
-
-  const extrasBlock = `Imported extras: ${cleanExtras.join(" | ")}`;
-  return cleanNotes ? `${cleanNotes}\n\n${extrasBlock}` : extrasBlock;
 }
 
 function isPlanLimitError(message: string | null | undefined): boolean {

@@ -6,7 +6,29 @@ import ImportPage from "@/pages/ImportPage";
 
 const mockParseCSV = vi.fn();
 const mockInsert = vi.fn();
-const mockFrom = vi.fn((_table: string) => ({ insert: mockInsert }));
+const mockUpsert = vi.fn();
+const mockSelect = vi.fn(() => ({ single: vi.fn(async () => ({ data: { id: "row-1" }, error: null })) }));
+const mockInsertBuilder = {
+  select: mockSelect,
+  single: vi.fn(async () => ({ data: { id: "row-1" }, error: null })),
+};
+const mockFrom = vi.fn((table: string) => {
+  if (table === "renters" || table === "machines") {
+    return {
+      insert: (...args: unknown[]) => {
+        mockInsert(...args);
+        return mockInsertBuilder;
+      },
+    };
+  }
+
+  return {
+    upsert: (...args: unknown[]) => {
+      mockUpsert(...args);
+      return mockInsertBuilder;
+    },
+  };
+});
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockSubscriptionState = {
@@ -81,10 +103,11 @@ describe("ImportPage", () => {
   beforeEach(() => {
     mockParseCSV.mockReset();
     mockInsert.mockReset();
+    mockUpsert.mockReset();
+    mockSelect.mockClear();
     mockFrom.mockClear();
     mockToastError.mockReset();
     mockToastSuccess.mockReset();
-    mockInsert.mockResolvedValue({ error: null });
     mockSubscriptionState.tier = { max: 10, price: 0 };
     mockSubscriptionState.renterCount = 0;
     mockSubscriptionState.subscribed = false;
@@ -103,7 +126,7 @@ describe("ImportPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Preview Import" }));
 
-    expect(await screen.findByText("Unknown columns or invalid values will be added to Notes for your review after import.")).toBeInTheDocument();
+    expect(await screen.findByText("Custom columns will be created as custom fields. Invalid mapped values should be reviewed before import.")).toBeInTheDocument();
     expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
     expect(screen.getByText("Renter 1")).toBeInTheDocument();
     expect(screen.queryByText("Renter 26")).not.toBeInTheDocument();

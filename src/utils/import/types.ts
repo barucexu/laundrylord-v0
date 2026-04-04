@@ -38,6 +38,7 @@ export type ClassifiedRow = {
   mapped: Record<string, string>;
   record: Record<string, any>;
   extrasPreview: string[];
+  customFields: ImportedCustomField[];
   warnings: string[];
 };
 
@@ -49,4 +50,10 @@ export type ImportRowResult = {
   index: number;
   status: ImportExecutionStatus;
   error?: string;
+};
+
+export type ImportedCustomField = {
+  key: string;
+  label: string;
+  value: string;
 };

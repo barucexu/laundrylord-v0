@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { useUpdateRenter, type RenterRow } from "@/hooks/useSupabaseData";
+import { useUpdateRenter, useUpsertCustomFieldValues, type CustomFieldEntry, type RenterRow } from "@/hooks/useSupabaseData";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 
@@ -19,6 +19,7 @@ interface EditRenterDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   renter: RenterRow;
+  customFields: CustomFieldEntry[];
 }
 
 const ALL_STATUSES = [
@@ -34,8 +35,9 @@ const ALL_STATUSES = [
   { value: "archived", label: "Archived" },
 ];
 
-export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialogProps) {
+export function EditRenterDialog({ open, onOpenChange, renter, customFields }: EditRenterDialogProps) {
   const updateRenter = useUpdateRenter();
+  const upsertCustomFieldValues = useUpsertCustomFieldValues("renter");
   const [form, setForm] = useState({
     name: renter.name,
     phone: renter.phone || "",
@@ -54,6 +56,7 @@ export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialo
     install_notes: (renter as any).install_notes || "",
     dryer_outlet: (renter as any).dryer_outlet || "",
   });
+  const [customFieldForm, setCustomFieldForm] = useState<Record<string, string>>({});
   const [startDate, setStartDate] = useState<Date | undefined>(
     renter.lease_start_date ? new Date(renter.lease_start_date + "T00:00:00") : undefined
   );
@@ -79,8 +82,11 @@ export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialo
         dryer_outlet: (renter as any).dryer_outlet || "",
       });
       setStartDate(renter.lease_start_date ? new Date(renter.lease_start_date + "T00:00:00") : undefined);
+      setCustomFieldForm(
+        Object.fromEntries(customFields.map((field) => [field.field_definition_id, field.value])),
+      );
     }
-  }, [open, renter]);
+  }, [open, renter, customFields]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,6 +115,13 @@ export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialo
         install_notes: form.install_notes,
         dryer_outlet: form.dryer_outlet || null,
       } as any);
+      await upsertCustomFieldValues.mutateAsync({
+        entityId: renter.id,
+        values: customFields.map((field) => ({
+          field_definition_id: field.field_definition_id,
+          value: customFieldForm[field.field_definition_id] ?? "",
+        })),
+      });
       toast.success("Renter updated");
       onOpenChange(false);
     } catch (err: any) {
@@ -245,10 +258,37 @@ export function EditRenterDialog({ open, onOpenChange, renter }: EditRenterDialo
             <Label>Notes</Label>
             <Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} />
           </div>
+          {customFields.length > 0 && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <div>
+                  <Label>Custom Fields</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Imported custom fields stay separate from Notes.
+                  </p>
+                </div>
+                {customFields.map((field) => (
+                  <div key={field.field_definition_id} className="space-y-2">
+                    <Label>{field.label}</Label>
+                    <Input
+                      value={customFieldForm[field.field_definition_id] ?? ""}
+                      onChange={(e) =>
+                        setCustomFieldForm((current) => ({
+                          ...current,
+                          [field.field_definition_id]: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={updateRenter.isPending}>
-              {updateRenter.isPending ? "Saving..." : "Save Changes"}
+            <Button type="submit" disabled={updateRenter.isPending || upsertCustomFieldValues.isPending}>
+              {updateRenter.isPending || upsertCustomFieldValues.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </form>

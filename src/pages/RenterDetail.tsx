@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PaymentSourceBadge } from "@/components/PaymentSourceBadge";
 import { supabase } from "@/integrations/supabase/client";
-import { useRenter, useMachinesForRenter, useMachines, useUpdateRenter, useUpdateMachine, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection } from "@/hooks/useSupabaseData";
+import { useRenter, useMachinesForRenter, useMachines, useUpdateRenter, useUpdateMachine, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection, useEntityCustomFields } from "@/hooks/useSupabaseData";
 import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil, Plus, X, Globe, Plug, Archive, ArchiveRestore } from "lucide-react";
@@ -45,6 +45,7 @@ export default function RenterDetail() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { data: renter, isLoading } = useRenter(id);
+  const { data: renterCustomFields = [] } = useEntityCustomFields("renter", id);
   const { data: assignedMachines = [] } = useMachinesForRenter(id);
   const { data: allMachines = [] } = useMachines();
   const { data: timeline = [] } = useTimelineEvents(id);
@@ -605,6 +606,22 @@ export default function RenterDetail() {
             </Card>
           )}
 
+          {renterCustomFields.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Custom Fields</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2.5">
+                {renterCustomFields.map((field) => (
+                  <div key={field.field_definition_id} className="flex justify-between gap-4 text-sm">
+                    <span className="text-muted-foreground text-xs">{field.label}</span>
+                    <span className="text-right text-xs break-words">{field.value || "—"}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           {renter.notes && (
             <Card>
               <CardHeader>
@@ -617,7 +634,7 @@ export default function RenterDetail() {
           )}
         </div>
       </div>
-      <EditRenterDialog open={editOpen} onOpenChange={setEditOpen} renter={renter} />
+      <EditRenterDialog open={editOpen} onOpenChange={setEditOpen} renter={renter} customFields={renterCustomFields} />
       {paymentOpen && <RecordPaymentDialog open={paymentOpen} onOpenChange={setPaymentOpen} renter={renter} />}
 
       <AlertDialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
