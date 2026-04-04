@@ -63,6 +63,89 @@ export type Database = {
           },
         ]
       }
+      custom_field_definitions: {
+        Row: {
+          created_at: string
+          entity_type: string
+          id: string
+          key: string
+          label: string
+          updated_at: string
+          user_id: string
+          value_type: string
+        }
+        Insert: {
+          created_at?: string
+          entity_type: string
+          id?: string
+          key: string
+          label: string
+          updated_at?: string
+          user_id: string
+          value_type?: string
+        }
+        Update: {
+          created_at?: string
+          entity_type?: string
+          id?: string
+          key?: string
+          label?: string
+          updated_at?: string
+          user_id?: string
+          value_type?: string
+        }
+        Relationships: []
+      }
+      custom_field_values: {
+        Row: {
+          boolean_value: boolean | null
+          created_at: string
+          date_value: string | null
+          entity_id: string
+          entity_type: string
+          field_definition_id: string
+          id: string
+          number_value: number | null
+          text_value: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          boolean_value?: boolean | null
+          created_at?: string
+          date_value?: string | null
+          entity_id: string
+          entity_type: string
+          field_definition_id: string
+          id?: string
+          number_value?: number | null
+          text_value?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          boolean_value?: boolean | null
+          created_at?: string
+          date_value?: string | null
+          entity_id?: string
+          entity_type?: string
+          field_definition_id?: string
+          id?: string
+          number_value?: number | null
+          text_value?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_field_values_field_definition_id_fkey"
+            columns: ["field_definition_id"]
+            isOneToOne: false
+            referencedRelation: "custom_field_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_send_log: {
         Row: {
           created_at: string
