@@ -25,42 +25,45 @@ serve(async (req) => {
     if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Auth header missing" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 401,
       });
     }
 
-    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-    if (!token) {
-      return new Response(JSON.stringify({ error: "Invalid authorization header" }), {
+    const token = authHeader.replace("Bearer ", "");
+
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } },
+    );
+
+    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: `Auth error: ${claimsError?.message ?? "Invalid token"}` }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 401,
       });
     }
+
+    const userId = claimsData.claims.sub as string;
+    const email = claimsData.claims.email as string;
+
+    if (!email) {
+      return new Response(JSON.stringify({ error: "No email in token" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
+
+    logStep("User authenticated", { userId, email });
 
     const serviceClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
-
-    const userClient = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const {
-      data: { user },
-      error: userError,
-    } = await userClient.auth.getUser(token);
-    if (userError || !user?.email) {
-      const authMessage = userError?.message ?? "User not authenticated or email not available";
-      return new Response(JSON.stringify({ error: `Auth error: ${authMessage}` }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 401,
-      });
-    }
-    logStep("User authenticated", { userId: user.id, email: user.email });
 
     const syncOperatorPlanState = async ({
       subscribed,
@@ -71,12 +74,11 @@ serve(async (req) => {
       productId: string | null;
       subscriptionEnd: string | null;
     }) => {
-<<<<<<< HEAD
       const { error: syncError } = await serviceClient
         .from("operator_settings")
         .upsert(
           {
-            user_id: user.id,
+            user_id: userId,
             saas_subscribed: subscribed,
             saas_product_id: productId,
             saas_subscription_end: subscriptionEnd,
@@ -90,7 +92,7 @@ serve(async (req) => {
     };
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    const customers = await stripe.customers.list({ email, limit: 1 });
 
     if (customers.data.length === 0) {
       logStep("No Stripe customer found — not subscribed");
