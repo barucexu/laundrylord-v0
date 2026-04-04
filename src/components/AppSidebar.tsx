@@ -58,11 +58,11 @@ export function AppSidebar() {
         )}
       </SidebarHeader>
       <SidebarContent className={collapsed ? "px-2" : "px-3"}>
-        <SidebarGroup className={collapsed ? "px-1 py-2" : undefined}>
+        <SidebarGroup className={collapsed ? "px-1 py-2" : "px-2 py-2"}>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
               {navItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
+                <SidebarMenuItem key={item.title} className={collapsed ? "" : "px-1"}>
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={item.url}
