@@ -58,11 +58,11 @@ export function AppSidebar() {
         )}
       </SidebarHeader>
       <SidebarContent className={collapsed ? "px-2" : "px-3"}>
-        <SidebarGroup className={collapsed ? "px-1 py-2" : "px-2 py-2"}>
+        <SidebarGroup className={collapsed ? "px-1 py-2" : "px-3 py-2"}>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
               {navItems.map((item) => (
-                <SidebarMenuItem key={item.title} className={collapsed ? "" : "px-1"}>
+                <SidebarMenuItem key={item.title} className={collapsed ? "" : "px-2"}>
                   <SidebarMenuButton asChild tooltip={collapsed ? item.title : undefined}>
                     <NavLink
                       to={item.url}
@@ -70,7 +70,7 @@ export function AppSidebar() {
                       className={
                         collapsed
                           ? "rounded-2xl border border-transparent p-0 text-sidebar-foreground transition-all hover:border-sidebar-border/70 hover:bg-sidebar-accent/80"
-                          : "rounded-xl border border-transparent px-3 py-2.5 text-sidebar-foreground transition-all hover:border-sidebar-border/70 hover:bg-sidebar-accent/80"
+                          : "rounded-xl border border-transparent px-4 py-2.5 text-sidebar-foreground transition-all hover:border-sidebar-border/70 hover:bg-sidebar-accent/80"
                       }
                       activeClassName={
                         collapsed
