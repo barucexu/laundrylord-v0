@@ -1,10 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { corsHeaders } from "../_shared/cors.ts";
+import { ensureOperatorWebhookEndpoint } from "../_shared/operatorWebhooks.ts";
+import { getOperatorStripeSecret } from "../_shared/operatorStripeSecrets.ts";
+import { createServiceClient, createUserClient } from "../_shared/supabase.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -15,31 +13,20 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header");
 
-    // User client: authenticates via forwarded JWT
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } },
-    );
+    const userClient = createUserClient(authHeader);
     const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError || !user) throw new Error("Unauthorized");
 
-    // Admin client: bypasses RLS for stripe_keys table
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    );
-
-    const { data: keyRow } = await adminClient
-      .from("stripe_keys")
-      .select("encrypted_key")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    const stripeKey = keyRow?.encrypted_key;
+    const stripeKey = await getOperatorStripeSecret(user.id);
+    const endpoint = await ensureOperatorWebhookEndpoint(user.id);
 
     if (!stripeKey || stripeKey.trim() === "") {
-      return new Response(JSON.stringify({ connected: false, reason: "no_key" }), {
+      return new Response(JSON.stringify({
+        connected: false,
+        reason: "no_key",
+        webhook_path_token: endpoint.webhook_path_token,
+        webhook_configured: false,
+      }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -48,22 +35,36 @@ serve(async (req) => {
       headers: { Authorization: `Bearer ${stripeKey}` },
     });
 
-    if (res.ok) {
-      const account = await res.json();
-      return new Response(
-        JSON.stringify({
-          connected: true,
-          account_name: account.settings?.dashboard?.display_name || account.business_profile?.name || account.email || "Stripe Account",
-          account_id: account.id,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    } else {
-      return new Response(
-        JSON.stringify({ connected: false, reason: "invalid_key" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!res.ok) {
+      return new Response(JSON.stringify({
+        connected: false,
+        reason: "invalid_key",
+        webhook_path_token: endpoint.webhook_path_token,
+        webhook_configured: false,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
+
+    const account = await res.json();
+    const serviceClient = createServiceClient();
+    const { data: fullEndpoint } = await serviceClient
+      .from("operator_webhook_endpoints")
+      .select("webhook_path_token, webhook_secret_ciphertext")
+      .eq("user_id", user.id)
+      .eq("active", true)
+      .maybeSingle();
+
+    return new Response(
+      JSON.stringify({
+        connected: true,
+        account_name: account.settings?.dashboard?.display_name || account.business_profile?.name || account.email || "Stripe Account",
+        account_id: account.id,
+        webhook_path_token: fullEndpoint?.webhook_path_token ?? endpoint.webhook_path_token,
+        webhook_configured: Boolean(fullEndpoint?.webhook_secret_ciphertext),
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (err) {
     return new Response(
       JSON.stringify({ connected: false, reason: "error", message: String(err) }),

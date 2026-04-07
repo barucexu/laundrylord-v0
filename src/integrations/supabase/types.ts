@@ -477,6 +477,45 @@ export type Database = {
         }
         Relationships: []
       }
+      operator_webhook_endpoints: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          stripe_account_label: string | null
+          updated_at: string
+          user_id: string
+          webhook_path_token: string
+          webhook_secret_ciphertext: string | null
+          webhook_secret_iv_or_nonce: string | null
+          webhook_secret_key_version: number | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          stripe_account_label?: string | null
+          updated_at?: string
+          user_id: string
+          webhook_path_token: string
+          webhook_secret_ciphertext?: string | null
+          webhook_secret_iv_or_nonce?: string | null
+          webhook_secret_key_version?: number | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          stripe_account_label?: string | null
+          updated_at?: string
+          user_id?: string
+          webhook_path_token?: string
+          webhook_secret_ciphertext?: string | null
+          webhook_secret_iv_or_nonce?: string | null
+          webhook_secret_key_version?: number | null
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
@@ -543,6 +582,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      processed_stripe_events: {
+        Row: {
+          event_id: string
+          id: string
+          processed_at: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          event_id: string
+          id?: string
+          processed_at?: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          event_id?: string
+          id?: string
+          processed_at?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       renters: {
         Row: {
@@ -670,22 +733,73 @@ export type Database = {
           },
         ]
       }
+      saas_plans: {
+        Row: {
+          active: boolean
+          created_at: string
+          display_label: string
+          id: string
+          max_count: number | null
+          min_count: number
+          name: string
+          price_id: string | null
+          product_id: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          display_label: string
+          id?: string
+          max_count?: number | null
+          min_count: number
+          name: string
+          price_id?: string | null
+          product_id?: string | null
+          sort_order: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          display_label?: string
+          id?: string
+          max_count?: number | null
+          min_count?: number
+          name?: string
+          price_id?: string | null
+          product_id?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       stripe_keys: {
         Row: {
+          ciphertext: string | null
           created_at: string
-          encrypted_key: string
+          iv_or_nonce: string | null
+          key_version: number | null
+          legacy_key_plaintext: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          ciphertext?: string | null
           created_at?: string
-          encrypted_key: string
+          iv_or_nonce?: string | null
+          key_version?: number | null
+          legacy_key_plaintext?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          ciphertext?: string | null
           created_at?: string
-          encrypted_key?: string
+          iv_or_nonce?: string | null
+          key_version?: number | null
+          legacy_key_plaintext?: string | null
           updated_at?: string
           user_id?: string
         }

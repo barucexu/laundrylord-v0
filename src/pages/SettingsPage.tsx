@@ -18,6 +18,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { TIERS, canFitTier, tierUpgradeLabel } from "@/lib/pricing-tiers";
 import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
 import { useSearchParams } from "react-router-dom";
+import type { Database } from "@/integrations/supabase/types";
 
 const DEFAULT_TEMPLATES = {
   template_upcoming_subject: "Payment Reminder",
@@ -27,6 +28,12 @@ const DEFAULT_TEMPLATES = {
   template_latefee_subject: "Late Fee Applied",
   template_latefee_body: "Hi {name},\n\nA late fee of ${late_fee} has been applied to your account. Your payment is {days_late} days overdue.\n\nUpdated balance: ${balance}\n\nPlease update your payment method as soon as possible.\n\n— {business_name}",
 };
+
+type OperatorSettingsRow = Database["public"]["Tables"]["operator_settings"]["Row"];
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
 
 export default function SettingsPage() {
   const { data: stripe, isLoading: stripeLoading } = useStripeConnection();
@@ -55,7 +62,9 @@ export default function SettingsPage() {
   });
 
   const [stripeKey, setStripeKey] = useState("");
+  const [webhookSecret, setWebhookSecret] = useState("");
   const [showKey, setShowKey] = useState(false);
+  const [showWebhookSecret, setShowWebhookSecret] = useState(false);
   const [savingKey, setSavingKey] = useState(false);
 
   useEffect(() => {
@@ -68,7 +77,7 @@ export default function SettingsPage() {
         late_fee_after_days: String(settings.late_fee_after_days),
         reminder_days_before: String(settings.reminder_days_before),
       });
-      const s = settings as any;
+      const s = settings as OperatorSettingsRow;
       setEmailForm({
         email_reminders_enabled: s.email_reminders_enabled ?? true,
         reminder_upcoming_enabled: s.reminder_upcoming_enabled ?? true,
@@ -97,8 +106,8 @@ export default function SettingsPage() {
         ...emailForm,
       });
       toast.success("Settings saved");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save settings");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to save settings"));
     }
   };
 
@@ -111,18 +120,27 @@ export default function SettingsPage() {
       toast.error("Key must start with sk_test_ or sk_live_");
       return;
     }
+    if (webhookSecret.trim() && !webhookSecret.startsWith("whsec_")) {
+      toast.error("Webhook signing secret must start with whsec_");
+      return;
+    }
     setSavingKey(true);
     try {
       const { data, error } = await supabase.functions.invoke("save-stripe-key", {
-        body: { key: stripeKey.trim() },
+        body: {
+          key: stripeKey.trim(),
+          webhook_secret: webhookSecret.trim() || undefined,
+          stripe_account_label: stripe?.account_name ?? null,
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setStripeKey("");
+      setWebhookSecret("");
       toast.success("Stripe key saved! Verifying connection…");
       queryClient.invalidateQueries({ queryKey: ["stripe-connection"] });
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save Stripe key");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to save Stripe key"));
     } finally {
       setSavingKey(false);
     }
@@ -378,6 +396,34 @@ export default function SettingsPage() {
                 </a>
               </p>
             </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Webhook Signing Secret</Label>
+              <div className="relative">
+                <Input
+                  type={showWebhookSecret ? "text" : "password"}
+                  placeholder={stripe?.webhook_configured ? "whsec_****••••••••••••" : "whsec_••••••••••••"}
+                  value={webhookSecret}
+                  onChange={e => setWebhookSecret(e.target.value)}
+                  className="font-mono pr-8 h-8 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowWebhookSecret(!showWebhookSecret)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showWebhookSecret ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Save the Stripe key first, then paste the signing secret from the webhook endpoint Stripe creates for your routed URL.
+              </p>
+              {stripe?.webhook_path_token ? (
+                <p className="text-[10px] text-muted-foreground font-mono break-all">
+                  {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-webhook/${stripe.webhook_path_token}`}
+                </p>
+              ) : null}
+            </div>
           </CardContent>
         </Card>
 
@@ -395,7 +441,7 @@ export default function SettingsPage() {
               <span className="text-xs">Stripe key connected</span>
             </div>
             <div className="flex items-center gap-2">
-              {stripe?.connected ? (
+              {stripe?.webhook_configured ? (
                 <CheckCircle className="h-3.5 w-3.5 text-success" />
               ) : (
                 <div className="h-3.5 w-3.5 rounded-full border-2 border-muted-foreground/30" />

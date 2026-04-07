@@ -1,11 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { corsHeaders } from "../_shared/cors.ts";
+import { saveOperatorStripeSecret } from "../_shared/operatorStripeSecrets.ts";
+import { ensureOperatorWebhookEndpoint, saveOperatorWebhookSecret } from "../_shared/operatorWebhooks.ts";
+import { createUserClient } from "../_shared/supabase.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -16,16 +13,11 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header");
 
-    // User client: authenticates via forwarded JWT
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } },
-    );
+    const userClient = createUserClient(authHeader);
     const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError || !user) throw new Error("Unauthorized");
 
-    const { key } = await req.json();
+    const { key, webhook_secret, stripe_account_label } = await req.json();
     if (!key || typeof key !== "string") throw new Error("key is required");
 
     const trimmed = key.trim();
@@ -33,26 +25,20 @@ serve(async (req) => {
       throw new Error("Key must start with sk_test_ or sk_live_");
     }
 
-    // Admin client: bypasses RLS for stripe_keys table
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    );
+    await saveOperatorStripeSecret(user.id, trimmed);
+    const endpoint = webhook_secret && typeof webhook_secret === "string"
+      ? await saveOperatorWebhookSecret({
+        userId: user.id,
+        webhookSecret: webhook_secret.trim(),
+        stripeAccountLabel: stripe_account_label ?? null,
+      })
+      : await ensureOperatorWebhookEndpoint(user.id);
 
-    const { error } = await adminClient
-      .from("stripe_keys")
-      .upsert(
-        {
-          user_id: user.id,
-          encrypted_key: trimmed,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" }
-      );
-
-    if (error) throw error;
-
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({
+      success: true,
+      webhook_path_token: endpoint.webhook_path_token,
+      webhook_configured: Boolean(webhook_secret || endpoint.webhook_secret_ciphertext),
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

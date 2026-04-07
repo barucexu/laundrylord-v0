@@ -1,12 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
-import { createClient } from "npm:@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { corsHeaders } from "../_shared/cors.ts";
+import { getOperatorStripeSecret } from "../_shared/operatorStripeSecrets.ts";
+import { createServiceClient, createUserClient } from "../_shared/supabase.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -17,20 +13,11 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header");
 
-    // User client: authenticates via forwarded JWT
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } },
-    );
+    const userClient = createUserClient(authHeader);
     const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError || !user) throw new Error("Unauthorized");
 
-    // Admin client: bypasses RLS for stripe_keys and renter updates
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    );
+    const adminClient = createServiceClient();
 
     const { renter_id, billing_anchor_day } = await req.json();
     if (!renter_id) throw new Error("renter_id is required");
@@ -55,12 +42,7 @@ serve(async (req) => {
       });
     }
 
-    const { data: keyRow } = await adminClient
-      .from("stripe_keys")
-      .select("encrypted_key")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    const stripeKey = keyRow?.encrypted_key;
+    const stripeKey = await getOperatorStripeSecret(user.id);
     if (!stripeKey) throw new Error("Stripe not connected. Add your Stripe key in Settings.");
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
@@ -91,13 +73,13 @@ serve(async (req) => {
       recurring: { interval: "month" },
       product_data: {
         name: `Washer Rental - ${renter.name}`,
-        metadata: { renter_id: renter.id },
+        metadata: { renter_id: renter.id, user_id: user.id },
       },
     });
 
     let anchorDay = billing_anchor_day || new Date().getUTCDate();
     if (!billing_anchor_day && renter.lease_start_date) {
-      const parsed = new Date(renter.lease_start_date + "T00:00:00Z");
+      const parsed = new Date(`${renter.lease_start_date}T00:00:00Z`);
       if (!isNaN(parsed.getTime())) {
         anchorDay = parsed.getUTCDate();
       }
