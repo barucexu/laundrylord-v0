@@ -1,110 +1,91 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
-import { corsHeaders } from "../_shared/cors.ts";
-import { getOperatorWebhookEndpointByToken } from "../_shared/operatorWebhooks.ts";
-import { createServiceClient } from "../_shared/supabase.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
-const supabase = createServiceClient();
+// KNOWN LIMITATION: This webhook uses a single STRIPE_WEBHOOK_SECRET env var.
+// Each operator has their own Stripe account, but only one webhook secret can
+// be verified at a time. Customer ID lookups work because Stripe customer IDs
+// are globally unique, but signature verification only validates against one
+// Stripe account's signing secret. Multi-operator webhook routing is not
+// solved in this pass.
 
-function getWebhookPathToken(url: string) {
-  const pathname = new URL(url).pathname;
-  const segments = pathname.split("/").filter(Boolean);
-  const functionIndex = segments.findIndex((segment) => segment === "stripe-webhook");
-  return functionIndex >= 0 && segments.length > functionIndex + 1
-    ? segments[functionIndex + 1]
-    : null;
-}
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
-async function markEventProcessed(eventId: string, userId: string, type: string) {
-  const { error } = await supabase
-    .from("processed_stripe_events")
-    .insert({ event_id: eventId, user_id: userId, type });
-
-  if (!error) return true;
-  if ((error as { code?: string }).code === "23505") return false;
-  throw error;
-}
-
-async function buildStripeEvent(req: Request) {
-  const webhookPathToken = getWebhookPathToken(req.url);
-  if (!webhookPathToken) {
-    const legacySecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
-    const sig = req.headers.get("stripe-signature");
-    if (!legacySecret || !sig) {
-      throw new Error("Webhook path token missing");
-    }
-    const body = await req.text();
-    const tempStripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "sk_stub", {
-      apiVersion: "2025-08-27.basil",
-    });
-    const event = await tempStripe.webhooks.constructEventAsync(body, sig, legacySecret);
-    return { endpoint: null, event, compatibilityMode: true };
-  }
-
-  const endpoint = await getOperatorWebhookEndpointByToken(webhookPathToken);
-  if (!endpoint?.webhookSecret) {
-    throw new Error("Webhook endpoint not configured");
-  }
-
-  const body = await req.text();
-  const sig = req.headers.get("stripe-signature");
-  if (!sig) throw new Error("Missing stripe-signature header");
-
-  const tempStripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "sk_stub", {
-    apiVersion: "2025-08-27.basil",
-  });
-  const event = await tempStripe.webhooks.constructEventAsync(body, sig, endpoint.webhookSecret);
-  return { endpoint, event, compatibilityMode: false };
-}
+const supabase = createClient(
+  Deno.env.get("SUPABASE_URL") ?? "",
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+);
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const { endpoint, event, compatibilityMode } = await buildStripeEvent(req);
-    const alreadyProcessed = !compatibilityMode && endpoint
-      ? !(await markEventProcessed(event.id, endpoint.user_id, event.type))
-      : false;
-    if (alreadyProcessed) {
-      return new Response(JSON.stringify({ received: true, duplicate: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+  const body = await req.text();
+  const sig = req.headers.get("stripe-signature");
+  const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
 
+  let event: any;
+  try {
+    if (webhookSecret && sig) {
+      const tempStripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "sk_stub", {
+        apiVersion: "2025-08-27.basil",
+      });
+      event = await tempStripe.webhooks.constructEventAsync(body, sig, webhookSecret);
+    } else {
+      console.warn("[WEBHOOK] No STRIPE_WEBHOOK_SECRET set — skipping signature verification");
+      event = JSON.parse(body);
+    }
+  } catch (err) {
+    console.error("[WEBHOOK] Signature verification failed:", err);
+    return new Response(JSON.stringify({ error: "Invalid signature" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  console.log(`[WEBHOOK] Received event: ${event.type}`);
+
+  try {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object;
-      if (session.mode === "setup") {
-        const customerId = session.customer;
-        const renterId = session.metadata?.renter_id;
+      if (session.mode !== "setup") {
+        return new Response(JSON.stringify({ received: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
 
-        const renterQuery = supabase
+      const customerId = session.customer;
+      const renterId = session.metadata?.renter_id;
+      console.log(`[WEBHOOK] Setup completed for customer ${customerId}, renter ${renterId}`);
+
+      const { data: renter } = await supabase
+        .from("renters")
+        .select("id, user_id")
+        .eq("stripe_customer_id", customerId)
+        .maybeSingle();
+
+      const targetRenterId = renter?.id || renterId;
+      const targetUserId = renter?.user_id;
+
+      if (targetRenterId) {
+        await supabase
           .from("renters")
-          .select("id, user_id");
-        const { data: renter } = compatibilityMode
-          ? await (renterId
-            ? renterQuery.or(`stripe_customer_id.eq.${customerId},id.eq.${renterId}`).maybeSingle()
-            : renterQuery.eq("stripe_customer_id", customerId).maybeSingle())
-          : await (renterId
-            ? renterQuery.eq("user_id", endpoint!.user_id).or(`stripe_customer_id.eq.${customerId},id.eq.${renterId}`).maybeSingle()
-            : renterQuery.eq("user_id", endpoint!.user_id).eq("stripe_customer_id", customerId).maybeSingle());
+          .update({ has_payment_method: true })
+          .eq("id", targetRenterId);
 
-        if (renter?.id) {
-          let updateQuery = supabase
-            .from("renters")
-            .update({ has_payment_method: true })
-            .eq("id", renter.id);
-          if (!compatibilityMode) updateQuery = updateQuery.eq("user_id", endpoint!.user_id);
-          await updateQuery;
-
+        if (targetUserId) {
           await supabase.from("timeline_events").insert({
-            renter_id: renter.id,
-            user_id: renter.user_id,
+            renter_id: targetRenterId,
+            user_id: targetUserId,
             type: "payment_method_saved",
             description: "Card saved via Stripe checkout",
           });
         }
+        console.log(`[WEBHOOK] Updated has_payment_method=true for renter ${targetRenterId}`);
+      } else {
+        console.warn(`[WEBHOOK] Could not find renter for customer ${customerId}`);
       }
     }
 
@@ -113,12 +94,11 @@ serve(async (req) => {
       const customerId = invoice.customer;
       const amountPaid = (invoice.amount_paid || 0) / 100;
 
-      let renterQuery = supabase
+      const { data: renter } = await supabase
         .from("renters")
         .select("id, user_id, rent_collected, balance")
-        .eq("stripe_customer_id", customerId);
-      if (!compatibilityMode) renterQuery = renterQuery.eq("user_id", endpoint!.user_id);
-      const { data: renter } = await renterQuery.maybeSingle();
+        .eq("stripe_customer_id", customerId)
+        .maybeSingle();
 
       if (renter) {
         const periodEnd = invoice.lines?.data?.[0]?.period?.end;
@@ -127,7 +107,7 @@ serve(async (req) => {
           ? new Date(invoice.lines.data[0].period.start * 1000).toISOString().split("T")[0]
           : null;
 
-        let updateQuery = supabase
+        await supabase
           .from("renters")
           .update({
             status: "active",
@@ -138,8 +118,6 @@ serve(async (req) => {
             next_due_date: nextDue,
           })
           .eq("id", renter.id);
-        if (!compatibilityMode) updateQuery = updateQuery.eq("user_id", endpoint!.user_id);
-        await updateQuery;
 
         await supabase.from("payments").insert({
           renter_id: renter.id,
@@ -165,15 +143,14 @@ serve(async (req) => {
       const customerId = invoice.customer;
       const amountDue = (invoice.amount_due || 0) / 100;
 
-      let renterQuery = supabase
+      const { data: renter } = await supabase
         .from("renters")
         .select("id, user_id, balance, days_late")
-        .eq("stripe_customer_id", customerId);
-      if (!compatibilityMode) renterQuery = renterQuery.eq("user_id", endpoint!.user_id);
-      const { data: renter } = await renterQuery.maybeSingle();
+        .eq("stripe_customer_id", customerId)
+        .maybeSingle();
 
       if (renter) {
-        let updateQuery = supabase
+        await supabase
           .from("renters")
           .update({
             status: "late",
@@ -181,8 +158,6 @@ serve(async (req) => {
             days_late: Number(renter.days_late) + 1,
           })
           .eq("id", renter.id);
-        if (!compatibilityMode) updateQuery = updateQuery.eq("user_id", endpoint!.user_id);
-        await updateQuery;
 
         await supabase.from("payments").insert({
           renter_id: renter.id,
@@ -206,23 +181,20 @@ serve(async (req) => {
       const subscription = event.data.object;
       const customerId = subscription.customer;
 
-      let renterQuery = supabase
+      const { data: renter } = await supabase
         .from("renters")
         .select("id, user_id")
-        .eq("stripe_customer_id", customerId);
-      if (!compatibilityMode) renterQuery = renterQuery.eq("user_id", endpoint!.user_id);
-      const { data: renter } = await renterQuery.maybeSingle();
+        .eq("stripe_customer_id", customerId)
+        .maybeSingle();
 
       if (renter) {
-        let updateQuery = supabase
+        await supabase
           .from("renters")
           .update({
             stripe_subscription_id: null,
             status: "closed",
           })
           .eq("id", renter.id);
-        if (!compatibilityMode) updateQuery = updateQuery.eq("user_id", endpoint!.user_id);
-        await updateQuery;
 
         await supabase.from("timeline_events").insert({
           renter_id: renter.id,

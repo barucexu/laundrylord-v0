@@ -52,7 +52,7 @@ All reads AND writes must use `machines.assigned_renter_id`. The legacy `renters
 | Function | Trust Level | Auth Pattern |
 |----------|------------|--------------|
 | `send-billing-reminders` | Service-role only | Validates `Authorization: Bearer <SERVICE_ROLE_KEY>` exactly |
-| `stripe-webhook` | Webhook | Stripe signature verification with operator-routed path tokens |
+| `stripe-webhook` | Webhook | Stripe signature verification (or raw JSON parse fallback) |
 | `create-checkout` | User-authenticated | Standard JWT via Supabase client |
 | `create-subscription` | User-authenticated | Standard JWT |
 | `create-setup-link` | User-authenticated | Standard JWT |
@@ -65,19 +65,9 @@ All reads AND writes must use `machines.assigned_renter_id`. The legacy `renters
 
 ## Billing / Reminder / Webhook Flow
 
-1. **Stripe webhook** (`stripe-webhook/:webhook_path_token`): Receives operator-routed Stripe events → verifies with the operator-scoped signing secret → updates `renters`, inserts `payments` and `timeline_events`
+1. **Stripe webhook** (`stripe-webhook`): Receives Stripe events → updates `renters`, inserts `payments` and `timeline_events`
 2. **Billing reminders** (`send-billing-reminders`): Scheduled/cron → checks active renters → inserts `billing_reminders`, applies late fees, sends emails via Lovable API
 3. **Payment recording** (UI): `RecordPaymentDialog` → inserts `payments` row via authenticated client
-
-### Canonical SaaS plan source
-
-- Canonical SaaS plan policy lives in `public.saas_plans`
-- Frontend pricing helpers are display-only; authoritative enforcement and capacity resolution happen on the server
-
-### Operator Stripe secrets
-
-- Operator renter-billing Stripe API keys are encrypted at rest in `public.stripe_keys`
-- Operator webhook signing secrets are encrypted at rest in `public.operator_webhook_endpoints`
 
 ### Canonical Value Sets
 
@@ -91,7 +81,6 @@ All reads AND writes must use `machines.assigned_renter_id`. The legacy `renters
 
 ## Project Operating Docs
 
-- `AGENTS.md` — shared instructions for AI coding agents working in this repo
 - `RULES.md` — non-negotiable engineering guardrails
 - `ARCHITECTURE.md` — system map and module boundaries
 - `BILLING_POLICY.md` — SaaS/enforcement policy decisions

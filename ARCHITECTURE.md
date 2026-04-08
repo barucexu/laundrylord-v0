@@ -33,17 +33,10 @@ This is a practical map for new contributors and coding agents.
 - `supabase/functions/create-subscription`
 - `supabase/functions/stripe-webhook`
 
-### Canonical policy / secret storage
-- `public.saas_plans` — authoritative SaaS tier catalog and capacity policy
-- `public.stripe_keys` — encrypted operator Stripe API secrets
-- `public.operator_webhook_endpoints` — operator-routed webhook path token + encrypted signing secret
-- `public.processed_stripe_events` — webhook idempotency ledger
-
 ## Important separations
 
 1. **SaaS billing key context** (platform-level)
 2. **Operator renter-billing key context** (per-user `stripe_keys` table)
-3. **Webhook routing context** (per-user `operator_webhook_endpoints` row and path token)
 
 Never conflate these two domains in code changes.
 
@@ -68,3 +61,4 @@ Never conflate these two domains in code changes.
 ## Design principle
 
 Prefer **simple, centralized, well-named helpers** over duplicated conditional logic in UI components.
+
