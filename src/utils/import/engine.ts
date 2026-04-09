@@ -317,11 +317,6 @@ function isPlanLimitError(message: string | null | undefined): boolean {
   return normalized.includes("plan limit reached") || normalized.includes("subscribe to add more renters");
 }
 
-function isPlanLimitError(message: string | null | undefined): boolean {
-  const normalized = normalizeCell(message ?? "").toLowerCase();
-  return normalized.includes("plan limit reached") || normalized.includes("subscribe to add more renters");
-}
-
 function collectSourceValues(headers: string[], row: string[]): Record<string, string> {
   return headers.reduce<Record<string, string>>((acc, header, index) => {
     const value = normalizeCell(row[index]);
