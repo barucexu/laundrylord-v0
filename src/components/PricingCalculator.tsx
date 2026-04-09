@@ -21,6 +21,11 @@ function pct(price: number, rev: number): string {
   return ((price / rev) * 100).toFixed(1) + "%";
 }
 
+function perRenterAtCap(price: number, max: number): string {
+  if (max <= 0) return "—";
+  return `$${(price / max).toFixed(2)}/renter`;
+}
+
 export function PricingCalculator() {
   const [rentPerMachine, setRentPerMachine] = useState(60);
 
@@ -29,7 +34,7 @@ export function PricingCalculator() {
       <div className="text-center space-y-2">
         <h2 className="text-xl font-semibold text-foreground tracking-tight">Simple, Transparent Pricing</h2>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          Usually around 1–4% of gross revenue for most operators.
+          Flat monthly plans. No extra platform percentage fee on top.
         </p>
       </div>
 
@@ -95,7 +100,10 @@ export function PricingCalculator() {
                       Est. gross revenue: {fmt(revMin)}–{fmt(revMax)}/mo
                     </div>
                     <div className="text-xs font-medium text-primary">
-                      LaundryLord: {pctLow}–{pctHigh} of gross
+                      About {perRenterAtCap(tier.price, tier.max)} at full tier usage
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Typically {pctLow}–{pctHigh} of gross revenue
                     </div>
                   </div>
                 )}
