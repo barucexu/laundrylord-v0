@@ -45,9 +45,12 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    const userClient = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
-      global: { headers: { Authorization: authHeader } },
-    });
+    // Use anon key + forwarded auth header so getUser works correctly
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } },
+    );
 
     const {
       data: { user },
@@ -71,7 +74,6 @@ serve(async (req) => {
       productId: string | null;
       subscriptionEnd: string | null;
     }) => {
-<<<<<<< HEAD
       const { error: syncError } = await serviceClient
         .from("operator_settings")
         .upsert(

@@ -108,6 +108,7 @@ describe("ImportPage", () => {
     mockFrom.mockClear();
     mockToastError.mockReset();
     mockToastSuccess.mockReset();
+    mockInsert.mockResolvedValue({ error: null });
     mockSubscriptionState.tier = { max: 10, price: 0 };
     mockSubscriptionState.renterCount = 0;
     mockSubscriptionState.subscribed = false;
