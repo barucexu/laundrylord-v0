@@ -35,6 +35,7 @@ Read these before making meaningful changes:
 5. Enforcement-critical fixes must live in authoritative logic, not only in UI disabled states
 6. Import flows must respect the same plan and data-integrity rules as add/create flows
 7. Demo and authenticated experiences should not drift in navigation, shell behavior, or page availability without an explicit product reason
+8. This project uses a Lovable Cloud-managed Supabase backend; distinguish between Lovable-internal database capabilities and external agent capabilities before promising DB work
 
 ## Supabase DB change handling in this environment
 
@@ -127,6 +128,14 @@ Before wrapping up, confirm:
 2. Before large changes, confirm the starting branch and HEAD commit SHA
 3. If working in a cloud or detached environment, do not assume the repo is current without an explicit branch/SHA check
 4. If the environment cannot verify remote state, say so clearly before continuing with risky work
+
+## Database access guidance
+
+1. Local development may point at the hosted Supabase project when the safe frontend env values are present
+2. In Lovable itself, database work can be done directly through the managed migration/query/deploy tooling with user approval
+3. In external Codex sessions, do not claim direct database execution unless the environment actually exposes a supported DB access path
+4. Never expose backend-only secrets such as `SUPABASE_SERVICE_ROLE_KEY` in frontend code or docs
+5. If direct database access is unavailable in the current environment, say that clearly and fall back to repo migrations, code changes, or user-run steps as needed
 
 ## Final summary requirements
 

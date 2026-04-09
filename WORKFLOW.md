@@ -154,12 +154,20 @@ Use local when:
 1. You want tight back-and-forth iteration
 2. You need direct access to your running app or local tools
 3. You want the agent to coordinate multiple sub-steps in the same workspace session
+4. You want to test against the hosted Supabase backend through local frontend env values
 
 Use cloud when:
 
 1. The task may run for a long time unattended
 2. You want background execution
 3. You want to minimize dependence on your laptop staying awake and connected
+
+Database note:
+
+1. Do not assume all agents have the same database capabilities
+2. In Lovable, use the managed database tooling when direct migration/query/deploy work is part of the task
+3. In external Codex sessions, first check whether the environment actually exposes a supported DB access path
+4. If it does not, prefer repo migrations and code changes, and say clearly that execution must flow through Lovable or another supported pipeline
 
 ## Definition of done
 

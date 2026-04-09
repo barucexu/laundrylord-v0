@@ -30,6 +30,7 @@ Vertical SaaS for washer/dryer rental operators. Billing clarity + renter system
 - **Real mode**: `AuthProvider` → `ProtectedRoute` → `AppLayout` → page routes. Data from Supabase via `useSupabaseData` hooks.
 - **Demo mode**: `/demo/*` routes. `AuthProvider isDemo` + `DemoProvider` → `DemoLayout` → same page routes. Data from in-memory `DemoContext` (seeded by `demo-seed-data.ts`).
 - Shared route fragment `PAGE_ROUTES` in `App.tsx` is used by both modes to prevent drift.
+- Local development can use the same hosted Supabase backend when `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are configured.
 
 ## Key Hooks & Services
 
@@ -62,6 +63,12 @@ All reads AND writes must use `machines.assigned_renter_id`. The legacy `renters
 | `save-stripe-key` | User-authenticated | Standard JWT |
 | `parse-image-table` | User-authenticated | Standard JWT |
 | `process-email-queue` | Service-role only | Internal queue processor |
+
+## Backend Hosting Model
+
+- This project uses a Lovable Cloud-managed Supabase backend.
+- In the Lovable editor, migrations, read queries, Edge Function deploys, and secret checks can be handled through Lovable's managed tooling.
+- In external coding environments, frontend env values allow app access, but do not by themselves grant direct database-admin execution.
 
 ## Billing / Reminder / Webhook Flow
 
@@ -110,3 +117,10 @@ Key contract tests:
 ## Tech Stack
 
 React 18, Vite, TypeScript, Tailwind CSS, shadcn/ui, Supabase (auth + Postgres + edge functions), Stripe (billing), React Query, React Router v6.
+
+## Local Backend Access
+
+- Frontend local development uses `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
+- These are safe client-side values and are enough for normal authenticated app usage against the hosted Supabase project.
+- External agents working only from the repo should use migrations in `supabase/migrations/` unless they also have an explicit supported DB access path.
+- Backend-only secrets such as `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `LOVABLE_API_KEY` must stay server-side.

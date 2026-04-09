@@ -21,6 +21,8 @@ This is a practical map for new contributors and coding agents.
 
 ## Backend architecture (Supabase edge functions)
 
+This project runs on a Lovable Cloud-managed Supabase backend. That hosting model matters operationally: Lovable-internal tooling can execute migrations and related backend actions directly, while external coding sessions typically work through repo changes plus Lovable-managed application/deployment.
+
 ### SaaS billing
 - `supabase/functions/create-checkout`
 - `supabase/functions/check-subscription`
@@ -61,4 +63,3 @@ Never conflate these two domains in code changes.
 ## Design principle
 
 Prefer **simple, centralized, well-named helpers** over duplicated conditional logic in UI components.
-
