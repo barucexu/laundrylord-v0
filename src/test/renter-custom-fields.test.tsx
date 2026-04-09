@@ -42,6 +42,8 @@ vi.mock("@/hooks/useSupabaseData", () => ({
   }),
   useMachinesForRenter: () => ({ data: [], isLoading: false }),
   useMachines: () => ({ data: [], isLoading: false }),
+  useAssignMachineToRenter: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUnassignMachineFromRenter: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateRenter: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateMachine: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useTimelineEvents: () => ({ data: [], isLoading: false }),

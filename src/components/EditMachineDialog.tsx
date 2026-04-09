@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useEntityCustomFields, useUpdateMachine, useUpsertCustomFieldValues, type MachineRow } from "@/hooks/useSupabaseData";
+import { normalizeEditableMachineStatus } from "@/lib/machine-assignment";
 import { toast } from "sonner";
 
 interface EditMachineDialogProps {
@@ -26,7 +27,7 @@ export function EditMachineDialog({ open, onOpenChange, machine }: EditMachineDi
     prong: machine.prong || "",
     condition: machine.condition || "",
     notes: machine.notes || "",
-    status: machine.status,
+    status: normalizeEditableMachineStatus(machine.status),
     cost_basis: String((machine as any).cost_basis || 0),
     sourced_from: (machine as any).sourced_from || "",
   });
@@ -41,7 +42,7 @@ export function EditMachineDialog({ open, onOpenChange, machine }: EditMachineDi
         prong: machine.prong || "",
         condition: machine.condition || "",
         notes: machine.notes || "",
-        status: machine.status,
+        status: normalizeEditableMachineStatus(machine.status),
         cost_basis: String((machine as any).cost_basis || 0),
         sourced_from: (machine as any).sourced_from || "",
       });
@@ -147,7 +148,7 @@ export function EditMachineDialog({ open, onOpenChange, machine }: EditMachineDi
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="available">Available</SelectItem>
-                <SelectItem value="rented">Rented</SelectItem>
+                <SelectItem value="assigned">Assigned</SelectItem>
                 <SelectItem value="maintenance">Maintenance</SelectItem>
                 <SelectItem value="retired">Retired</SelectItem>
               </SelectContent>
