@@ -96,6 +96,7 @@ All reads AND writes must use `machines.assigned_renter_id`. The legacy `renters
 3. **Source-of-truth changes must be documented**: If the canonical relation for machine assignment or billing state ownership changes, update this README.
 4. **Machine assignment uses `machines.assigned_renter_id`**: Do not introduce reads via `renters.machine_id`.
 5. **Payment status `"pending"` is not valid**: The billing reminders function writes `"overdue"` for late fees.
+6. **Supabase DB changes are manual from agent output**: If a task needs DB/schema/data mutation, provide SQL for the user to run manually in Lovable's Supabase SQL interface.
 
 ## Testing
 

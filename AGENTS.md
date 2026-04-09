@@ -36,6 +36,12 @@ Read these before making meaningful changes:
 6. Import flows must respect the same plan and data-integrity rules as add/create flows
 7. Demo and authenticated experiences should not drift in navigation, shell behavior, or page availability without an explicit product reason
 
+## Supabase DB change handling in this environment
+
+1. Codex cannot apply SQL directly to your live Supabase project
+2. For schema/data changes, provide explicit SQL that the user can run manually in Lovable's Supabase SQL interface
+3. When SQL is required, clearly label what to run, where to run it, and any ordering/rollback notes
+
 ## Key implementation hotspots
 
 Inspect these files before changing the related area:

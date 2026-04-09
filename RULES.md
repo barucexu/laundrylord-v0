@@ -50,3 +50,8 @@ A PR is not ready unless it contains:
 3. Explicit test evidence
 4. Doc updates when logic changes
 
+## 6) Supabase execution boundary
+
+1. Assume coding agents cannot directly execute SQL against the live Supabase project.
+2. For DB/schema/data tasks, always provide runnable SQL for manual execution in Lovable's Supabase SQL interface.
+3. Clearly separate "SQL to run manually" from repo code changes, including execution order and rollback guidance when relevant.
