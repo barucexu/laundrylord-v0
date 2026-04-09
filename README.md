@@ -48,6 +48,8 @@ Vertical SaaS for washer/dryer rental operators. Billing clarity + renter system
 
 All reads AND writes must use `machines.assigned_renter_id`. The legacy `renters.machine_id` column still exists in the schema but is NOT the source of truth for assignment display or logic.
 
+Assignment writes should go through the guarded assignment hooks in `useSupabaseData` and shared helpers in `src/lib/machine-assignment.ts`. They enforce that only unassigned `available` machines can be assigned and that unassigning clears only the current renter's assignment instead of relying on UI filtering alone.
+
 ## Edge Function Matrix
 
 | Function | Trust Level | Auth Pattern |

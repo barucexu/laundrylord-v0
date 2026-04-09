@@ -30,12 +30,13 @@ Read these before making meaningful changes:
 
 1. Machine assignment source of truth is `machines.assigned_renter_id`
 2. Do not introduce logic that reads `renters.machine_id` as canonical
-3. SaaS billing and renter billing are separate systems with separate key and trust contexts
-4. Persisted enums and status values cannot drift silently; update docs, UI mappings, and tests together
-5. Enforcement-critical fixes must live in authoritative logic, not only in UI disabled states
-6. Import flows must respect the same plan and data-integrity rules as add/create flows
-7. Demo and authenticated experiences should not drift in navigation, shell behavior, or page availability without an explicit product reason
-8. This project uses a Lovable Cloud-managed Supabase backend; distinguish between Lovable-internal database capabilities and external agent capabilities before promising DB work
+3. Machine assignment mutations should use the guarded assign/unassign hooks and `src/lib/machine-assignment.ts`, not ad hoc `useUpdateMachine` calls or UI-only availability filters
+4. SaaS billing and renter billing are separate systems with separate key and trust contexts
+5. Persisted enums and status values cannot drift silently; update docs, UI mappings, and tests together
+6. Enforcement-critical fixes must live in authoritative logic, not only in UI disabled states
+7. Import flows must respect the same plan and data-integrity rules as add/create flows
+8. Demo and authenticated experiences should not drift in navigation, shell behavior, or page availability without an explicit product reason
+9. This project uses a Lovable Cloud-managed Supabase backend; distinguish between Lovable-internal database capabilities and external agent capabilities before promising DB work
 
 ## Supabase DB change handling in this environment
 
@@ -54,7 +55,8 @@ Inspect these files before changing the related area:
 5. Plan enforcement and billing counts: `src/hooks/useSubscription.ts`, `src/lib/pricing-tiers.ts`
 6. Import flow: `src/pages/ImportPage.tsx`, `src/utils/import/*`
 7. Renter center of gravity: `src/pages/RenterDetail.tsx`
-8. Backend enforcement and billing functions: `supabase/functions/*`
+8. Machine assignment helpers: `src/lib/machine-assignment.ts`, `src/components/RenterMachineAssignments.tsx`
+9. Backend enforcement and billing functions: `supabase/functions/*`
 
 ## Change discipline
 
