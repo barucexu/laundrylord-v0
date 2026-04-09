@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { useEntityCustomFields, useUpdateMachine, useUpsertCustomFieldValues, type MachineRow } from "@/hooks/useSupabaseData";
 import { normalizeEditableMachineStatus } from "@/lib/machine-assignment";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 
 interface EditMachineDialogProps {
   open: boolean;
@@ -28,8 +29,8 @@ export function EditMachineDialog({ open, onOpenChange, machine }: EditMachineDi
     condition: machine.condition || "",
     notes: machine.notes || "",
     status: normalizeEditableMachineStatus(machine.status),
-    cost_basis: String((machine as any).cost_basis || 0),
-    sourced_from: (machine as any).sourced_from || "",
+    cost_basis: String(machine.cost_basis || 0),
+    sourced_from: machine.sourced_from || "",
   });
   const [customFieldForm, setCustomFieldForm] = useState<Record<string, string>>({});
 
@@ -43,8 +44,8 @@ export function EditMachineDialog({ open, onOpenChange, machine }: EditMachineDi
         condition: machine.condition || "",
         notes: machine.notes || "",
         status: normalizeEditableMachineStatus(machine.status),
-        cost_basis: String((machine as any).cost_basis || 0),
-        sourced_from: (machine as any).sourced_from || "",
+        cost_basis: String(machine.cost_basis || 0),
+        sourced_from: machine.sourced_from || "",
       });
     }
   }, [open, machine]);
@@ -75,7 +76,7 @@ export function EditMachineDialog({ open, onOpenChange, machine }: EditMachineDi
         status: form.status,
         cost_basis: parseFloat(form.cost_basis) || 0,
         sourced_from: form.sourced_from,
-      } as any);
+      });
       await upsertCustomFieldValues.mutateAsync({
         entityId: machine.id,
         values: customFields.map((field) => ({
@@ -85,8 +86,8 @@ export function EditMachineDialog({ open, onOpenChange, machine }: EditMachineDi
       });
       toast.success("Machine updated");
       onOpenChange(false);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update machine");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Failed to update machine"));
     }
   };
 

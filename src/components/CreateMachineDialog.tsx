@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 
 interface CreateMachineDialogProps {
   open: boolean;
@@ -53,12 +54,12 @@ export function CreateMachineDialog({ open, onOpenChange, canAddRenter = true }:
         status: "available",
         cost_basis: parseFloat(form.cost_basis) || 0,
         sourced_from: form.sourced_from.trim(),
-      } as any);
+      });
       toast.success(`Machine ${form.serial} added`);
       setForm({ type: "washer", model: "", serial: "", prong: "", condition: "good", notes: "", cost_basis: "", sourced_from: "" });
       onOpenChange(false);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to add machine");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Failed to add machine"));
     }
   };
 

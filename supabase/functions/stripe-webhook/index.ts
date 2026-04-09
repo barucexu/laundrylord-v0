@@ -28,7 +28,7 @@ serve(async (req) => {
   const sig = req.headers.get("stripe-signature");
   const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
 
-  let event: any;
+  let event: Stripe.Event;
   try {
     if (webhookSecret && sig) {
       const tempStripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "sk_stub", {

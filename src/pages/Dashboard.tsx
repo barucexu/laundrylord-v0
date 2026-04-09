@@ -176,7 +176,7 @@ export default function Dashboard() {
                   <div key={p.id} className="flex items-center justify-between px-4 py-2">
                     <div className="flex items-center gap-2">
                       <div className="text-[10px] text-muted-foreground font-mono">{p.paid_date || p.due_date}</div>
-                      <PaymentSourceBadge source={(p as any).payment_source || "stripe"} />
+                      <PaymentSourceBadge source={p.payment_source || "stripe"} />
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-mono font-medium">${Number(p.amount).toFixed(2)}</span>

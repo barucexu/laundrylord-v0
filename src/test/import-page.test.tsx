@@ -34,6 +34,7 @@ const mockToastSuccess = vi.fn();
 const mockSubscriptionState = {
   tier: { max: 10, price: 0 },
   renterCount: 0,
+  billableCount: 0,
   subscribed: false,
   loading: false,
 };
@@ -111,6 +112,7 @@ describe("ImportPage", () => {
     mockInsert.mockResolvedValue({ error: null });
     mockSubscriptionState.tier = { max: 10, price: 0 };
     mockSubscriptionState.renterCount = 0;
+    mockSubscriptionState.billableCount = 0;
     mockSubscriptionState.subscribed = false;
     mockSubscriptionState.loading = false;
   });
@@ -193,6 +195,7 @@ describe("ImportPage", () => {
 
   it("shows a blocked-by-plan preview message when the free tier is already full", async () => {
     mockSubscriptionState.renterCount = 10;
+    mockSubscriptionState.billableCount = 10;
 
     mockParseCSV.mockResolvedValue({
       headers: ["Name"],

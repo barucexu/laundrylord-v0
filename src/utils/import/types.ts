@@ -36,7 +36,7 @@ export type ClassifiedRow = {
   hasMappedContent: boolean;
   source: Record<string, string>;
   mapped: Record<string, string>;
-  record: Record<string, any>;
+  record: Record<string, unknown>;
   extrasPreview: string[];
   customFields: ImportedCustomField[];
   warnings: string[];

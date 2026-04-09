@@ -172,7 +172,7 @@ export default function MachineMapPage() {
     });
 
     return { mapped: mappedMachines, unmatched: unmatchedMachines };
-  }, [geoCache, machineAddresses, machines, renters]);
+  }, [geoCache, machineAddresses]);
 
   // Initialize map once
   useEffect(() => {

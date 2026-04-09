@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { EditRenterDialog } from "@/components/EditRenterDialog";
 import { RecordPaymentDialog } from "@/components/RecordPaymentDialog";
 import { RenterMachineAssignments } from "@/components/RenterMachineAssignments";
+import { getErrorMessage } from "@/lib/errors";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -68,15 +69,22 @@ export default function RenterDetail() {
         archived_at: now.toISOString(),
         billable_until: billableUntil.toISOString(),
       });
-      queryClient.invalidateQueries({ queryKey: ["renters"] });
-      queryClient.invalidateQueries({ queryKey: ["renters", "archived"] });
-      queryClient.invalidateQueries({ queryKey: ["renters", "billable-count"] });
-      toast.success("Renter archived");
+      toast.success("Renter archived. Archived renters remain billable for 30 days.");
       navigate("/renters");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to archive");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Failed to archive"));
     }
-  }, [renter, updateRenter, queryClient, navigate]);
+  }, [renter, updateRenter, navigate]);
+
+  const handleUnarchive = useCallback(async () => {
+    if (!renter) return;
+    try {
+      await updateRenter.mutateAsync({ id: renter.id, status: "closed" });
+      toast.success("Renter unarchived");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Failed to unarchive"));
+    }
+  }, [renter, updateRenter]);
 
   // Show toast on setup return
   const setupResult = searchParams.get("setup");
@@ -96,8 +104,8 @@ export default function RenterDetail() {
         await navigator.clipboard.writeText(data.url);
         toast.success("Setup link copied to clipboard! Send it to the renter.");
       }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to create setup link");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Failed to create setup link"));
     } finally {
       setSendingSetup(false);
     }
@@ -115,8 +123,8 @@ export default function RenterDetail() {
       }
       toast.success(data?.already_active ? "Autopay is already active for this renter." : `Billing activated! Next due: ${data.next_due}`);
       queryClient.invalidateQueries({ queryKey: ["renters", id] });
-    } catch (err: any) {
-      toast.error(err.message || "Failed to activate billing");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Failed to activate billing"));
     } finally {
       setActivating(false);
     }
@@ -183,17 +191,7 @@ export default function RenterDetail() {
             <Button
               variant="outline"
               size="sm"
-              onClick={async () => {
-                try {
-                  await updateRenter.mutateAsync({ id: renter.id, status: "closed" });
-                  queryClient.invalidateQueries({ queryKey: ["renters"] });
-                  queryClient.invalidateQueries({ queryKey: ["renters", "archived"] });
-                  queryClient.invalidateQueries({ queryKey: ["renters", "billable-count"] });
-                  toast.success("Renter unarchived");
-                } catch (err: any) {
-                  toast.error(err.message || "Failed to unarchive");
-                }
-              }}
+              onClick={handleUnarchive}
             >
               <ArchiveRestore className="h-3.5 w-3.5 mr-1" /> Unarchive
             </Button>
@@ -201,24 +199,7 @@ export default function RenterDetail() {
             <Button
               variant="outline"
               size="sm"
-              onClick={async () => {
-                try {
-                  const now = new Date();
-                  const billableUntil = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-                  await updateRenter.mutateAsync({
-                    id: renter.id,
-                    status: "archived",
-                    archived_at: now.toISOString(),
-                    billable_until: billableUntil.toISOString(),
-                  } as any);
-                  queryClient.invalidateQueries({ queryKey: ["renters"] });
-                  queryClient.invalidateQueries({ queryKey: ["renters", "archived"] });
-                  toast.success("Renter archived. Archived renters remain billable for 30 days.");
-                  navigate("/renters");
-                } catch (err: any) {
-                  toast.error(err.message || "Failed to archive");
-                }
-              }}
+              onClick={() => setArchiveDialogOpen(true)}
             >
               <Archive className="h-3.5 w-3.5 mr-1" /> Archive
             </Button>
@@ -385,7 +366,7 @@ export default function RenterDetail() {
                       <div className="flex items-center gap-2">
                         <span className="text-sm capitalize">{p.type === 'rent' ? 'Rent' : p.type.replace('_', ' ')}</span>
                         <span className="text-xs text-muted-foreground font-mono">{p.due_date}</span>
-                        <PaymentSourceBadge source={(p as any).payment_source} />
+                        <PaymentSourceBadge source={p.payment_source} />
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-sm font-mono font-medium">${Number(p.amount).toFixed(2)}</span>
@@ -483,23 +464,23 @@ export default function RenterDetail() {
                   <span className="text-xs">{renter.address}</span>
                 </div>
               )}
-              {(renter as any).secondary_contact && (
+              {renter.secondary_contact && (
                 <div className="flex items-center gap-2.5 text-sm">
                   <User className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-xs">{(renter as any).secondary_contact}</span>
+                  <span className="text-xs">{renter.secondary_contact}</span>
                   <span className="text-[10px] text-muted-foreground">(secondary)</span>
                 </div>
               )}
-              {(renter as any).dryer_outlet && (
+              {renter.dryer_outlet && (
                 <div className="flex items-center gap-2.5 text-sm">
                   <Plug className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-xs">{(renter as any).dryer_outlet} outlet</span>
+                  <span className="text-xs">{renter.dryer_outlet} outlet</span>
                 </div>
               )}
-              {(renter as any).language && (renter as any).language !== "English" && (
+              {renter.language && renter.language !== "English" && (
                 <div className="flex items-center gap-2.5 text-sm">
                   <Globe className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-xs">{(renter as any).language}</span>
+                  <span className="text-xs">{renter.language}</span>
                 </div>
               )}
               {!renter.phone && !renter.email && !renter.address && (
@@ -527,13 +508,13 @@ export default function RenterDetail() {
           <RenterMachineAssignments renterId={renter.id} />
 
           {/* Install Notes */}
-          {(renter as any).install_notes && (
+          {renter.install_notes && (
             <Card>
               <CardHeader>
                 <CardTitle>Install Notes</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground leading-relaxed">{(renter as any).install_notes}</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">{renter.install_notes}</p>
               </CardContent>
             </Card>
           )}

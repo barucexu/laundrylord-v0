@@ -27,7 +27,7 @@ This file is the non-negotiable implementation contract for human + AI contribut
 
 Every PR touching pricing/billing/enforcement must include:
 
-1. Boundary behavior at count caps (10/24/49/74/99).
+1. Boundary behavior at count caps (10/24/49/74/99/199/399/699/999 and 1000+ Ultimate).
 2. Import path parity with add/create path.
 3. Archive/unarchive behavior impact on plan enforcement.
 4. Upgrade CTA correctness and destination correctness.

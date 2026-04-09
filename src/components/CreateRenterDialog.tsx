@@ -15,6 +15,7 @@ import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 
 interface CreateRenterDialogProps {
   open: boolean;
@@ -88,13 +89,13 @@ export function CreateRenterDialog({ open, onOpenChange, canAddRenter = true }: 
         language: form.language,
         install_notes: form.install_notes.trim(),
         dryer_outlet: form.dryer_outlet || null,
-      } as any);
+      });
       toast.success(`${form.name} added as a new lead`);
       setForm({ name: "", phone: "", email: "", address: "", monthly_rate: "", rent_collected: "0", install_fee: "", install_fee_collected: false, deposit_amount: "", deposit_collected: false, late_fee: "", notes: "", secondary_contact: "", language: "English", install_notes: "", dryer_outlet: "" });
       setStartDate(undefined);
       onOpenChange(false);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to create renter");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Failed to create renter"));
     }
   };
 

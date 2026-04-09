@@ -7,7 +7,13 @@ Use this runbook before merging any plan/billing enforcement change.
 - Count 10: blocked + actionable Starter upgrade CTA
 - Count 24: blocked + actionable Growth upgrade CTA
 - Count 49: blocked + actionable Pro upgrade CTA
-- Repeat at 74 and 99
+- Count 74: blocked + actionable Scale upgrade CTA
+- Count 99: blocked + actionable Business upgrade CTA
+- Count 199: blocked + actionable Enterprise upgrade CTA
+- Count 399: blocked + actionable Portfolio upgrade CTA
+- Count 699: blocked + actionable Empire upgrade CTA
+- Count 999: blocked + actionable Ultimate upgrade CTA
+- Count 1000+: Ultimate remains unlimited
 
 ## 2) Loading-state tests
 
@@ -40,4 +46,3 @@ Use this runbook before merging any plan/billing enforcement change.
 - Add Machine dialog submit hard-stop
 - PlanBanner CTA text/target
 - Renter billing setup + activation still works
-

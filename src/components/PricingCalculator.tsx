@@ -70,10 +70,11 @@ export function PricingCalculator() {
         {TIERS.map((tier) => {
           const isCustom = tier.price === -1;
           const isFree = tier.price === 0;
+          const isOpenEnded = tier.max === Infinity;
           const revMin = tier.min * rentPerMachine;
-          const revMax = tier.max === Infinity ? 0 : tier.max * rentPerMachine;
+          const revMax = isOpenEnded ? null : tier.max * rentPerMachine;
           const pctHigh = !isFree && !isCustom ? pct(tier.price, revMin) : null;
-          const pctLow = !isFree && !isCustom && revMax > 0 ? pct(tier.price, revMax) : null;
+          const pctLow = !isFree && !isCustom && revMax !== null && revMax > 0 ? pct(tier.price, revMax) : null;
 
           return (
             <Card
@@ -97,13 +98,17 @@ export function PricingCalculator() {
                 {!isFree && !isCustom && (
                   <div className="space-y-1">
                     <div className="text-xs text-muted-foreground">
-                      Est. gross revenue: {fmt(revMin)}–{fmt(revMax)}/mo
+                      Est. gross revenue: {isOpenEnded ? `${fmt(revMin)}+/mo` : `${fmt(revMin)}–${fmt(revMax ?? 0)}/mo`}
                     </div>
                     <div className="text-xs font-medium text-primary">
-                      About {perRenterAtCap(tier.price, tier.max)} at full tier usage
+                      {isOpenEnded
+                        ? `At most ${perRenterAtCap(tier.price, tier.min)} at ${tier.min.toLocaleString()} renters`
+                        : `About ${perRenterAtCap(tier.price, tier.max)} at full tier usage`}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Typically {pctLow}–{pctHigh} of gross revenue
+                      {isOpenEnded
+                        ? `Typically ${pctHigh} or less of gross revenue`
+                        : `Typically ${pctLow}–${pctHigh} of gross revenue`}
                     </div>
                   </div>
                 )}
