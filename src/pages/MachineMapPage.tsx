@@ -16,6 +16,10 @@ const statusColors: Record<string, string> = {
   retired: "hsl(0 0% 72%)",
 };
 
+function formatMachineStatus(status: string) {
+  return status === "rented" ? "Assigned" : status.replace(/_/g, " ");
+}
+
 function createIcon(color: string) {
   return L.divIcon({
     className: "machine-map-marker",
@@ -218,7 +222,7 @@ export default function MachineMapPage() {
           <div style="color:hsl(0 0% 45%);">SN: ${item.machine.serial}</div>
           ${item.renter ? `<div>Renter: <strong>${item.renter.name}</strong></div>` : ""}
           <div style="color:hsl(0 0% 45%);">${item.address}</div>
-          <div style="margin-top:6px;text-transform:capitalize;">${item.machine.status}</div>
+          <div style="margin-top:6px;text-transform:capitalize;">${formatMachineStatus(item.machine.status)}</div>
         </div>
       `);
 
@@ -299,7 +303,7 @@ export default function MachineMapPage() {
 
           <div className="flex items-center gap-4 px-1 text-[10px] text-muted-foreground lg:col-span-2">
             {Object.entries({
-              assigned: "Assigned/Rented",
+              assigned: "Assigned",
               available: "Available",
               maintenance: "Maintenance",
               retired: "Retired",

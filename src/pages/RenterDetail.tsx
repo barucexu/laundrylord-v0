@@ -5,15 +5,15 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PaymentSourceBadge } from "@/components/PaymentSourceBadge";
 import { supabase } from "@/integrations/supabase/client";
-import { useRenter, useMachinesForRenter, useMachines, useUpdateRenter, useUpdateMachine, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection, useEntityCustomFields } from "@/hooks/useSupabaseData";
+import { useRenter, useUpdateRenter, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection, useEntityCustomFields } from "@/hooks/useSupabaseData";
 import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil, Plus, X, Globe, Plug, Archive, ArchiveRestore } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil, Globe, Plug, Archive, ArchiveRestore } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { EditRenterDialog } from "@/components/EditRenterDialog";
 import { RecordPaymentDialog } from "@/components/RecordPaymentDialog";
+import { RenterMachineAssignments } from "@/components/RenterMachineAssignments";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,14 +46,11 @@ export default function RenterDetail() {
   const navigate = useNavigate();
   const { data: renter, isLoading } = useRenter(id);
   const { data: renterCustomFields = [] } = useEntityCustomFields("renter", id);
-  const { data: assignedMachines = [] } = useMachinesForRenter(id);
-  const { data: allMachines = [] } = useMachines();
   const { data: timeline = [] } = useTimelineEvents(id);
   const { data: maintenance = [] } = useMaintenanceForRenter(id);
   const { data: renterPayments = [] } = usePaymentsForRenter(id);
   const { data: stripeStatus } = useStripeConnection();
   const updateRenter = useUpdateRenter();
-  const updateMachine = useUpdateMachine();
   const [sendingSetup, setSendingSetup] = useState(false);
   const [activating, setActivating] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -125,29 +122,6 @@ export default function RenterDetail() {
     }
   };
 
-  const handleAssignMachine = async (machineId: string) => {
-    if (!renter || !id) return;
-    try {
-      await updateMachine.mutateAsync({ id: machineId, assigned_renter_id: id, status: "assigned" });
-      queryClient.invalidateQueries({ queryKey: ["machines", "renter", id] });
-      queryClient.invalidateQueries({ queryKey: ["machines"] });
-      toast.success("Machine assigned");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to assign machine");
-    }
-  };
-
-  const handleUnassignMachine = async (machineId: string) => {
-    try {
-      await updateMachine.mutateAsync({ id: machineId, assigned_renter_id: null, status: "available" });
-      queryClient.invalidateQueries({ queryKey: ["machines", "renter", id] });
-      queryClient.invalidateQueries({ queryKey: ["machines"] });
-      toast.success("Machine unassigned");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to unassign machine");
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -184,8 +158,6 @@ export default function RenterDetail() {
   };
 
   const billingState = getBillingState();
-  const availableMachines = allMachines.filter(m => m.status === "available");
-
   return (
     <div className="space-y-5">
       <Link to="/renters" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -552,47 +524,7 @@ export default function RenterDetail() {
             </CardContent>
           </Card>
 
-          {/* Multi-Machine Assignment */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Box className="h-4 w-4" /> Machines</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {assignedMachines.length === 0 && (
-                <p className="text-sm text-muted-foreground">No machines assigned.</p>
-              )}
-              {assignedMachines.map(m => (
-                <div key={m.id} className="border rounded-md p-3 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium capitalize">{m.type} — {m.model}</span>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleUnassignMachine(m.id)}>
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
-                    <span>Serial: <span className="font-mono text-foreground">{m.serial}</span></span>
-                    <span>Status: <StatusBadge status={m.status} /></span>
-                    <span>Condition: <span className="text-foreground capitalize">{m.condition || '—'}</span></span>
-                    <span><StatusBadge status={m.status} /></span>
-                  </div>
-                </div>
-              ))}
-              {availableMachines.length > 0 && (
-                <Select onValueChange={handleAssignMachine}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Assign a machine..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableMachines.map(m => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.type} — {m.model} ({m.serial})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </CardContent>
-          </Card>
+          <RenterMachineAssignments renterId={renter.id} />
 
           {/* Install Notes */}
           {(renter as any).install_notes && (

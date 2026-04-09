@@ -3,11 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useDemo } from "@/contexts/DemoContext";
 import { buildCustomFieldValuePayload, getCustomFieldValue, type CustomFieldEntityType, type CustomFieldValueType } from "@/lib/custom-fields";
+import { getUnassignedMachineStatus, isMachineAssignable } from "@/lib/machine-assignment";
 import type { Database } from "@/integrations/supabase/types";
 
-type RenterRow = Database["public"]["Tables"]["renters"]["Row"];
+export type RenterRow = Database["public"]["Tables"]["renters"]["Row"];
 type RenterInsert = Database["public"]["Tables"]["renters"]["Insert"];
-type MachineRow = Database["public"]["Tables"]["machines"]["Row"];
+export type MachineRow = Database["public"]["Tables"]["machines"]["Row"];
 type MachineInsert = Database["public"]["Tables"]["machines"]["Insert"];
 type PaymentRow = Database["public"]["Tables"]["payments"]["Row"];
 type PaymentInsert = Database["public"]["Tables"]["payments"]["Insert"];
@@ -195,6 +196,97 @@ export function useUpdateMachine() {
     },
     onSuccess: () => {
       if (!demo?.isDemo) queryClient.invalidateQueries({ queryKey: ["machines"] });
+    },
+  });
+}
+
+export function useAssignMachineToRenter() {
+  const queryClient = useQueryClient();
+  const demo = useDemo();
+
+  return useMutation({
+    mutationFn: async ({ machineId, renterId }: { machineId: string; renterId: string }) => {
+      if (demo?.isDemo) {
+        const machine = demo.data.machines.find((m) => m.id === machineId);
+        if (!machine || !isMachineAssignable(machine)) {
+          throw new Error("Machine is no longer available");
+        }
+        return demo.updateMachine(machineId, {
+          assigned_renter_id: renterId,
+          status: "assigned",
+        }) as MachineRow;
+      }
+
+      const { data, error } = await supabase
+        .from("machines")
+        .update({ assigned_renter_id: renterId, status: "assigned" })
+        .eq("id", machineId)
+        .is("assigned_renter_id", null)
+        .eq("status", "available")
+        .select()
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) throw new Error("Machine is no longer available");
+      return data as MachineRow;
+    },
+    onSettled: (_data, _error, variables) => {
+      if (!demo?.isDemo) {
+        queryClient.invalidateQueries({ queryKey: ["machines"] });
+        queryClient.invalidateQueries({ queryKey: ["machines", "renter", variables.renterId] });
+      }
+    },
+  });
+}
+
+export function useUnassignMachineFromRenter() {
+  const queryClient = useQueryClient();
+  const demo = useDemo();
+
+  return useMutation({
+    mutationFn: async ({ machineId, renterId }: { machineId: string; renterId: string }) => {
+      if (demo?.isDemo) {
+        const machine = demo.data.machines.find((m) => m.id === machineId);
+        if (!machine || machine.assigned_renter_id !== renterId) {
+          throw new Error("Machine is no longer assigned to this renter");
+        }
+        return demo.updateMachine(machineId, {
+          assigned_renter_id: null,
+          status: getUnassignedMachineStatus(machine.status),
+        }) as MachineRow;
+      }
+
+      const { data: currentMachine, error: readError } = await supabase
+        .from("machines")
+        .select("*")
+        .eq("id", machineId)
+        .single();
+
+      if (readError) throw readError;
+      if (currentMachine.assigned_renter_id !== renterId) {
+        throw new Error("Machine is no longer assigned to this renter");
+      }
+
+      const { data, error } = await supabase
+        .from("machines")
+        .update({
+          assigned_renter_id: null,
+          status: getUnassignedMachineStatus(currentMachine.status),
+        })
+        .eq("id", machineId)
+        .eq("assigned_renter_id", renterId)
+        .select()
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) throw new Error("Machine is no longer assigned to this renter");
+      return data as MachineRow;
+    },
+    onSettled: (_data, _error, variables) => {
+      if (!demo?.isDemo) {
+        queryClient.invalidateQueries({ queryKey: ["machines"] });
+        queryClient.invalidateQueries({ queryKey: ["machines", "renter", variables.renterId] });
+      }
     },
   });
 }

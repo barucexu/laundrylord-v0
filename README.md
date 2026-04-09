@@ -81,6 +81,7 @@ All reads AND writes must use `machines.assigned_renter_id`. The legacy `renters
 | Domain | Values |
 |--------|--------|
 | `machines.type` | `washer`, `dryer`, `set` |
+| `machines.status` | `available`, `assigned`, `maintenance`, `retired` |
 | `payments.type` | `rent`, `install_fee`, `deposit`, `late_fee`, `other` |
 | `payments.status` | `upcoming`, `due_soon`, `overdue`, `failed`, `paid` |
 | `timeline_events.type` | `created`, `machine_assigned`, `payment_succeeded`, `payment_failed`, `payment_method_saved`, `late_fee`, `maintenance_opened`, `maintenance_resolved`, `pickup_scheduled`, `pickup_completed`, `note` |

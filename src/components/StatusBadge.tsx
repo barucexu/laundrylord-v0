@@ -20,6 +20,7 @@ const statusStyles: Record<string, string> = {
   // Machine statuses
   available: "bg-success/10 text-success",
   assigned: "bg-primary/10 text-primary",
+  rented: "bg-primary/10 text-primary",
   retired: "bg-muted text-muted-foreground",
   // Maintenance statuses
   reported: "bg-warning/10 text-warning",
@@ -46,6 +47,7 @@ const statusLabels: Record<string, string> = {
   paid: "Paid",
   available: "Available",
   assigned: "Assigned",
+  rented: "Assigned",
   retired: "Retired",
   reported: "Reported",
   in_progress: "In Progress",
