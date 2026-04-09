@@ -14,6 +14,7 @@ import { format } from "date-fns";
 import { useUpdateRenter, useUpsertCustomFieldValues, type CustomFieldEntry, type RenterRow } from "@/hooks/useSupabaseData";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
+import { getErrorMessage } from "@/lib/errors";
 
 interface EditRenterDialogProps {
   open: boolean;
@@ -51,10 +52,10 @@ export function EditRenterDialog({ open, onOpenChange, renter, customFields }: E
     status: renter.status,
     install_fee_collected: renter.install_fee_collected,
     deposit_collected: renter.deposit_collected,
-    secondary_contact: (renter as any).secondary_contact || "",
-    language: (renter as any).language || "English",
-    install_notes: (renter as any).install_notes || "",
-    dryer_outlet: (renter as any).dryer_outlet || "",
+    secondary_contact: renter.secondary_contact || "",
+    language: renter.language || "English",
+    install_notes: renter.install_notes || "",
+    dryer_outlet: renter.dryer_outlet || "",
   });
   const [customFieldForm, setCustomFieldForm] = useState<Record<string, string>>({});
   const [startDate, setStartDate] = useState<Date | undefined>(
@@ -76,10 +77,10 @@ export function EditRenterDialog({ open, onOpenChange, renter, customFields }: E
         status: renter.status,
         install_fee_collected: renter.install_fee_collected,
         deposit_collected: renter.deposit_collected,
-        secondary_contact: (renter as any).secondary_contact || "",
-        language: (renter as any).language || "English",
-        install_notes: (renter as any).install_notes || "",
-        dryer_outlet: (renter as any).dryer_outlet || "",
+        secondary_contact: renter.secondary_contact || "",
+        language: renter.language || "English",
+        install_notes: renter.install_notes || "",
+        dryer_outlet: renter.dryer_outlet || "",
       });
       setStartDate(renter.lease_start_date ? new Date(renter.lease_start_date + "T00:00:00") : undefined);
       setCustomFieldForm(
@@ -114,7 +115,7 @@ export function EditRenterDialog({ open, onOpenChange, renter, customFields }: E
         language: form.language,
         install_notes: form.install_notes,
         dryer_outlet: form.dryer_outlet || null,
-      } as any);
+      });
       await upsertCustomFieldValues.mutateAsync({
         entityId: renter.id,
         values: customFields.map((field) => ({
@@ -124,8 +125,8 @@ export function EditRenterDialog({ open, onOpenChange, renter, customFields }: E
       });
       toast.success("Renter updated");
       onOpenChange(false);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update renter");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Failed to update renter"));
     }
   };
 

@@ -12,7 +12,7 @@ export default function PaymentsView() {
 
   const filtered = payments.filter(p => {
     const matchesStatus = statusFilter === "all" || p.status === statusFilter;
-    const matchesSource = sourceFilter === "all" || (p as any).payment_source === sourceFilter;
+    const matchesSource = sourceFilter === "all" || p.payment_source === sourceFilter;
     return matchesStatus && matchesSource;
   });
 
@@ -80,7 +80,7 @@ export default function PaymentsView() {
                   <TableCell className="text-sm capitalize font-medium">{p.type.replace('_', ' ')}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{p.due_date}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{p.paid_date || '—'}</TableCell>
-                  <TableCell><PaymentSourceBadge source={(p as any).payment_source} /></TableCell>
+                  <TableCell><PaymentSourceBadge source={p.payment_source} /></TableCell>
                   <TableCell className="text-right font-mono text-sm font-medium">${Number(p.amount).toFixed(2)}</TableCell>
                   <TableCell><StatusBadge status={p.status} /></TableCell>
                 </TableRow>

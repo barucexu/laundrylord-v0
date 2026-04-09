@@ -12,6 +12,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useCreatePayment, useUpdateRenter, type RenterRow } from "@/hooks/useSupabaseData";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 
 interface RecordPaymentDialogProps {
   open: boolean;
@@ -74,8 +75,8 @@ export function RecordPaymentDialog({ open, onOpenChange, renter }: RecordPaymen
       toast.success(`$${amount.toFixed(2)} payment recorded via ${form.source}`);
       onOpenChange(false);
       setForm({ amount: String(renter.monthly_rate), source: "cash", notes: "", type: "rent" });
-    } catch (err: any) {
-      toast.error(err.message || "Failed to record payment");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Failed to record payment"));
     }
   };
 

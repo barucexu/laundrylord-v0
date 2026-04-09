@@ -116,7 +116,7 @@ Notes:
 
 Before wrapping up, confirm:
 
-1. Boundary behavior at counts `10`, `24`, `49`, `74`, and `99`
+1. Boundary behavior at counts `10`, `24`, `49`, `74`, `99`, `199`, `399`, `699`, `999`, and `1000+`
 2. Import-path parity with add/create flows
 3. Archive/unarchive impact on plan enforcement
 4. Upgrade CTA correctness

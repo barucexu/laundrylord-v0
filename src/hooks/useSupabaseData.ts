@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useDemo } from "@/contexts/DemoContext";
+import { BILLABLE_RENTER_COUNT_QUERY_KEY } from "@/lib/billing-counts";
 import { buildCustomFieldValuePayload, getCustomFieldValue, type CustomFieldEntityType, type CustomFieldValueType } from "@/lib/custom-fields";
 import { getUnassignedMachineStatus, isMachineAssignable } from "@/lib/machine-assignment";
 import type { Database } from "@/integrations/supabase/types";
@@ -118,7 +119,7 @@ export function useCreateRenter() {
   return useMutation({
     mutationFn: async (renter: Omit<RenterInsert, "user_id">) => {
       if (demo?.isDemo) {
-        return demo.addRenter(renter as any);
+        return demo.addRenter(renter as Parameters<typeof demo.addRenter>[0]);
       }
       const { data, error } = await supabase
         .from("renters")
@@ -129,7 +130,10 @@ export function useCreateRenter() {
       return data;
     },
     onSuccess: () => {
-      if (!demo?.isDemo) queryClient.invalidateQueries({ queryKey: ["renters"] });
+      if (!demo?.isDemo) {
+        queryClient.invalidateQueries({ queryKey: ["renters"] });
+        queryClient.invalidateQueries({ queryKey: BILLABLE_RENTER_COUNT_QUERY_KEY });
+      }
     },
   });
 }
@@ -160,7 +164,7 @@ export function useCreateMachine() {
   return useMutation({
     mutationFn: async (machine: Omit<MachineInsert, "user_id">) => {
       if (demo?.isDemo) {
-        return demo.addMachine(machine as any);
+        return demo.addMachine(machine as Parameters<typeof demo.addMachine>[0]);
       }
       const { data, error } = await supabase
         .from("machines")
@@ -313,6 +317,8 @@ export function useUpdateRenter() {
       if (!demo?.isDemo) {
         queryClient.invalidateQueries({ queryKey: ["renters"] });
         queryClient.invalidateQueries({ queryKey: ["renters", data.id] });
+        queryClient.invalidateQueries({ queryKey: ["renters", "archived"] });
+        queryClient.invalidateQueries({ queryKey: BILLABLE_RENTER_COUNT_QUERY_KEY });
       }
     },
   });
@@ -344,7 +350,7 @@ export function useCreatePayment() {
   return useMutation({
     mutationFn: async (payment: Omit<PaymentInsert, "user_id">) => {
       if (demo?.isDemo) {
-        return demo.addPayment(payment as any);
+        return demo.addPayment(payment as Parameters<typeof demo.addPayment>[0]);
       }
       const { data, error } = await supabase
         .from("payments")

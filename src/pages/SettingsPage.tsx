@@ -15,6 +15,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSubscription } from "@/hooks/useSubscription";
+import { BILLABLE_RENTER_COUNT_QUERY_KEY } from "@/lib/billing-counts";
+import { getErrorMessage } from "@/lib/errors";
 import { TIERS, canFitTier, tierUpgradeLabel } from "@/lib/pricing-tiers";
 import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
 import { useSearchParams } from "react-router-dom";
@@ -68,19 +70,18 @@ export default function SettingsPage() {
         late_fee_after_days: String(settings.late_fee_after_days),
         reminder_days_before: String(settings.reminder_days_before),
       });
-      const s = settings as any;
       setEmailForm({
-        email_reminders_enabled: s.email_reminders_enabled ?? true,
-        reminder_upcoming_enabled: s.reminder_upcoming_enabled ?? true,
-        reminder_failed_enabled: s.reminder_failed_enabled ?? true,
-        reminder_latefee_enabled: s.reminder_latefee_enabled ?? true,
-        business_name: s.business_name || "LaundryLord",
-        template_upcoming_subject: s.template_upcoming_subject || DEFAULT_TEMPLATES.template_upcoming_subject,
-        template_upcoming_body: s.template_upcoming_body || DEFAULT_TEMPLATES.template_upcoming_body,
-        template_failed_subject: s.template_failed_subject || DEFAULT_TEMPLATES.template_failed_subject,
-        template_failed_body: s.template_failed_body || DEFAULT_TEMPLATES.template_failed_body,
-        template_latefee_subject: s.template_latefee_subject || DEFAULT_TEMPLATES.template_latefee_subject,
-        template_latefee_body: s.template_latefee_body || DEFAULT_TEMPLATES.template_latefee_body,
+        email_reminders_enabled: settings.email_reminders_enabled ?? true,
+        reminder_upcoming_enabled: settings.reminder_upcoming_enabled ?? true,
+        reminder_failed_enabled: settings.reminder_failed_enabled ?? true,
+        reminder_latefee_enabled: settings.reminder_latefee_enabled ?? true,
+        business_name: settings.business_name || "LaundryLord",
+        template_upcoming_subject: settings.template_upcoming_subject || DEFAULT_TEMPLATES.template_upcoming_subject,
+        template_upcoming_body: settings.template_upcoming_body || DEFAULT_TEMPLATES.template_upcoming_body,
+        template_failed_subject: settings.template_failed_subject || DEFAULT_TEMPLATES.template_failed_subject,
+        template_failed_body: settings.template_failed_body || DEFAULT_TEMPLATES.template_failed_body,
+        template_latefee_subject: settings.template_latefee_subject || DEFAULT_TEMPLATES.template_latefee_subject,
+        template_latefee_body: settings.template_latefee_body || DEFAULT_TEMPLATES.template_latefee_body,
       });
     }
   }, [settings]);
@@ -97,8 +98,8 @@ export default function SettingsPage() {
         ...emailForm,
       });
       toast.success("Settings saved");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save settings");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Failed to save settings"));
     }
   };
 
@@ -121,8 +122,8 @@ export default function SettingsPage() {
       setStripeKey("");
       toast.success("Stripe key saved! Verifying connection…");
       queryClient.invalidateQueries({ queryKey: ["stripe-connection"] });
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save Stripe key");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Failed to save Stripe key"));
     } finally {
       setSavingKey(false);
     }
@@ -150,7 +151,7 @@ export default function SettingsPage() {
       try {
         await subscription.refresh();
         queryClient.invalidateQueries({ queryKey: ["renters"] });
-        queryClient.invalidateQueries({ queryKey: ["renters", "billable-count"] });
+        queryClient.invalidateQueries({ queryKey: BILLABLE_RENTER_COUNT_QUERY_KEY });
         if (!cancelled) {
           toast.success("Plan updated");
         }

@@ -15,6 +15,36 @@ function replaceVars(template: string, vars: Record<string, string>): string {
   return result;
 }
 
+type RenterReminderRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  email: string | null;
+  next_due_date: string | null;
+  monthly_rate: number;
+  balance: number;
+  late_fee: number | null;
+  days_late: number;
+};
+
+type OperatorReminderSettings = {
+  user_id: string;
+  reminder_days_before?: number | null;
+  late_fee_after_days?: number | null;
+  late_fee_amount?: number | null;
+  business_name?: string | null;
+  email_reminders_enabled?: boolean | null;
+  reminder_upcoming_enabled?: boolean | null;
+  reminder_failed_enabled?: boolean | null;
+  reminder_latefee_enabled?: boolean | null;
+  template_upcoming_subject?: string | null;
+  template_upcoming_body?: string | null;
+  template_failed_subject?: string | null;
+  template_failed_body?: string | null;
+  template_latefee_subject?: string | null;
+  template_latefee_body?: string | null;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -53,19 +83,20 @@ serve(async (req) => {
       });
     }
 
-    const userIds = [...new Set(renters.map((r: any) => r.user_id))];
+    const renterRows = renters as RenterReminderRow[];
+    const userIds = [...new Set(renterRows.map((r) => r.user_id))];
 
     const { data: allSettings } = await supabase
       .from("operator_settings")
       .select("*")
       .in("user_id", userIds);
 
-    const settingsMap: Record<string, any> = {};
+    const settingsMap: Record<string, OperatorReminderSettings> = {};
     for (const s of allSettings || []) {
       settingsMap[s.user_id] = s;
     }
 
-    for (const renter of renters) {
+    for (const renter of renterRows) {
       const settings = settingsMap[renter.user_id] || {};
       const reminderDaysBefore = settings.reminder_days_before ?? 3;
       const lateFeeAfterDays = settings.late_fee_after_days ?? 7;

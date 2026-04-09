@@ -101,7 +101,7 @@ export default function MachinesList() {
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground capitalize">{m.condition || '—'}</TableCell>
                     <TableCell className="text-right font-mono text-sm">
-                      {Number((m as any).cost_basis || 0) > 0 ? `$${Number((m as any).cost_basis).toFixed(0)}` : '—'}
+                      {Number(m.cost_basis || 0) > 0 ? `$${Number(m.cost_basis).toFixed(0)}` : '—'}
                     </TableCell>
                     <TableCell>
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditMachine(m)}>

@@ -12,6 +12,8 @@ import { SupportFooter } from "@/components/SupportFooter";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { supabase } from "@/integrations/supabase/client";
+import { BILLABLE_RENTER_COUNT_QUERY_KEY } from "@/lib/billing-counts";
+import { getErrorMessage } from "@/lib/errors";
 import { autoMap } from "@/utils/import/auto-mapper";
 import { parseCSV } from "@/utils/import/csv-parser";
 import { classifyImportRows, executeImport, getPreviewStatus, toggleRowDeleted } from "@/utils/import/engine";
@@ -23,10 +25,12 @@ import { parseXLSX } from "@/utils/import/xlsx-parser";
 type Step = "upload" | "map" | "preview" | "done";
 
 const ROWS_PER_PAGE = 25;
+const ACCEPTED_EXTENSIONS = [".csv", ".xlsx", ".png", ".jpg", ".jpeg"];
+const ACCEPT_STRING = ".csv,.xlsx,.png,.jpg,.jpeg";
 
 export default function ImportPage() {
   const { user } = useAuth();
-  const { tier, renterCount, subscribed, loading: planLoading } = useSubscription();
+  const { tier, billableCount, subscribed, loading: planLoading } = useSubscription();
   const queryClient = useQueryClient();
 
   const [importMode, setImportMode] = useState<ImportMode>("renters");
@@ -43,16 +47,14 @@ export default function ImportPage() {
   const [previewPage, setPreviewPage] = useState(0);
 
   const activeFields = importMode === "renters" ? RENTER_FIELDS : MACHINE_FIELDS;
-  const ACCEPTED_EXTENSIONS = [".csv", ".xlsx", ".png", ".jpg", ".jpeg"];
-  const ACCEPT_STRING = ".csv,.xlsx,.png,.jpg,.jpeg";
 
   const renterSlotsAvailable = useMemo(() => {
     if (importMode !== "renters") return Number.POSITIVE_INFINITY;
     if (tier.max === Infinity) return Number.POSITIVE_INFINITY;
-    if (tier.price === 0) return Math.max(0, tier.max - renterCount);
+    if (tier.price === 0) return Math.max(0, tier.max - billableCount);
     if (!subscribed) return 0;
-    return Math.max(0, tier.max - renterCount);
-  }, [importMode, renterCount, subscribed, tier.max, tier.price]);
+    return Math.max(0, tier.max - billableCount);
+  }, [billableCount, importMode, subscribed, tier.max, tier.price]);
 
   const processFile = useCallback(
     async (file: File) => {
@@ -76,8 +78,8 @@ export default function ImportPage() {
         setClassifiedRows([]);
         setPreviewPage(0);
         setStep("map");
-      } catch (err: any) {
-        toast.error(err.message || "Failed to parse file");
+      } catch (err: unknown) {
+        toast.error(getErrorMessage(err, "Failed to parse file"));
       } finally {
         setParsing(false);
       }
@@ -178,14 +180,17 @@ export default function ImportPage() {
       setResult(summary);
       setStep("done");
       queryClient.invalidateQueries({ queryKey: [importMode === "renters" ? "renters" : "machines"] });
+      if (importMode === "renters") {
+        queryClient.invalidateQueries({ queryKey: BILLABLE_RENTER_COUNT_QUERY_KEY });
+      }
 
       if (summary.imported === 0) {
         toast.error("No rows imported. Review the summary for details.");
       } else {
         toast.success(`Imported ${summary.imported} ${importMode === "renters" ? "renters" : "machines"}.`);
       }
-    } catch (err: any) {
-      toast.error(err.message || "Import failed");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Import failed"));
     } finally {
       setImporting(false);
     }
