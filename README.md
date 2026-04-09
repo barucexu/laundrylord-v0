@@ -81,6 +81,9 @@ All reads AND writes must use `machines.assigned_renter_id`. The legacy `renters
 
 ## Project Operating Docs
 
+- `AGENTS.md` — shared instructions for AI coding agents working in this repo
+- `WORKFLOW.md` — default planning, phasing, branch, and validation loop for non-trivial work
+- `REVIEW_STANDARD.md` — review bar for plans, implementations, and phase completion
 - `RULES.md` — non-negotiable engineering guardrails
 - `ARCHITECTURE.md` — system map and module boundaries
 - `BILLING_POLICY.md` — SaaS/enforcement policy decisions
