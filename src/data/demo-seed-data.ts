@@ -392,6 +392,7 @@ function generateOperatorSettings(): OperatorSettingsRow {
     template_latefee_subject: "Late Fee Notice",
     template_latefee_body: "Hi {{name}}, a late fee of ${{late_fee}} has been applied to your account.",
     saas_product_id: null,
+    saas_stripe_customer_id: null,
     saas_subscribed: false,
     saas_subscription_end: null,
     created_at: dateOffset(365) + "T00:00:00.000Z",

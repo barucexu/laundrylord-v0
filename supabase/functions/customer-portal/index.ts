@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { resolveSaasCustomer } from "../_shared/saas-billing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -40,10 +41,34 @@ serve(async (req) => {
     logStep("User authenticated", { email: user.email });
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-    if (customers.data.length === 0) throw new Error("No Stripe customer found");
+    const { data: settingsRow, error: settingsError } = await supabase
+      .from("operator_settings")
+      .select("saas_stripe_customer_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (settingsError) throw new Error(`Failed to load operator settings: ${settingsError.message}`);
 
-    const customerId = customers.data[0].id;
+    const resolvedCustomer = await resolveSaasCustomer({
+      stripe,
+      email: user.email,
+      persistedCustomerId: settingsRow?.saas_stripe_customer_id ?? null,
+      createIfMissing: false,
+      customerName: user.user_metadata?.full_name ?? user.email,
+    });
+    if (!resolvedCustomer.customerId) throw new Error("No SaaS Stripe customer found");
+
+    const { error: persistError } = await supabase
+      .from("operator_settings")
+      .upsert(
+        {
+          user_id: user.id,
+          saas_stripe_customer_id: resolvedCustomer.customerId,
+        },
+        { onConflict: "user_id" },
+      );
+    if (persistError) throw new Error(`Failed to persist SaaS customer ID: ${persistError.message}`);
+
+    const customerId = resolvedCustomer.customerId;
     const origin = req.headers.get("origin") || "https://laundrylord-v0.lovable.app";
 
     const portalSession = await stripe.billingPortal.sessions.create({

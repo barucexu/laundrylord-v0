@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { resolveSaasCustomer } from "../_shared/saas-billing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,24 +12,6 @@ const corsHeaders = {
 const logStep = (step: string, details?: unknown) => {
   const d = details ? ` - ${JSON.stringify(details)}` : "";
   console.log(`[CHECK-SUBSCRIPTION] ${step}${d}`);
-};
-
-// SaaS product IDs — only subscriptions for these products count as LaundryLord plan subscriptions.
-const SAAS_PRODUCT_IDS = new Set([
-  "prod_UJ58t9MVJy9kM1", // Starter
-  "prod_UJ58vllhfPnDMA", // Growth
-  "prod_UJ58WKvIfBSgVF", // Pro
-  "prod_UJ58Un0dqdr1bw", // Scale
-  "prod_UJ570aXFf4kHyD", // Business
-  "prod_UJ57FSgV0zgrlb", // Enterprise
-  "prod_UJ57tGh0ISMKcj", // Portfolio
-  "prod_UJ57Jy6PV80WrY", // Empire
-  "prod_UJ57nRhlCMzAzY", // Ultimate
-]);
-
-const getProductId = (product: string | { id?: string } | null | undefined): string | null => {
-  if (!product) return null;
-  return typeof product === "string" ? product : product.id ?? null;
 };
 
 serve(async (req) => {
@@ -87,10 +70,12 @@ serve(async (req) => {
       subscribed,
       productId,
       subscriptionEnd,
+      customerId,
     }: {
       subscribed: boolean;
       productId: string | null;
       subscriptionEnd: string | null;
+      customerId: string | null;
     }) => {
       const { error: syncError } = await serviceClient
         .from("operator_settings")
@@ -100,6 +85,7 @@ serve(async (req) => {
             saas_subscribed: subscribed,
             saas_product_id: productId,
             saas_subscription_end: subscriptionEnd,
+            saas_stripe_customer_id: customerId,
           },
           { onConflict: "user_id" },
         );
@@ -110,44 +96,36 @@ serve(async (req) => {
     };
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    const { data: settingsRow, error: settingsError } = await serviceClient
+      .from("operator_settings")
+      .select("saas_stripe_customer_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (settingsError) throw new Error(`Failed to load operator settings: ${settingsError.message}`);
 
-    if (customers.data.length === 0) {
-      logStep("No Stripe customer found — not subscribed");
-      await syncOperatorPlanState({ subscribed: false, productId: null, subscriptionEnd: null });
-      return new Response(JSON.stringify({ subscribed: false }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const customerId = customers.data[0].id;
-    logStep("Found Stripe customer", { customerId });
-
-    const subscriptions = await stripe.subscriptions.list({
-      customer: customerId,
-      status: "active",
-      limit: 50,
+    const resolvedCustomer = await resolveSaasCustomer({
+      stripe,
+      email: user.email,
+      persistedCustomerId: settingsRow?.saas_stripe_customer_id ?? null,
+      createIfMissing: false,
+      customerName: user.user_metadata?.full_name ?? user.email,
     });
 
-    const getSaasProductId = (subscription: Stripe.Subscription): string | null => {
-      for (const item of subscription.items.data) {
-        const productId = getProductId(item.price.product);
-        if (productId !== null && SAAS_PRODUCT_IDS.has(productId)) return productId;
-      }
-      return null;
-    };
-
-    const sub = subscriptions.data.find((subscription: Stripe.Subscription) => getSaasProductId(subscription) !== null);
-
-    if (!sub) {
+    if (!resolvedCustomer.customerId || !resolvedCustomer.activeSubscription) {
       logStep("No active SaaS subscription");
-      await syncOperatorPlanState({ subscribed: false, productId: null, subscriptionEnd: null });
+      await syncOperatorPlanState({
+        subscribed: false,
+        productId: null,
+        subscriptionEnd: null,
+        customerId: resolvedCustomer.customerId,
+      });
       return new Response(JSON.stringify({ subscribed: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const productId = getSaasProductId(sub);
+    const sub = resolvedCustomer.activeSubscription;
+    const productId = resolvedCustomer.activeProductId;
 
     let subscriptionEnd: string | null = null;
     try {
@@ -162,7 +140,12 @@ serve(async (req) => {
     }
 
     logStep("Active subscription found", { subscriptionId: sub.id, productId, subscriptionEnd });
-    await syncOperatorPlanState({ subscribed: true, productId, subscriptionEnd });
+    await syncOperatorPlanState({
+      subscribed: true,
+      productId,
+      subscriptionEnd,
+      customerId: resolvedCustomer.customerId,
+    });
 
     return new Response(
       JSON.stringify({ subscribed: true, product_id: productId, subscription_end: subscriptionEnd }),

@@ -1,24 +1,12 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { resolveSaasCustomer, SAAS_PRODUCT_IDS } from "../_shared/saas-billing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
-
-// SaaS product IDs — used to detect existing SaaS subscriptions
-const SAAS_PRODUCT_IDS = new Set([
-  "prod_UJ58t9MVJy9kM1", // Starter
-  "prod_UJ58vllhfPnDMA", // Growth
-  "prod_UJ58WKvIfBSgVF", // Pro
-  "prod_UJ58Un0dqdr1bw", // Scale
-  "prod_UJ570aXFf4kHyD", // Business
-  "prod_UJ57FSgV0zgrlb", // Enterprise
-  "prod_UJ57tGh0ISMKcj", // Portfolio
-  "prod_UJ57Jy6PV80WrY", // Empire
-  "prod_UJ57nRhlCMzAzY", // Ultimate
-]);
 
 // SaaS price IDs — incoming Checkout requests must target one of these prices.
 const SAAS_PRICE_IDS = new Set([
@@ -58,6 +46,10 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
       { global: { headers: { Authorization: authHeader } } },
     );
+    const serviceClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
     const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError) throw new Error(`Auth error: ${userError.message}`);
     if (!user?.email) throw new Error("User not authenticated or email not available");
@@ -70,45 +62,55 @@ serve(async (req) => {
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
     const origin = req.headers.get("origin") || "https://laundrylord-v0.lovable.app";
+    const { data: settingsRow, error: settingsError } = await serviceClient
+      .from("operator_settings")
+      .select("saas_stripe_customer_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (settingsError) throw new Error(`Failed to load operator settings: ${settingsError.message}`);
 
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-    let customerId: string | undefined;
-    if (customers.data.length > 0) {
-      customerId = customers.data[0].id;
+    const resolvedCustomer = await resolveSaasCustomer({
+      stripe,
+      email: user.email,
+      persistedCustomerId: settingsRow?.saas_stripe_customer_id ?? null,
+      createIfMissing: true,
+      customerName: user.user_metadata?.full_name ?? user.email,
+      metadata: {
+        laundrylord_user_id: user.id,
+        usage: "saas_billing",
+      },
+    });
 
-      // Keep only one SaaS subscription by cancelling prior SaaS subscriptions immediately
-      // before starting checkout for the newly selected plan.
-      const subscriptions = await stripe.subscriptions.list({
-        customer: customerId,
-        status: "active",
-        limit: 50,
-      });
+    const customerId = resolvedCustomer.customerId;
+    if (!customerId) throw new Error("Failed to resolve SaaS Stripe customer");
 
-      const activeSaasSubs = subscriptions.data.filter((sub: Stripe.Subscription) =>
-        sub.items.data.some((item) => {
-          const productId = typeof item.price.product === "string"
-            ? item.price.product
-            : item.price.product?.id;
-          return productId && SAAS_PRODUCT_IDS.has(productId);
-        })
+    const { error: persistError } = await serviceClient
+      .from("operator_settings")
+      .upsert(
+        {
+          user_id: user.id,
+          saas_stripe_customer_id: customerId,
+        },
+        { onConflict: "user_id" },
       );
+    if (persistError) throw new Error(`Failed to persist SaaS customer ID: ${persistError.message}`);
 
-      for (const sub of activeSaasSubs) {
-        logStep("Cancelling existing SaaS subscription before new checkout", { subscriptionId: sub.id });
-        await stripe.subscriptions.cancel(sub.id, {
-          prorate: false,
-          invoice_now: false,
-        });
-      }
+    if (resolvedCustomer.activeSubscription) {
+      logStep("Cancelling existing SaaS subscription before new checkout", {
+        subscriptionId: resolvedCustomer.activeSubscription.id,
+        customerId,
+      });
+      await stripe.subscriptions.cancel(resolvedCustomer.activeSubscription.id, {
+        prorate: false,
+        invoice_now: false,
+      });
     }
 
     // Clear orphaned customer credit that could make first checkout $0
-    if (customerId) {
-      const customer = await stripe.customers.retrieve(customerId);
-      if (!customer.deleted && customer.balance < 0) {
-        logStep("Clearing orphaned customer credit before first checkout", { balance: customer.balance });
-        await stripe.customers.update(customerId, { balance: 0 });
-      }
+    const customer = await stripe.customers.retrieve(customerId);
+    if (!customer.deleted && customer.balance < 0) {
+      logStep("Clearing orphaned customer credit before first checkout", { balance: customer.balance });
+      await stripe.customers.update(customerId, { balance: 0 });
     }
 
     const session = await stripe.checkout.sessions.create({
