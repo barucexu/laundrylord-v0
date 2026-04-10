@@ -137,7 +137,7 @@ serve(async (req) => {
       return null;
     };
 
-    const sub = subscriptions.data.find((subscription) => getSaasProductId(subscription) !== null);
+    const sub = subscriptions.data.find((subscription: Stripe.Subscription) => getSaasProductId(subscription) !== null);
 
     if (!sub) {
       logStep("No active SaaS subscription");

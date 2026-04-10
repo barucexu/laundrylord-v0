@@ -84,7 +84,7 @@ serve(async (req) => {
         limit: 50,
       });
 
-      const activeSaasSubs = subscriptions.data.filter((sub) =>
+      const activeSaasSubs = subscriptions.data.filter((sub: Stripe.Subscription) =>
         sub.items.data.some((item) => {
           const productId = typeof item.price.product === "string"
             ? item.price.product
