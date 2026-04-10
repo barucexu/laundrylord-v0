@@ -52,9 +52,24 @@ function parseJwtClaims(token: string): Record<string, unknown> | null {
   }
 }
 
+type QueueSupabaseClient = {
+  from: (table: 'email_send_log') => {
+    insert: (values: Record<string, unknown>) => PromiseLike<unknown>;
+  };
+  rpc: (
+    fn: 'move_to_dlq',
+    args: {
+      source_queue: string;
+      dlq_name: string;
+      message_id: number;
+      payload: Record<string, unknown>;
+    }
+  ) => PromiseLike<{ error: unknown }>;
+};
+
 // Move a message to the dead letter queue and log the reason.
 async function moveToDlq(
-  supabase: any,
+  supabase: QueueSupabaseClient,
   queue: string,
   msg: { msg_id: number; message: Record<string, unknown> },
   reason: string
