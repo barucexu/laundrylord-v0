@@ -693,8 +693,6 @@ export function useSaveOperatorSettings() {
 }
 
 export type {
-  RenterRow,
-  MachineRow,
   PaymentRow,
   PaymentInsert,
   MaintenanceRow,
