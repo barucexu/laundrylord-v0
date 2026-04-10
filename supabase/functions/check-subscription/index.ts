@@ -44,19 +44,13 @@ serve(async (req) => {
     const serviceClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    );
-
-    // Use anon key + forwarded auth header so getUser works correctly
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } },
+      { auth: { persistSession: false } },
     );
 
     const {
       data: { user },
       error: userError,
-    } = await userClient.auth.getUser();
+    } = await serviceClient.auth.getUser(token);
     if (userError || !user?.email) {
       const authMessage = userError?.message ?? "User not authenticated or email not available";
       return new Response(JSON.stringify({ error: `Auth error: ${authMessage}` }), {
