@@ -13,6 +13,24 @@ const logStep = (step: string, details?: unknown) => {
   console.log(`[CHECK-SUBSCRIPTION] ${step}${d}`);
 };
 
+// SaaS product IDs — only subscriptions for these products count as LaundryLord plan subscriptions.
+const SAAS_PRODUCT_IDS = new Set([
+  "prod_UJ58t9MVJy9kM1", // Starter
+  "prod_UJ58vllhfPnDMA", // Growth
+  "prod_UJ58WKvIfBSgVF", // Pro
+  "prod_UJ58Un0dqdr1bw", // Scale
+  "prod_UJ570aXFf4kHyD", // Business
+  "prod_UJ57FSgV0zgrlb", // Enterprise
+  "prod_UJ57tGh0ISMKcj", // Portfolio
+  "prod_UJ57Jy6PV80WrY", // Empire
+  "prod_UJ57nRhlCMzAzY", // Ultimate
+]);
+
+const getProductId = (product: string | { id?: string } | null | undefined): string | null => {
+  if (!product) return null;
+  return typeof product === "string" ? product : product.id ?? null;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -108,19 +126,28 @@ serve(async (req) => {
     const subscriptions = await stripe.subscriptions.list({
       customer: customerId,
       status: "active",
-      limit: 1,
+      limit: 50,
     });
 
-    if (subscriptions.data.length === 0) {
-      logStep("No active subscription");
+    const getSaasProductId = (subscription: Stripe.Subscription): string | null => {
+      for (const item of subscription.items.data) {
+        const productId = getProductId(item.price.product);
+        if (productId !== null && SAAS_PRODUCT_IDS.has(productId)) return productId;
+      }
+      return null;
+    };
+
+    const sub = subscriptions.data.find((subscription) => getSaasProductId(subscription) !== null);
+
+    if (!sub) {
+      logStep("No active SaaS subscription");
       await syncOperatorPlanState({ subscribed: false, productId: null, subscriptionEnd: null });
       return new Response(JSON.stringify({ subscribed: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const sub = subscriptions.data[0];
-    const productId = sub.items.data[0]?.price?.product ?? null;
+    const productId = getSaasProductId(sub);
 
     let subscriptionEnd: string | null = null;
     try {

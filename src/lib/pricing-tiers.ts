@@ -15,15 +15,15 @@ export interface PricingTier {
 
 export const TIERS: PricingTier[] = [
   { name: "Free",       min: 1,    max: 10,       price: 0,    label: "Free" },
-  { name: "Starter",    min: 11,   max: 24,       price: 29,   label: "$29/mo",   product_id: "prod_UEEy3RgIQPQOGZ", price_id: "price_1TFmUg7o90tJn3krILvYLKBP" },
-  { name: "Growth",     min: 25,   max: 49,       price: 49,   label: "$49/mo",   product_id: "prod_UEEyoVnhxLF3vy", price_id: "price_1TFmUh7o90tJn3krlGQuqdiu" },
-  { name: "Pro",        min: 50,   max: 74,       price: 99,   label: "$99/mo",   product_id: "prod_UEEyKtssPt0430", price_id: "price_1TFmUi7o90tJn3krfXA6KgB2" },
-  { name: "Scale",      min: 75,   max: 99,       price: 129,  label: "$129/mo",  product_id: "prod_UEEygRRU9opKwW", price_id: "price_1TFmUj7o90tJn3krsJq0qv9N" },
-  { name: "Business",   min: 100,  max: 199,      price: 199,  label: "$199/mo",  product_id: "prod_UEEyrzDO6LUlgl", price_id: "price_1TFmUk7o90tJn3kr0GNbTYIg" },
-  { name: "Enterprise", min: 200,  max: 399,      price: 299,  label: "$299/mo",  product_id: "prod_UEEyuMGKTuzhYF", price_id: "price_1TFmUl7o90tJn3krfybZEO7K" },
-  { name: "Portfolio",  min: 400,  max: 699,      price: 499,  label: "$499/mo",  product_id: "prod_UEEyc2En1L0HBs", price_id: "price_1TFmUn7o90tJn3krki0r0xmT" },
-  { name: "Empire",     min: 700,  max: 999,      price: 799,  label: "$799/mo",  product_id: "prod_UEEyriCh6VhS2S", price_id: "price_1TFmUo7o90tJn3krKsZmjhAk" },
-  { name: "Ultimate",   min: 1000, max: Infinity, price: 999,  label: "$999/mo",  product_id: "prod_UEEyMlX4QNETsG", price_id: "price_1TFmUo7o90tJn3krdi8mb7pZ" },
+  { name: "Starter",    min: 11,   max: 24,       price: 29,   label: "$29/mo",   product_id: "prod_UJ58t9MVJy9kM1", price_id: "price_1TKSxq6ThRF2oI0ePEVOB78i" },
+  { name: "Growth",     min: 25,   max: 49,       price: 49,   label: "$49/mo",   product_id: "prod_UJ58vllhfPnDMA", price_id: "price_1TKSxp6ThRF2oI0e6SvsTacu" },
+  { name: "Pro",        min: 50,   max: 74,       price: 99,   label: "$99/mo",   product_id: "prod_UJ58WKvIfBSgVF", price_id: "price_1TKSxn6ThRF2oI0emf6Qv0rk" },
+  { name: "Scale",      min: 75,   max: 99,       price: 129,  label: "$129/mo",  product_id: "prod_UJ58Un0dqdr1bw", price_id: "price_1TKSxl6ThRF2oI0eVda3nXiN" },
+  { name: "Business",   min: 100,  max: 199,      price: 199,  label: "$199/mo",  product_id: "prod_UJ570aXFf4kHyD", price_id: "price_1TKSxj6ThRF2oI0ef8fSmIyV" },
+  { name: "Enterprise", min: 200,  max: 399,      price: 299,  label: "$299/mo",  product_id: "prod_UJ57FSgV0zgrlb", price_id: "price_1TKSxh6ThRF2oI0ezlVTH1Iv" },
+  { name: "Portfolio",  min: 400,  max: 699,      price: 499,  label: "$499/mo",  product_id: "prod_UJ57tGh0ISMKcj", price_id: "price_1TKSxf6ThRF2oI0e6xk6eK8r" },
+  { name: "Empire",     min: 700,  max: 999,      price: 799,  label: "$799/mo",  product_id: "prod_UJ57Jy6PV80WrY", price_id: "price_1TKSxd6ThRF2oI0eqcX1mYga" },
+  { name: "Ultimate",   min: 1000, max: Infinity, price: 999,  label: "$999/mo",  product_id: "prod_UJ57nRhlCMzAzY", price_id: "price_1TKSxX6ThRF2oI0exkH7YfC0" },
 ];
 
 /** Returns the tier matching a given total renter count (all statuses). */

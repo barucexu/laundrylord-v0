@@ -9,15 +9,28 @@ const corsHeaders = {
 
 // SaaS product IDs — used to detect existing SaaS subscriptions
 const SAAS_PRODUCT_IDS = new Set([
-  "prod_UEEy3RgIQPQOGZ", // Starter
-  "prod_UEEyoVnhxLF3vy", // Growth
-  "prod_UEEyKtssPt0430", // Pro
-  "prod_UEEygRRU9opKwW", // Scale
-  "prod_UEEyrzDO6LUlgl", // Business
-  "prod_UEEyuMGKTuzhYF", // Enterprise
-  "prod_UEEyc2En1L0HBs", // Portfolio
-  "prod_UEEyriCh6VhS2S", // Empire
-  "prod_UEEyMlX4QNETsG", // Ultimate
+  "prod_UJ58t9MVJy9kM1", // Starter
+  "prod_UJ58vllhfPnDMA", // Growth
+  "prod_UJ58WKvIfBSgVF", // Pro
+  "prod_UJ58Un0dqdr1bw", // Scale
+  "prod_UJ570aXFf4kHyD", // Business
+  "prod_UJ57FSgV0zgrlb", // Enterprise
+  "prod_UJ57tGh0ISMKcj", // Portfolio
+  "prod_UJ57Jy6PV80WrY", // Empire
+  "prod_UJ57nRhlCMzAzY", // Ultimate
+]);
+
+// SaaS price IDs — incoming Checkout requests must target one of these prices.
+const SAAS_PRICE_IDS = new Set([
+  "price_1TKSxq6ThRF2oI0ePEVOB78i", // Starter
+  "price_1TKSxp6ThRF2oI0e6SvsTacu", // Growth
+  "price_1TKSxn6ThRF2oI0emf6Qv0rk", // Pro
+  "price_1TKSxl6ThRF2oI0eVda3nXiN", // Scale
+  "price_1TKSxj6ThRF2oI0ef8fSmIyV", // Business
+  "price_1TKSxh6ThRF2oI0ezlVTH1Iv", // Enterprise
+  "price_1TKSxf6ThRF2oI0e6xk6eK8r", // Portfolio
+  "price_1TKSxd6ThRF2oI0eqcX1mYga", // Empire
+  "price_1TKSxX6ThRF2oI0exkH7YfC0", // Ultimate
 ]);
 
 const logStep = (step: string, details?: unknown) => {
@@ -52,6 +65,7 @@ serve(async (req) => {
 
     const { price_id } = await req.json();
     if (!price_id) throw new Error("price_id is required");
+    if (!SAAS_PRICE_IDS.has(price_id)) throw new Error("Invalid SaaS price_id");
     logStep("Price ID", { price_id });
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });

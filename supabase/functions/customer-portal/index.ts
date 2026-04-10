@@ -7,19 +7,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// SaaS product IDs — only these should appear in the billing portal
-const SAAS_PRODUCT_IDS = [
-  "prod_UEEy3RgIQPQOGZ", // Starter
-  "prod_UEEyoVnhxLF3vy", // Growth
-  "prod_UEEyKtssPt0430", // Pro
-  "prod_UEEygRRU9opKwW", // Scale
-  "prod_UEEyrzDO6LUlgl", // Business
-  "prod_UEEyuMGKTuzhYF", // Enterprise
-  "prod_UEEyc2En1L0HBs", // Portfolio
-  "prod_UEEyriCh6VhS2S", // Empire
-  "prod_UEEyMlX4QNETsG", // Ultimate
-];
-
 const logStep = (step: string, details?: unknown) => {
   const d = details ? ` - ${JSON.stringify(details)}` : "";
   console.log(`[CUSTOMER-PORTAL] ${step}${d}`);
