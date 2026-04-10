@@ -1,65 +1,72 @@
 
-Do I know what the issue is? Yes.
 
-What’s wrong right now
-- This is not RLS and not plan-gating. The logs show a PostgreSQL `23514` check-constraint failure on `renters_status_check`.
-- In `src/pages/ImportPage.tsx`, the importer currently:
-  - copies the mapped spreadsheet value directly into `record.status` (`getMappedRecord`)
-  - never normalizes renter status in `parseRenterRecord`
-  - inserts that raw value as-is in `handleImport`
-- `applyInsertDefaults()` only fills `status: "lead"` when status is blank, so it does nothing when the sheet already contains a status.
-- Your uploaded XLSX maps `Customer Status` to renter status, and that sheet contains values like `Active` and `Former Customer`.
-- The database only accepts canonical internal renter statuses: `lead`, `scheduled`, `active`, `late`, `maintenance`, `termination_requested`, `pickup_scheduled`, `closed`, `defaulted`, `archived`.
-- So:
-  - `Active` fails because the check is case-sensitive
-  - `Former Customer` fails because it is not a valid internal status at all
-- That explains why all 47 rows failed together.
-- Preview still looks “Ready” because the current row classification only checks `empty / has_data / likely_duplicate`. It does not validate or sanitize constrained values, so preview and insert are out of sync.
+# Fix Build Errors and Deploy Live Stripe SaaS Billing
 
-Smallest safe fix
-1. Keep the new preview / duplicate-review UI.
-2. Do not loosen the database constraint. The rest of the app already uses the canonical internal status set, so changing the DB to accept external labels would create contract drift.
-3. Add one shared normalization step that runs before both preview and insert:
-   - renter status examples:
-     - `Active` -> `active`
-     - `Former Customer` -> `archived`
-     - known synonyms -> matching internal status
-     - unknown status text -> remove the invalid status and let the default `lead` apply, with a visible warning
-4. Use that same normalized record in preview and in `handleImport`, so a row marked “Ready” is actually insertable.
-5. Show row warnings in preview for transformed values, for example:
-   - `Status normalized: Former Customer -> archived`
-   - `Unrecognized status "X" -> using lead`
-6. Improve the done-state error messaging so the first real DB error is surfaced in the UI if anything still fails.
+## Changes
 
-Files to change
-- `src/pages/ImportPage.tsx`
-  - add a tiny `normalizeImportedRecord()` helper
-  - call it during row classification
-  - store normalized warnings/results per row
-  - import the normalized record instead of rebuilding a different one later
-- `src/utils/import/types.ts`
-  - extend `ClassifiedRow` with normalized warnings and/or prepared record fields so preview/import truly share one path
+### 1. `src/hooks/useSupabaseData.ts` — remove only duplicate exports
 
-Edge cases I would harden in the same pass
-- Machine import should get the same treatment for constrained values so the next blanket failure doesn’t happen there:
-  - machine `status` -> `available | assigned | maintenance | retired`
-  - machine `prong` -> `3-prong | 4-prong`, otherwise `null`
-  - machine `type` normalize obvious washer/dryer variants if that DB constraint still applies
-- Blank status should keep working via existing defaults.
-- Unknown external labels should warn, not hard-fail the whole batch.
+`RenterRow` (line 10) and `MachineRow` (line 12) are already `export type` at declaration. The other six types (`PaymentRow`, `PaymentInsert`, `MaintenanceRow`, `TimelineRow`, `CustomFieldDefinitionRow`, `CustomFieldValueRow`) are declared without `export` on lines 14-19 and only exported via the block at line 695.
 
-Why this is the right fix
-- It fixes the actual blocker shown in the logs.
-- It preserves the UI you like.
-- It keeps the database and app contracts clean.
-- It removes the current preview/import contradiction without redesigning the importer again.
+Fix: remove `RenterRow` and `MachineRow` from the block, keep the other six.
 
-Manual QA after implementation
-- Re-import the same XLSX with `Customer Status` mapped:
-  - `Active` rows import
-  - `Former Customer` rows import
-  - no `renters_status_check` errors
-- Confirm preview shows normalization warnings before import.
-- Confirm duplicate review behavior is unchanged.
-- Confirm skipping the status column still imports renters with default `lead`.
-- Smoke-test one machine import with odd status/prong labels to make sure raw constrained text no longer causes a blanket failure.
+```typescript
+export type {
+  PaymentRow,
+  PaymentInsert,
+  MaintenanceRow,
+  TimelineRow,
+  CustomFieldDefinitionRow,
+  CustomFieldValueRow,
+};
+```
+
+### 2. `supabase/functions/create-checkout/index.ts` — type the filter callback
+
+Line 87: add `Stripe.Subscription` type to the outer callback. Let item type infer.
+
+```typescript
+const activeSaasSubs = subscriptions.data.filter((sub: Stripe.Subscription) =>
+  sub.items.data.some((item) => {
+```
+
+### 3. `supabase/functions/check-subscription/index.ts` — type the find callback
+
+Line 140:
+
+```typescript
+const sub = subscriptions.data.find((subscription: Stripe.Subscription) => getSaasProductId(subscription) !== null);
+```
+
+### 4. `supabase/functions/process-email-queue/index.ts` — type-only fixes if deploy is blocked
+
+- Line 57: widen `supabase` param to `any` (the generated Supabase types don't include `email_send_log` or the queue RPC signatures, so typed client won't work)
+- Lines 63, 70: no code changes needed once the param is `any`
+- Lines 159, 164: add `{ msg_id: number; message: Record<string, unknown> }` and `string | null` types to the callbacks
+
+No behavior changes.
+
+### 5. Migration
+
+`20260410010000_live_saas_stripe_ids.sql` already exists — apply only, do not recreate.
+
+### 6. Deploy
+
+- Frontend (auto-deploys after build fix)
+- Edge functions: `create-checkout`, `check-subscription`, `customer-portal`
+- Migration
+
+### 7. STRIPE_SECRET_KEY
+
+Update to live platform key using the Stripe secret key tool. Not in frontend env or Settings > Stripe Connection.
+
+### 8. Post-deploy smoke test
+
+Manual verification of Starter checkout, plan sync, Customer Portal, Stripe Dashboard, capacity enforcement, archived-renter billing window, and upgrade CTA price IDs.
+
+## Files touched
+- `src/hooks/useSupabaseData.ts` — fix export block
+- `supabase/functions/create-checkout/index.ts` — typed callback
+- `supabase/functions/check-subscription/index.ts` — typed callback
+- `supabase/functions/process-email-queue/index.ts` — narrow type fixes (only if deploy blocked)
+
