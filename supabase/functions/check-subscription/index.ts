@@ -56,7 +56,7 @@ serve(async (req) => {
     const {
       data: { user },
       error: userError,
-    } = await userClient.auth.getUser(token);
+    } = await userClient.auth.getUser();
     if (userError || !user?.email) {
       const authMessage = userError?.message ?? "User not authenticated or email not available";
       return new Response(JSON.stringify({ error: `Auth error: ${authMessage}` }), {
