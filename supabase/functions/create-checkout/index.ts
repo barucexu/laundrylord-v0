@@ -96,13 +96,22 @@ serve(async (req) => {
     if (persistError) throw new Error(`Failed to persist SaaS customer ID: ${persistError.message}`);
 
     if (resolvedCustomer.activeSubscription) {
-      logStep("Cancelling existing SaaS subscription before new checkout", {
+      logStep("Active SaaS subscription already exists; routing to billing portal", {
         subscriptionId: resolvedCustomer.activeSubscription.id,
         customerId,
       });
-      await stripe.subscriptions.cancel(resolvedCustomer.activeSubscription.id, {
-        prorate: false,
-        invoice_now: false,
+
+      const portalSession = await stripe.billingPortal.sessions.create({
+        customer: customerId,
+        return_url: `${origin}/settings`,
+      });
+
+      return new Response(JSON.stringify({
+        url: portalSession.url,
+        already_subscribed: true,
+        action: "manage_billing",
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 

@@ -6,6 +6,7 @@ import { useDemo } from "@/contexts/DemoContext";
 import { useRenters } from "@/hooks/useSupabaseData";
 import { BILLABLE_RENTER_COUNT_QUERY_KEY, countBillableRenters } from "@/lib/billing-counts";
 import { getNextUpgradeTierForCount, getRequiredTierForCount, getTierByProductId, TIERS, type PricingTier } from "@/lib/pricing-tiers";
+import { toast } from "sonner";
 
 export interface SubscriptionCapacityState {
   requiredTier: PricingTier;
@@ -201,8 +202,13 @@ export function useSubscription(): SubscriptionState {
       return;
     }
     if (data?.url) {
+      if (data?.already_subscribed) {
+        toast.info("You already have an active plan. Opening billing management.");
+      }
       window.open(data.url, "_blank");
-      startAggressivePolling();
+      if (!data?.already_subscribed) {
+        startAggressivePolling();
+      }
     }
   }, [capacity.effectiveTier.price_id, checkSubscription, isDemo, queryClient, startAggressivePolling]);
 
