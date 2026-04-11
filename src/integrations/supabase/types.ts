@@ -677,19 +677,61 @@ export type Database = {
         Row: {
           created_at: string
           encrypted_key: string
+          stripe_account_id: string | null
+          stripe_account_name: string | null
+          stripe_livemode: boolean | null
           updated_at: string
           user_id: string
+          webhook_configured_at: string | null
+          webhook_endpoint_token: string
+          webhook_signing_secret: string | null
         }
         Insert: {
           created_at?: string
           encrypted_key: string
+          stripe_account_id?: string | null
+          stripe_account_name?: string | null
+          stripe_livemode?: boolean | null
           updated_at?: string
           user_id: string
+          webhook_configured_at?: string | null
+          webhook_endpoint_token?: string
+          webhook_signing_secret?: string | null
         }
         Update: {
           created_at?: string
           encrypted_key?: string
+          stripe_account_id?: string | null
+          stripe_account_name?: string | null
+          stripe_livemode?: boolean | null
           updated_at?: string
+          user_id?: string
+          webhook_configured_at?: string | null
+          webhook_endpoint_token?: string
+          webhook_signing_secret?: string | null
+        }
+        Relationships: []
+      }
+      stripe_webhook_events: {
+        Row: {
+          event_id: string
+          event_type: string
+          id: string
+          processed_at: string
+          user_id: string
+        }
+        Insert: {
+          event_id: string
+          event_type: string
+          id?: string
+          processed_at?: string
+          user_id: string
+        }
+        Update: {
+          event_id?: string
+          event_type?: string
+          id?: string
+          processed_at?: string
           user_id?: string
         }
         Relationships: []
