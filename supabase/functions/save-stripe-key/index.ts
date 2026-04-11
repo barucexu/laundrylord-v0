@@ -25,12 +25,18 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError || !user) throw new Error("Unauthorized");
 
-    const { key } = await req.json();
+    const { key, webhookSigningSecret } = await req.json();
     if (!key || typeof key !== "string") throw new Error("key is required");
 
     const trimmed = key.trim();
     if (!trimmed.startsWith("sk_test_") && !trimmed.startsWith("sk_live_")) {
       throw new Error("Key must start with sk_test_ or sk_live_");
+    }
+    const trimmedWebhookSecret = typeof webhookSigningSecret === "string"
+      ? webhookSigningSecret.trim()
+      : "";
+    if (trimmedWebhookSecret && !trimmedWebhookSecret.startsWith("whsec_")) {
+      throw new Error("Webhook signing secret must start with whsec_");
     }
 
     // Admin client: bypasses RLS for stripe_keys table
@@ -39,12 +45,40 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
+    const { data: existingRow } = await adminClient
+      .from("stripe_keys")
+      .select("webhook_signing_secret, webhook_configured_at")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const accountRes = await fetch("https://api.stripe.com/v1/account", {
+      headers: { Authorization: `Bearer ${trimmed}` },
+    });
+    if (!accountRes.ok) {
+      throw new Error("Invalid Stripe key");
+    }
+    const account = await accountRes.json();
+
+    const nextWebhookSecret = trimmedWebhookSecret || existingRow?.webhook_signing_secret || null;
+    const webhookConfiguredAt = trimmedWebhookSecret
+      ? new Date().toISOString()
+      : existingRow?.webhook_configured_at || null;
+
     const { error } = await adminClient
       .from("stripe_keys")
       .upsert(
         {
           user_id: user.id,
           encrypted_key: trimmed,
+          webhook_signing_secret: nextWebhookSecret,
+          webhook_configured_at: webhookConfiguredAt,
+          stripe_account_id: account.id ?? null,
+          stripe_account_name:
+            account.settings?.dashboard?.display_name ||
+            account.business_profile?.name ||
+            account.email ||
+            "Stripe Account",
+          stripe_livemode: typeof account.livemode === "boolean" ? account.livemode : trimmed.startsWith("sk_live_"),
           updated_at: new Date().toISOString(),
         },
         { onConflict: "user_id" }

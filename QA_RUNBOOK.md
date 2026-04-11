@@ -46,3 +46,16 @@ Use this runbook before merging any plan/billing enforcement change.
 - Add Machine dialog submit hard-stop
 - PlanBanner CTA text/target
 - Renter billing setup + activation still works
+
+## 7) Multi-operator renter billing checks
+
+- Operator A saves Stripe key + webhook signing secret and reaches renter-billing-ready state
+- Operator B does the same with a different Stripe account
+- Operator A sees a different webhook URL than Operator B
+- A setup-link completion updates only A renter rows
+- A successful renter payment updates only A renter/payment/timeline rows
+- B events do not mutate A data, and A events do not mutate B data
+- Wrong webhook token fails closed
+- Wrong Stripe signature fails closed
+- Replayed Stripe event is ignored after the first successful process
+- If webhook setup is incomplete, renter setup-link and autopay actions are blocked in both UI and backend

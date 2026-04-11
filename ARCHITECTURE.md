@@ -35,6 +35,13 @@ This project runs on a Lovable Cloud-managed Supabase backend. That hosting mode
 - `supabase/functions/create-subscription`
 - `supabase/functions/stripe-webhook`
 
+Renter billing now assumes per-operator webhook routing:
+
+1. Each operator stores their own Stripe secret key in `stripe_keys`
+2. Each operator stores their own webhook signing secret in `stripe_keys`
+3. Each operator gets a unique webhook endpoint token
+4. `stripe-webhook` resolves the operator from that token and verifies the signature with that operator's signing secret
+
 ## Important separations
 
 1. **SaaS billing key context** (platform-level)

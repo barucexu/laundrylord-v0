@@ -2,13 +2,6 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-// KNOWN LIMITATION: This webhook uses a single STRIPE_WEBHOOK_SECRET env var.
-// Each operator has their own Stripe account, but only one webhook secret can
-// be verified at a time. Customer ID lookups work because Stripe customer IDs
-// are globally unique, but signature verification only validates against one
-// Stripe account's signing secret. Multi-operator webhook routing is not
-// solved in this pass.
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -19,200 +12,245 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
 );
 
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const token = new URL(req.url).searchParams.get("token")?.trim();
+  if (!token) {
+    return jsonResponse({ error: "Missing webhook token" }, 400);
+  }
+
   const body = await req.text();
   const sig = req.headers.get("stripe-signature");
-  const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
+  if (!sig) {
+    return jsonResponse({ error: "Missing Stripe signature" }, 400);
+  }
+
+  const { data: stripeKeyRow, error: stripeKeyError } = await supabase
+    .from("stripe_keys")
+    .select("user_id, webhook_signing_secret")
+    .eq("webhook_endpoint_token", token)
+    .maybeSingle();
+
+  if (stripeKeyError) {
+    console.error("[WEBHOOK] Failed to look up webhook token:", stripeKeyError);
+    return jsonResponse({ error: "Webhook lookup failed" }, 500);
+  }
+
+  if (!stripeKeyRow?.user_id || !stripeKeyRow.webhook_signing_secret) {
+    return jsonResponse({ error: "Unknown webhook token" }, 400);
+  }
 
   let event: Stripe.Event;
   try {
-    if (webhookSecret && sig) {
-      const tempStripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "sk_stub", {
-        apiVersion: "2025-08-27.basil",
-      });
-      event = await tempStripe.webhooks.constructEventAsync(body, sig, webhookSecret);
-    } else {
-      console.warn("[WEBHOOK] No STRIPE_WEBHOOK_SECRET set — skipping signature verification");
-      event = JSON.parse(body);
-    }
+    const tempStripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "sk_stub", {
+      apiVersion: "2025-08-27.basil",
+    });
+    event = await tempStripe.webhooks.constructEventAsync(body, sig, stripeKeyRow.webhook_signing_secret);
   } catch (err) {
     console.error("[WEBHOOK] Signature verification failed:", err);
-    return new Response(JSON.stringify({ error: "Invalid signature" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: "Invalid signature" }, 400);
   }
 
-  console.log(`[WEBHOOK] Received event: ${event.type}`);
+  const userId = stripeKeyRow.user_id;
+  console.log(`[WEBHOOK] Received event ${event.type} for user ${userId}`);
+
+  const { error: dedupeError } = await supabase
+    .from("stripe_webhook_events")
+    .insert({
+      user_id: userId,
+      event_id: event.id,
+      event_type: event.type,
+    });
+
+  if (dedupeError) {
+    if (dedupeError.code === "23505") {
+      console.log(`[WEBHOOK] Duplicate event ${event.id} for user ${userId}`);
+      return jsonResponse({ received: true, duplicate: true });
+    }
+    console.error("[WEBHOOK] Failed to record event:", dedupeError);
+    return jsonResponse({ error: "Failed to record webhook event" }, 500);
+  }
 
   try {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object;
-      if (session.mode !== "setup") {
-        return new Response(JSON.stringify({ received: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+      if (session.mode === "setup") {
+        const customerId = typeof session.customer === "string" ? session.customer : null;
+        const metadataRenterId = session.metadata?.renter_id ?? null;
 
-      const customerId = session.customer;
-      const renterId = session.metadata?.renter_id;
-      console.log(`[WEBHOOK] Setup completed for customer ${customerId}, renter ${renterId}`);
-
-      const { data: renter } = await supabase
-        .from("renters")
-        .select("id, user_id")
-        .eq("stripe_customer_id", customerId)
-        .maybeSingle();
-
-      const targetRenterId = renter?.id || renterId;
-      const targetUserId = renter?.user_id;
-
-      if (targetRenterId) {
-        await supabase
+        let renterQuery = supabase
           .from("renters")
-          .update({ has_payment_method: true })
-          .eq("id", targetRenterId);
+          .select("id, user_id")
+          .eq("user_id", userId);
 
-        if (targetUserId) {
+        if (customerId) {
+          renterQuery = renterQuery.eq("stripe_customer_id", customerId);
+        } else if (metadataRenterId) {
+          renterQuery = renterQuery.eq("id", metadataRenterId);
+        } else {
+          return jsonResponse({ received: true });
+        }
+
+        const { data: renter } = await renterQuery.maybeSingle();
+
+        if (renter) {
+          await supabase
+            .from("renters")
+            .update({ has_payment_method: true })
+            .eq("id", renter.id)
+            .eq("user_id", userId);
+
           await supabase.from("timeline_events").insert({
-            renter_id: targetRenterId,
-            user_id: targetUserId,
+            renter_id: renter.id,
+            user_id: userId,
             type: "payment_method_saved",
             description: "Card saved via Stripe checkout",
           });
         }
-        console.log(`[WEBHOOK] Updated has_payment_method=true for renter ${targetRenterId}`);
-      } else {
-        console.warn(`[WEBHOOK] Could not find renter for customer ${customerId}`);
       }
     }
 
     if (event.type === "invoice.payment_succeeded") {
       const invoice = event.data.object;
-      const customerId = invoice.customer;
+      const customerId = typeof invoice.customer === "string" ? invoice.customer : null;
       const amountPaid = (invoice.amount_paid || 0) / 100;
 
-      const { data: renter } = await supabase
-        .from("renters")
-        .select("id, user_id, rent_collected, balance")
-        .eq("stripe_customer_id", customerId)
-        .maybeSingle();
-
-      if (renter) {
-        const periodEnd = invoice.lines?.data?.[0]?.period?.end;
-        const nextDue = periodEnd ? new Date(periodEnd * 1000).toISOString().split("T")[0] : null;
-        const paidThrough = invoice.lines?.data?.[0]?.period?.start
-          ? new Date(invoice.lines.data[0].period.start * 1000).toISOString().split("T")[0]
-          : null;
-
-        await supabase
+      if (customerId) {
+        const { data: renter } = await supabase
           .from("renters")
-          .update({
-            status: "active",
-            days_late: 0,
-            balance: Math.max(0, Number(renter.balance) - amountPaid),
-            rent_collected: Number(renter.rent_collected) + amountPaid,
-            paid_through_date: paidThrough,
-            next_due_date: nextDue,
-          })
-          .eq("id", renter.id);
+          .select("id, user_id, rent_collected, balance")
+          .eq("user_id", userId)
+          .eq("stripe_customer_id", customerId)
+          .maybeSingle();
 
-        await supabase.from("payments").insert({
-          renter_id: renter.id,
-          user_id: renter.user_id,
-          amount: amountPaid,
-          due_date: paidThrough || new Date().toISOString().split("T")[0],
-          paid_date: new Date().toISOString().split("T")[0],
-          status: "paid",
-          type: "rent",
-        });
+        if (renter) {
+          const periodEnd = invoice.lines?.data?.[0]?.period?.end;
+          const nextDue = periodEnd ? new Date(periodEnd * 1000).toISOString().split("T")[0] : null;
+          const paidThrough = invoice.lines?.data?.[0]?.period?.start
+            ? new Date(invoice.lines.data[0].period.start * 1000).toISOString().split("T")[0]
+            : null;
 
-        await supabase.from("timeline_events").insert({
-          renter_id: renter.id,
-          user_id: renter.user_id,
-          type: "payment_succeeded",
-          description: `Payment of $${amountPaid.toFixed(2)} succeeded`,
-        });
+          await supabase
+            .from("renters")
+            .update({
+              status: "active",
+              days_late: 0,
+              balance: Math.max(0, Number(renter.balance) - amountPaid),
+              rent_collected: Number(renter.rent_collected) + amountPaid,
+              paid_through_date: paidThrough,
+              next_due_date: nextDue,
+            })
+            .eq("id", renter.id)
+            .eq("user_id", userId);
+
+          await supabase.from("payments").insert({
+            renter_id: renter.id,
+            user_id: userId,
+            amount: amountPaid,
+            due_date: paidThrough || new Date().toISOString().split("T")[0],
+            paid_date: new Date().toISOString().split("T")[0],
+            status: "paid",
+            type: "rent",
+          });
+
+          await supabase.from("timeline_events").insert({
+            renter_id: renter.id,
+            user_id: userId,
+            type: "payment_succeeded",
+            description: `Payment of $${amountPaid.toFixed(2)} succeeded`,
+          });
+        }
       }
     }
 
     if (event.type === "invoice.payment_failed") {
       const invoice = event.data.object;
-      const customerId = invoice.customer;
+      const customerId = typeof invoice.customer === "string" ? invoice.customer : null;
       const amountDue = (invoice.amount_due || 0) / 100;
 
-      const { data: renter } = await supabase
-        .from("renters")
-        .select("id, user_id, balance, days_late")
-        .eq("stripe_customer_id", customerId)
-        .maybeSingle();
-
-      if (renter) {
-        await supabase
+      if (customerId) {
+        const { data: renter } = await supabase
           .from("renters")
-          .update({
-            status: "late",
-            balance: Number(renter.balance) + amountDue,
-            days_late: Number(renter.days_late) + 1,
-          })
-          .eq("id", renter.id);
+          .select("id, user_id, balance, days_late")
+          .eq("user_id", userId)
+          .eq("stripe_customer_id", customerId)
+          .maybeSingle();
 
-        await supabase.from("payments").insert({
-          renter_id: renter.id,
-          user_id: renter.user_id,
-          amount: amountDue,
-          due_date: new Date().toISOString().split("T")[0],
-          status: "failed",
-          type: "rent",
-        });
+        if (renter) {
+          await supabase
+            .from("renters")
+            .update({
+              status: "late",
+              balance: Number(renter.balance) + amountDue,
+              days_late: Number(renter.days_late) + 1,
+            })
+            .eq("id", renter.id)
+            .eq("user_id", userId);
 
-        await supabase.from("timeline_events").insert({
-          renter_id: renter.id,
-          user_id: renter.user_id,
-          type: "payment_failed",
-          description: `Payment of $${amountDue.toFixed(2)} failed`,
-        });
+          await supabase.from("payments").insert({
+            renter_id: renter.id,
+            user_id: userId,
+            amount: amountDue,
+            due_date: new Date().toISOString().split("T")[0],
+            status: "failed",
+            type: "rent",
+          });
+
+          await supabase.from("timeline_events").insert({
+            renter_id: renter.id,
+            user_id: userId,
+            type: "payment_failed",
+            description: `Payment of $${amountDue.toFixed(2)} failed`,
+          });
+        }
       }
     }
 
     if (event.type === "customer.subscription.deleted") {
       const subscription = event.data.object;
-      const customerId = subscription.customer;
+      const customerId = typeof subscription.customer === "string" ? subscription.customer : null;
 
-      const { data: renter } = await supabase
-        .from("renters")
-        .select("id, user_id")
-        .eq("stripe_customer_id", customerId)
-        .maybeSingle();
-
-      if (renter) {
-        await supabase
+      if (customerId) {
+        const { data: renter } = await supabase
           .from("renters")
-          .update({
-            stripe_subscription_id: null,
-            status: "closed",
-          })
-          .eq("id", renter.id);
+          .select("id, user_id")
+          .eq("user_id", userId)
+          .eq("stripe_customer_id", customerId)
+          .maybeSingle();
 
-        await supabase.from("timeline_events").insert({
-          renter_id: renter.id,
-          user_id: renter.user_id,
-          type: "note",
-          description: "Subscription canceled",
-        });
+        if (renter) {
+          await supabase
+            .from("renters")
+            .update({
+              stripe_subscription_id: null,
+              status: "closed",
+            })
+            .eq("id", renter.id)
+            .eq("user_id", userId);
+
+          await supabase.from("timeline_events").insert({
+            renter_id: renter.id,
+            user_id: userId,
+            type: "note",
+            description: "Subscription canceled",
+          });
+        }
       }
     }
 
-    return new Response(JSON.stringify({ received: true }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ received: true });
   } catch (err) {
     console.error("[WEBHOOK] Error processing event:", err);
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: String(err) }, 400);
   }
 });

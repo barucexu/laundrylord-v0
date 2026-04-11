@@ -55,7 +55,7 @@ Assignment writes should go through the guarded assignment hooks in `useSupabase
 | Function | Trust Level | Auth Pattern |
 |----------|------------|--------------|
 | `send-billing-reminders` | Service-role only | Validates `Authorization: Bearer <SERVICE_ROLE_KEY>` exactly |
-| `stripe-webhook` | Webhook | Stripe signature verification (or raw JSON parse fallback) |
+| `stripe-webhook` | Webhook | Operator token in URL + per-operator Stripe signature verification |
 | `create-checkout` | User-authenticated | Standard JWT via Supabase client |
 | `create-subscription` | User-authenticated | Standard JWT |
 | `create-setup-link` | User-authenticated | Standard JWT |
@@ -74,9 +74,17 @@ Assignment writes should go through the guarded assignment hooks in `useSupabase
 
 ## Billing / Reminder / Webhook Flow
 
-1. **Stripe webhook** (`stripe-webhook`): Receives Stripe events → updates `renters`, inserts `payments` and `timeline_events`
+1. **Stripe webhook** (`stripe-webhook`): Receives Stripe events on an operator-specific endpoint URL, verifies the matching operator signing secret, dedupes events, then updates `renters`, inserts `payments`, and inserts `timeline_events`
 2. **Billing reminders** (`send-billing-reminders`): Scheduled/cron → checks active renters → inserts `billing_reminders`, applies late fees, sends emails via Lovable API
 3. **Payment recording** (UI): `RecordPaymentDialog` → inserts `payments` row via authenticated client
+
+Renter billing readiness now means:
+
+1. Operator Stripe secret key saved
+2. Operator webhook signing secret saved
+3. Operator-specific webhook endpoint URL configured in Stripe
+
+Until all three are true, renter setup-link and autopay actions stay blocked.
 
 ### Canonical Value Sets
 

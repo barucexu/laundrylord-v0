@@ -613,13 +613,34 @@ export function useStripeConnection() {
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("check-stripe-connection");
       if (error) return { connected: false, reason: "error" } as const;
-      return data as { connected: boolean; reason?: string; account_name?: string; account_id?: string };
+      return data as {
+        connected: boolean;
+        webhook_configured?: boolean;
+        renter_billing_ready?: boolean;
+        reason?: string;
+        account_name?: string;
+        account_id?: string;
+        stripe_livemode?: boolean | null;
+        webhook_url?: string | null;
+      };
     },
     staleTime: 5 * 60 * 1000,
     enabled: !demo?.isDemo,
   });
   if (demo?.isDemo) {
-    return { ...supaQuery, data: { connected: true, account_name: "SunBelt Laundry Rentals (Demo)" }, isLoading: false, error: null };
+    return {
+      ...supaQuery,
+      data: {
+        connected: true,
+        webhook_configured: true,
+        renter_billing_ready: true,
+        account_name: "SunBelt Laundry Rentals (Demo)",
+        stripe_livemode: false,
+        webhook_url: "https://demo.supabase.co/functions/v1/stripe-webhook?token=demo-token",
+      },
+      isLoading: false,
+      error: null,
+    };
   }
   return supaQuery;
 }

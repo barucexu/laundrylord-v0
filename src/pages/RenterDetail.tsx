@@ -155,11 +155,13 @@ export default function RenterDetail() {
   }
 
   const stripeConnected = stripeStatus?.connected === true;
+  const renterBillingReady = stripeStatus?.renter_billing_ready === true;
   const hasCard = !!renter.has_payment_method;
   const hasSubscription = !!renter.stripe_subscription_id;
 
   const getBillingState = () => {
     if (!stripeConnected) return "no_stripe";
+    if (!renterBillingReady) return "webhook_incomplete";
     if (!hasCard) return "no_card";
     if (!hasSubscription) return "no_autopay";
     return "active";
@@ -224,6 +226,16 @@ export default function RenterDetail() {
                     Connect Stripe
                   </Button>
                   <p className="text-xs text-muted-foreground">Add your Stripe key in Settings to enable billing.</p>
+                </>
+              )}
+
+              {billingState === "webhook_incomplete" && (
+                <>
+                  <Button size="sm" onClick={() => navigate("/settings")}>
+                    <Settings className="h-4 w-4" />
+                    Finish Webhook Setup
+                  </Button>
+                  <p className="text-xs text-muted-foreground">Stripe is connected, but renter billing stays blocked until this operator&apos;s webhook signing secret is saved in Settings.</p>
                 </>
               )}
 

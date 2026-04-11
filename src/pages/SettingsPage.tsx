@@ -57,7 +57,9 @@ export default function SettingsPage() {
   });
 
   const [stripeKey, setStripeKey] = useState("");
+  const [webhookSecret, setWebhookSecret] = useState("");
   const [showKey, setShowKey] = useState(false);
+  const [showWebhookSecret, setShowWebhookSecret] = useState(false);
   const [savingKey, setSavingKey] = useState(false);
 
   useEffect(() => {
@@ -115,12 +117,16 @@ export default function SettingsPage() {
     setSavingKey(true);
     try {
       const { data, error } = await supabase.functions.invoke("save-stripe-key", {
-        body: { key: stripeKey.trim() },
+        body: {
+          key: stripeKey.trim(),
+          webhookSigningSecret: webhookSecret.trim() || undefined,
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setStripeKey("");
-      toast.success("Stripe key saved! Verifying connection…");
+      setWebhookSecret("");
+      toast.success("Stripe settings saved! Verifying connection…");
       queryClient.invalidateQueries({ queryKey: ["stripe-connection"] });
     } catch (err: unknown) {
       toast.error(getErrorMessage(err, "Failed to save Stripe key"));
@@ -332,11 +338,24 @@ export default function SettingsPage() {
                 Checking…
               </div>
             ) : stripe?.connected ? (
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-success/10 border border-success/20">
-                <CheckCircle className="h-3.5 w-3.5 text-success" />
+              <div className={`flex items-center gap-2 px-2 py-1.5 rounded-md border ${
+                stripe.renter_billing_ready
+                  ? "bg-success/10 border-success/20"
+                  : "bg-warning/10 border-warning/20"
+              }`}>
+                {stripe.renter_billing_ready ? (
+                  <CheckCircle className="h-3.5 w-3.5 text-success" />
+                ) : (
+                  <AlertTriangle className="h-3.5 w-3.5 text-warning" />
+                )}
                 <div>
-                  <div className="text-xs font-medium text-success">Connected</div>
-                  <div className="text-[10px] text-muted-foreground">{stripe.account_name}</div>
+                  <div className={`text-xs font-medium ${stripe.renter_billing_ready ? "text-success" : "text-warning"}`}>
+                    {stripe.renter_billing_ready ? "Renter billing ready" : "Webhook setup incomplete"}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {stripe.account_name}
+                    {typeof stripe.stripe_livemode === "boolean" ? ` · ${stripe.stripe_livemode ? "Live" : "Test"}` : ""}
+                  </div>
                 </div>
               </div>
             ) : (stripe && "reason" in stripe && stripe.reason === "invalid_key") ? (
@@ -379,6 +398,39 @@ export default function SettingsPage() {
                 </a>
               </p>
             </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Webhook Signing Secret</Label>
+              <div className="relative">
+                <Input
+                  type={showWebhookSecret ? "text" : "password"}
+                  placeholder={stripe?.webhook_configured ? "whsec_****••••••••••••" : "whsec_••••••••••••"}
+                  value={webhookSecret}
+                  onChange={e => setWebhookSecret(e.target.value)}
+                  className="font-mono pr-8 h-8 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowWebhookSecret(!showWebhookSecret)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showWebhookSecret ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Paste the `whsec_...` secret from the webhook endpoint you create in Stripe.
+              </p>
+            </div>
+
+            {stripe?.webhook_url && (
+              <div className="space-y-1">
+                <Label className="text-xs">Webhook Endpoint URL</Label>
+                <Input readOnly value={stripe.webhook_url} className="font-mono h-8 text-[11px]" />
+                <p className="text-[10px] text-muted-foreground">
+                  Add this exact URL in Stripe, then paste the matching signing secret above.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -396,7 +448,7 @@ export default function SettingsPage() {
               <span className="text-xs">Stripe key connected</span>
             </div>
             <div className="flex items-center gap-2">
-              {stripe?.connected ? (
+              {stripe?.webhook_configured ? (
                 <CheckCircle className="h-3.5 w-3.5 text-success" />
               ) : (
                 <div className="h-3.5 w-3.5 rounded-full border-2 border-muted-foreground/30" />
@@ -404,9 +456,23 @@ export default function SettingsPage() {
               <span className="text-xs">Webhook configured</span>
             </div>
             <div className="flex items-center gap-2">
+              {stripe?.renter_billing_ready ? (
+                <CheckCircle className="h-3.5 w-3.5 text-success" />
+              ) : (
+                <div className="h-3.5 w-3.5 rounded-full border-2 border-muted-foreground/30" />
+              )}
+              <span className="text-xs">Renter billing ready</span>
+            </div>
+            <div className="flex items-center gap-2">
               <CheckCircle className="h-3.5 w-3.5 text-success" />
               <span className="text-xs">Email sending active</span>
             </div>
+            {stripe?.reason === "webhook_missing" && (
+              <div className="flex items-start gap-2 rounded-md border border-warning/20 bg-warning/10 p-2 text-[10px] text-muted-foreground">
+                <Info className="mt-0.5 h-3.5 w-3.5 text-warning shrink-0" />
+                <p>Stripe is connected, but renter autopay stays blocked until this operator&apos;s webhook signing secret is saved.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

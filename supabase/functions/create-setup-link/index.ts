@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { isRenterBillingReady } from "../_shared/renter-billing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,11 +46,14 @@ serve(async (req) => {
 
     const { data: keyRow } = await adminClient
       .from("stripe_keys")
-      .select("encrypted_key")
+      .select("encrypted_key, webhook_signing_secret")
       .eq("user_id", user.id)
       .maybeSingle();
     const stripeKey = keyRow?.encrypted_key;
     if (!stripeKey) throw new Error("Stripe not connected. Add your Stripe key in Settings.");
+    if (!isRenterBillingReady(keyRow)) {
+      throw new Error("Finish webhook setup in Settings before sending renter billing links.");
+    }
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
@@ -66,7 +70,8 @@ serve(async (req) => {
       await adminClient
         .from("renters")
         .update({ stripe_customer_id: customer.id })
-        .eq("id", renter_id);
+        .eq("id", renter_id)
+        .eq("user_id", user.id);
       return customer.id;
     };
 
@@ -89,7 +94,7 @@ serve(async (req) => {
       payment_method_types: ["us_bank_account", "card"],
       success_url: `${origin}/renters/${renter_id}?setup=success`,
       cancel_url: `${origin}/renters/${renter_id}?setup=canceled`,
-      metadata: { renter_id: renter.id },
+      metadata: { renter_id: renter.id, user_id: user.id },
     });
 
     return new Response(JSON.stringify({ url: session.url }), {
