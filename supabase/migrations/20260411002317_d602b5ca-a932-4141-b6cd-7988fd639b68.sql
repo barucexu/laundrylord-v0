@@ -1,0 +1,1 @@
+ALTER VIEW public.v_renters_for_admin SET (security_invoker = true);
