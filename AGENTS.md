@@ -43,6 +43,7 @@ Read these before making meaningful changes:
 1. Codex cannot apply SQL directly to your live Supabase project
 2. For schema/data changes, provide explicit SQL that the user can run manually in Lovable's Supabase SQL interface
 3. When SQL is required, clearly label what to run, where to run it, and any ordering/rollback notes
+4. In this project, SQL can be run manually in the SQL editor, but Edge Function deployment should be treated as a Lovable-managed action unless a separate supported deployment path is explicitly confirmed
 
 ## Key implementation hotspots
 
