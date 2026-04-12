@@ -610,19 +610,19 @@ export function useStripeConnection() {
   const demo = useDemo();
   const supaQuery = useQuery({
     queryKey: ["stripe-connection"],
-    queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("check-stripe-connection");
-      if (error) return { connected: false, reason: "error" } as const;
-      return data as {
+    queryFn: async (): Promise<{
         connected: boolean;
-        webhook_configured?: boolean;
-        renter_billing_ready?: boolean;
-        reason?: string;
-        account_name?: string;
-        account_id?: string;
-        stripe_livemode?: boolean | null;
-        webhook_url?: string | null;
-      };
+        webhook_configured: boolean;
+        renter_billing_ready: boolean;
+        reason: string;
+        account_name: string | null;
+        account_id: string | null;
+        stripe_livemode: boolean | null;
+        webhook_url: string | null;
+      }> => {
+      const { data, error } = await supabase.functions.invoke("check-stripe-connection");
+      if (error) return { connected: false, webhook_configured: false, renter_billing_ready: false, reason: "error", account_name: null, account_id: null, stripe_livemode: null, webhook_url: null };
+      return data;
     },
     staleTime: 5 * 60 * 1000,
     enabled: !demo?.isDemo,
