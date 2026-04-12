@@ -55,11 +55,11 @@ serve(async (req) => {
       headers: { Authorization: `Bearer ${stripeKey}` },
     });
 
-    let nextConfig = keyRow;
+    let nextConfig: typeof keyRow = keyRow;
     if (res.ok) {
       const account = await res.json();
       nextConfig = {
-        ...keyRow,
+        ...keyRow!,
         stripe_account_id: account.id ?? keyRow?.stripe_account_id ?? null,
         stripe_account_name:
           account.settings?.dashboard?.display_name ||
