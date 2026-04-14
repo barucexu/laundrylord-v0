@@ -41,8 +41,12 @@ export function hasWebhookSecret(config?: StripeKeyConfigLike | null): boolean {
   return clean(config?.webhook_signing_secret) !== null;
 }
 
+export function hasWebhookEndpointToken(config?: StripeKeyConfigLike | null): boolean {
+  return clean(config?.webhook_endpoint_token) !== null;
+}
+
 export function isRenterBillingReady(config?: StripeKeyConfigLike | null): boolean {
-  return hasStripeKey(config) && hasWebhookSecret(config);
+  return hasStripeKey(config) && hasWebhookSecret(config) && hasWebhookEndpointToken(config);
 }
 
 export function buildRenterBillingConnectionStatus(args: {
@@ -52,7 +56,7 @@ export function buildRenterBillingConnectionStatus(args: {
 }): RenterBillingConnection {
   const { config, accountReachable, supabaseUrl } = args;
   const keyPresent = hasStripeKey(config);
-  const webhookConfigured = hasWebhookSecret(config);
+  const webhookConfigured = hasWebhookSecret(config) && hasWebhookEndpointToken(config);
   const webhookUrl = buildWebhookUrl(supabaseUrl, config?.webhook_endpoint_token);
 
   if (!keyPresent) {

@@ -47,7 +47,7 @@ serve(async (req) => {
 
     const { data: existingRow } = await adminClient
       .from("stripe_keys")
-      .select("webhook_signing_secret, webhook_configured_at")
+      .select("webhook_endpoint_token, webhook_signing_secret, webhook_configured_at")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -63,6 +63,7 @@ serve(async (req) => {
     const webhookConfiguredAt = trimmedWebhookSecret
       ? new Date().toISOString()
       : existingRow?.webhook_configured_at || null;
+    const webhookEndpointToken = existingRow?.webhook_endpoint_token || crypto.randomUUID();
 
     const { error } = await adminClient
       .from("stripe_keys")
@@ -70,6 +71,7 @@ serve(async (req) => {
         {
           user_id: user.id,
           encrypted_key: trimmed,
+          webhook_endpoint_token: webhookEndpointToken,
           webhook_signing_secret: nextWebhookSecret,
           webhook_configured_at: webhookConfiguredAt,
           stripe_account_id: account.id ?? null,

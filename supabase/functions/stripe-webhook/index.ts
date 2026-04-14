@@ -251,6 +251,17 @@ serve(async (req) => {
     return jsonResponse({ received: true });
   } catch (err) {
     console.error("[WEBHOOK] Error processing event:", err);
+
+    const { error: cleanupError } = await supabase
+      .from("stripe_webhook_events")
+      .delete()
+      .eq("user_id", userId)
+      .eq("event_id", event.id);
+
+    if (cleanupError) {
+      console.error("[WEBHOOK] Failed to release webhook dedupe lock after processing error:", cleanupError);
+    }
+
     return jsonResponse({ error: String(err) }, 400);
   }
 });

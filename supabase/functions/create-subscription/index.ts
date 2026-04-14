@@ -58,7 +58,7 @@ serve(async (req) => {
 
     const { data: keyRow } = await adminClient
       .from("stripe_keys")
-      .select("encrypted_key, webhook_signing_secret")
+      .select("encrypted_key, webhook_endpoint_token, webhook_signing_secret")
       .eq("user_id", user.id)
       .maybeSingle();
     const stripeKey = keyRow?.encrypted_key;

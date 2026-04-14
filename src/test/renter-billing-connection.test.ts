@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildRenterBillingConnectionStatus,
   buildWebhookUrl,
+  hasWebhookEndpointToken,
   isRenterBillingReady,
 } from "../../supabase/functions/_shared/renter-billing";
 
@@ -13,16 +14,26 @@ describe("renter billing connection helpers", () => {
   });
 
   it("marks renter billing ready only when key and webhook secret are both present", () => {
-    expect(isRenterBillingReady({ encrypted_key: "sk_test_123", webhook_signing_secret: "whsec_123" })).toBe(true);
+    expect(hasWebhookEndpointToken({ webhook_endpoint_token: "token-123" })).toBe(true);
+    expect(isRenterBillingReady({
+      encrypted_key: "sk_test_123",
+      webhook_endpoint_token: "token-123",
+      webhook_signing_secret: "whsec_123",
+    })).toBe(true);
     expect(isRenterBillingReady({ encrypted_key: "sk_test_123", webhook_signing_secret: null })).toBe(false);
     expect(isRenterBillingReady({ encrypted_key: null, webhook_signing_secret: "whsec_123" })).toBe(false);
+    expect(isRenterBillingReady({
+      encrypted_key: "sk_test_123",
+      webhook_endpoint_token: null,
+      webhook_signing_secret: "whsec_123",
+    })).toBe(false);
   });
 
   it("returns webhook_missing when Stripe account is valid but webhook is not configured", () => {
     const status = buildRenterBillingConnectionStatus({
       config: {
         encrypted_key: "sk_live_123",
-        webhook_endpoint_token: "token-123",
+        webhook_endpoint_token: null,
         webhook_signing_secret: null,
         stripe_account_name: "LaundryLord Operator",
       },
@@ -37,7 +48,7 @@ describe("renter billing connection helpers", () => {
       reason: "webhook_missing",
       account_name: "LaundryLord Operator",
     });
-    expect(status.webhook_url).toContain("token-123");
+    expect(status.webhook_url).toBeNull();
   });
 
   it("returns ready when key, webhook secret, and Stripe account are all valid", () => {
