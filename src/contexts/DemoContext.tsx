@@ -27,6 +27,7 @@ interface DemoContextType {
   updateMachine: (id: string, updates: Partial<MachineRow>) => MachineRow | null;
   addMachine: (machine: Omit<MachineRow, "id" | "user_id" | "created_at" | "updated_at">) => MachineRow;
   addPayment: (payment: Omit<PaymentRow, "id" | "user_id" | "created_at" | "updated_at">) => PaymentRow;
+  addTimelineEvent: (event: Omit<TimelineRow, "id" | "user_id" | "created_at">) => TimelineRow;
   updateSettings: (updates: Partial<OperatorSettingsRow>) => OperatorSettingsRow;
 }
 
@@ -85,6 +86,18 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     return newP;
   }, []);
 
+  const addTimelineEvent = useCallback((event: Omit<TimelineRow, "id" | "user_id" | "created_at">) => {
+    const now = new Date().toISOString();
+    const newEvent: TimelineRow = {
+      ...event,
+      id: genId("tl"),
+      user_id: DEMO_USER_ID,
+      created_at: now,
+    } as TimelineRow;
+    setData(prev => ({ ...prev, timelineEvents: [newEvent, ...prev.timelineEvents] }));
+    return newEvent;
+  }, []);
+
   const updateSettings = useCallback((updates: Partial<OperatorSettingsRow>) => {
     let result: OperatorSettingsRow = data.operatorSettings;
     setData(prev => {
@@ -95,7 +108,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   }, [data.operatorSettings]);
 
   return (
-    <DemoContext.Provider value={{ isDemo: true, data, updateRenter, addRenter, updateMachine, addMachine, addPayment, updateSettings }}>
+    <DemoContext.Provider value={{ isDemo: true, data, updateRenter, addRenter, updateMachine, addMachine, addPayment, addTimelineEvent, updateSettings }}>
       {children}
     </DemoContext.Provider>
   );

@@ -4,9 +4,10 @@ import { getNextUpgradeTierForCount, needsSubscription, tierUpgradeLabel } from 
 import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
 import { X, Sparkles, ArrowUpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { UpgradeConfirmDialog } from "@/components/UpgradeConfirmDialog";
 
 export function PlanBanner() {
-  const { billableCount, subscribed, loading, effectiveTier, currentBilledTier, checkout } = useSubscription();
+  const { billableCount, subscribed, loading, currentBilledTier, initiateUpgrade, upgradeIntent, confirmUpgrade, cancelUpgrade } = useSubscription();
   const [dismissed, setDismissed] = useState<string | null>(null);
   const upgradeTarget = getNextUpgradeTierForCount(billableCount);
 
@@ -50,7 +51,7 @@ export function PlanBanner() {
           </p>
           <p className="text-muted-foreground">{BANK_ACCOUNT_RECOMMENDATION}</p>
         </div>
-        <Button size="sm" onClick={() => checkout(upgradeTarget.price_id)} className="gap-1.5" disabled={!upgradeTarget.price_id}>
+        <Button size="sm" onClick={() => upgradeTarget.price_id && initiateUpgrade(upgradeTarget.price_id)} className="gap-1.5" disabled={!upgradeTarget.price_id}>
           <ArrowUpCircle className="h-3.5 w-3.5" />
           {tierUpgradeLabel(upgradeTarget)}
         </Button>
@@ -62,6 +63,21 @@ export function PlanBanner() {
       >
         <X className="h-4 w-4" />
       </button>
+      {upgradeTarget && (
+        <UpgradeConfirmDialog
+          open={upgradeIntent?.priceId === upgradeTarget.price_id}
+          onOpenChange={(open) => {
+            if (!open) cancelUpgrade();
+          }}
+          tierName={upgradeTarget.name}
+          tierLabel={upgradeTarget.label}
+          isUpgrade={true}
+          loading={false}
+          onConfirm={() => {
+            void confirmUpgrade();
+          }}
+        />
+      )}
     </div>
   );
 }

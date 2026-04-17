@@ -10,7 +10,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useCreatePayment, useUpdateRenter, type RenterRow } from "@/hooks/useSupabaseData";
+import { useRecordManualPayment, type RenterRow } from "@/hooks/useSupabaseData";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errors";
 
@@ -32,8 +32,7 @@ const PAYMENT_SOURCES = [
 ];
 
 export function RecordPaymentDialog({ open, onOpenChange, renter }: RecordPaymentDialogProps) {
-  const createPayment = useCreatePayment();
-  const updateRenter = useUpdateRenter();
+  const recordManualPayment = useRecordManualPayment();
   const [paidDate, setPaidDate] = useState<Date>(new Date());
   const [form, setForm] = useState({
     amount: String(renter.monthly_rate),
@@ -51,25 +50,13 @@ export function RecordPaymentDialog({ open, onOpenChange, renter }: RecordPaymen
     }
     try {
       const dateStr = format(paidDate, "yyyy-MM-dd");
-      await createPayment.mutateAsync({
+      await recordManualPayment.mutateAsync({
         renter_id: renter.id,
         amount,
-        due_date: dateStr,
         paid_date: dateStr,
-        status: "paid",
         type: form.type,
         payment_source: form.source,
         payment_notes: form.notes,
-      });
-
-      // Update renter balance
-      const newBalance = Math.max(0, Number(renter.balance) - amount);
-      const newRentCollected = Number(renter.rent_collected || 0) + amount;
-      await updateRenter.mutateAsync({
-        id: renter.id,
-        balance: newBalance,
-        rent_collected: newRentCollected,
-        ...(newBalance === 0 ? { days_late: 0, paid_through_date: dateStr } : {}),
       });
 
       toast.success(`$${amount.toFixed(2)} payment recorded via ${form.source}`);
@@ -151,8 +138,8 @@ export function RecordPaymentDialog({ open, onOpenChange, renter }: RecordPaymen
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={createPayment.isPending}>
-              {createPayment.isPending ? "Recording..." : "Record Payment"}
+            <Button type="submit" disabled={recordManualPayment.isPending}>
+              {recordManualPayment.isPending ? "Recording..." : "Record Payment"}
             </Button>
           </DialogFooter>
         </form>

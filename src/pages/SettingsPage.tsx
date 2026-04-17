@@ -147,6 +147,9 @@ export default function SettingsPage() {
   };
 
   const subscription = useSubscription();
+  const selectedUpgradeTier = subscription.upgradeIntent
+    ? TIERS.find((tier) => tier.price_id === subscription.upgradeIntent?.priceId) ?? null
+    : null;
 
   useEffect(() => {
     if (searchParams.get("subscription") !== "success") return;
@@ -258,7 +261,7 @@ export default function SettingsPage() {
                               <Button
                                 size="sm"
                                 className="h-7 text-xs"
-                                onClick={() => subscription.checkout(t.price_id)}
+                                onClick={() => t.price_id && subscription.initiateUpgrade(t.price_id)}
                               >
                                 {tierUpgradeLabel(t)}
                               </Button>
@@ -277,6 +280,22 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {selectedUpgradeTier && (
+        <UpgradeConfirmDialog
+          open={!!selectedUpgradeTier}
+          onOpenChange={(open) => {
+            if (!open) subscription.cancelUpgrade();
+          }}
+          tierName={selectedUpgradeTier.name}
+          tierLabel={selectedUpgradeTier.label}
+          isUpgrade={true}
+          loading={false}
+          onConfirm={() => {
+            void subscription.confirmUpgrade();
+          }}
+        />
+      )}
 
       {/* Row 1: Billing Defaults + Reminder Timing */}
       <div className="grid md:grid-cols-2 gap-3">

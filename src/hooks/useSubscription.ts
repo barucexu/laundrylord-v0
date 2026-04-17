@@ -199,6 +199,7 @@ export function useSubscription(): SubscriptionState {
       await checkSubscription();
       queryClient.invalidateQueries({ queryKey: ["renters"] });
       queryClient.invalidateQueries({ queryKey: BILLABLE_RENTER_COUNT_QUERY_KEY });
+      toast.success("Plan updated. Your new billing cycle starts today.");
       return;
     }
     if (data?.url) {
