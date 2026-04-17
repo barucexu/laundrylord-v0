@@ -547,6 +547,61 @@ export type Database = {
           },
         ]
       }
+      renter_balance_adjustments: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string
+          id: string
+          kind: string
+          renter_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description: string
+          id?: string
+          kind?: string
+          renter_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string
+          id?: string
+          kind?: string
+          renter_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "renter_balance_adjustments_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "renters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renter_balance_adjustments_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_renters_for_admin"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renter_balance_adjustments_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_renters_with_owner"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       renters: {
         Row: {
           address: string | null

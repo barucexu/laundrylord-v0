@@ -43,6 +43,8 @@ vi.mock("@/hooks/useSupabaseData", () => ({
   useTimelineEvents: () => ({ data: [], isLoading: false }),
   useMaintenanceForRenter: () => ({ data: [], isLoading: false }),
   usePaymentsForRenter: () => ({ data: [], isLoading: false }),
+  useRenterBalanceAdjustments: () => ({ data: [], isLoading: false }),
+  useAddRenterBalanceAdjustment: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useStripeConnection: () => ({
     data: {
       connected: true,

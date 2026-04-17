@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { resolveSaasCustomer, SAAS_PRODUCT_IDS } from "../_shared/saas-billing.ts";
+import { getProductId, resolveSaasCustomer } from "../_shared/saas-billing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -96,20 +96,75 @@ serve(async (req) => {
     if (persistError) throw new Error(`Failed to persist SaaS customer ID: ${persistError.message}`);
 
     if (resolvedCustomer.activeSubscription) {
-      logStep("Active SaaS subscription already exists; routing to billing portal", {
-        subscriptionId: resolvedCustomer.activeSubscription.id,
+      const activeSubscription = resolvedCustomer.activeSubscription as unknown as Stripe.Subscription;
+      const currentItem = activeSubscription.items.data[0];
+      if (!currentItem?.id) {
+        throw new Error("Active SaaS subscription is missing an updatable subscription item");
+      }
+
+      if (currentItem.price.id === price_id) {
+        logStep("Requested SaaS price matches current price; routing to billing portal", {
+          subscriptionId: activeSubscription.id,
+          customerId,
+          price_id,
+        });
+
+        const portalSession = await stripe.billingPortal.sessions.create({
+          customer: customerId,
+          return_url: `${origin}/settings`,
+        });
+
+        return new Response(JSON.stringify({
+          url: portalSession.url,
+          already_subscribed: true,
+          action: "manage_billing",
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const targetPrice = await stripe.prices.retrieve(price_id);
+      const targetProductId = getProductId(targetPrice.product);
+
+      logStep("Updating active SaaS subscription immediately", {
+        subscriptionId: activeSubscription.id,
         customerId,
+        fromPriceId: currentItem.price.id,
+        toPriceId: price_id,
       });
 
-      const portalSession = await stripe.billingPortal.sessions.create({
-        customer: customerId,
-        return_url: `${origin}/settings`,
+      const updatedSubscription = await stripe.subscriptions.update(activeSubscription.id, {
+        items: [{ id: currentItem.id, price: price_id }],
+        billing_cycle_anchor: "now",
+        proration_behavior: "always_invoice",
+        payment_behavior: "error_if_incomplete",
+        cancel_at_period_end: false,
       });
+
+      const nextSubscriptionEnd = typeof updatedSubscription.current_period_end === "number"
+        ? new Date(updatedSubscription.current_period_end * 1000).toISOString()
+        : null;
+
+      const { error: syncError } = await serviceClient
+        .from("operator_settings")
+        .upsert(
+          {
+            user_id: user.id,
+            saas_subscribed: true,
+            saas_product_id: targetProductId,
+            saas_subscription_end: nextSubscriptionEnd,
+            saas_stripe_customer_id: customerId,
+          },
+          { onConflict: "user_id" },
+        );
+      if (syncError) {
+        throw new Error(`Failed to sync upgraded SaaS plan state: ${syncError.message}`);
+      }
 
       return new Response(JSON.stringify({
-        url: portalSession.url,
-        already_subscribed: true,
-        action: "manage_billing",
+        updated: true,
+        product_id: targetProductId,
+        subscription_end: nextSubscriptionEnd,
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

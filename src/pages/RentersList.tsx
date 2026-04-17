@@ -12,13 +12,14 @@ import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
 import { Search, Plus } from "lucide-react";
 import { CreateRenterDialog } from "@/components/CreateRenterDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { UpgradeConfirmDialog } from "@/components/UpgradeConfirmDialog";
 
 export default function RentersList() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: renters = [], isLoading } = useRenters();
-  const { canAddRenter, billableCount, capacityTier, nextUpgradeTier, checkout, loading: planLoading } = useSubscription();
+  const { canAddRenter, billableCount, capacityTier, nextUpgradeTier, loading: planLoading, initiateUpgrade, upgradeIntent, confirmUpgrade, cancelUpgrade } = useSubscription();
 
   const filtered = renters.filter(r => {
     const matchesSearch = r.name.toLowerCase().includes(search.toLowerCase()) || (r.phone || "").includes(search);
@@ -60,7 +61,7 @@ export default function RentersList() {
               </p>
               <p className="text-xs text-muted-foreground mt-2">{BANK_ACCOUNT_RECOMMENDATION}</p>
               {nextUpgradeTier?.price_id && (
-                <Button size="sm" className="w-full mt-3" onClick={() => checkout(nextUpgradeTier.price_id)}>
+                <Button size="sm" className="w-full mt-3" onClick={() => nextUpgradeTier.price_id && initiateUpgrade(nextUpgradeTier.price_id)}>
                   {tierUpgradeLabel(nextUpgradeTier)}
                 </Button>
               )}
@@ -140,6 +141,21 @@ export default function RentersList() {
       )}
 
       <CreateRenterDialog open={dialogOpen} onOpenChange={setDialogOpen} canAddRenter={canAddRenter} />
+      {nextUpgradeTier && (
+        <UpgradeConfirmDialog
+          open={upgradeIntent?.priceId === nextUpgradeTier.price_id}
+          onOpenChange={(open) => {
+            if (!open) cancelUpgrade();
+          }}
+          tierName={nextUpgradeTier.name}
+          tierLabel={nextUpgradeTier.label}
+          isUpgrade={true}
+          loading={false}
+          onConfirm={() => {
+            void confirmUpgrade();
+          }}
+        />
+      )}
     </div>
   );
 }

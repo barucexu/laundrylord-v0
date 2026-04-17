@@ -37,7 +37,7 @@ serve(async (req) => {
 
   const { data: stripeKeyRow, error: stripeKeyError } = await supabase
     .from("stripe_keys")
-    .select("user_id, webhook_signing_secret")
+    .select("user_id, encrypted_key, webhook_signing_secret")
     .eq("webhook_endpoint_token", token)
     .maybeSingle();
 
@@ -46,7 +46,7 @@ serve(async (req) => {
     return jsonResponse({ error: "Webhook lookup failed" }, 500);
   }
 
-  if (!stripeKeyRow?.user_id || !stripeKeyRow.webhook_signing_secret) {
+  if (!stripeKeyRow?.user_id || !stripeKeyRow.encrypted_key || !stripeKeyRow.webhook_signing_secret) {
     return jsonResponse({ error: "Unknown webhook token" }, 400);
   }
 
@@ -87,10 +87,14 @@ serve(async (req) => {
       if (session.mode === "setup") {
         const customerId = typeof session.customer === "string" ? session.customer : null;
         const metadataRenterId = session.metadata?.renter_id ?? null;
+        const setupIntentId = typeof session.setup_intent === "string" ? session.setup_intent : null;
+        const stripe = new Stripe(stripeKeyRow.encrypted_key, {
+          apiVersion: "2025-08-27.basil",
+        });
 
         let renterQuery = supabase
           .from("renters")
-          .select("id, user_id")
+          .select("id, user_id, stripe_subscription_id")
           .eq("user_id", userId);
 
         if (customerId) {
@@ -104,6 +108,28 @@ serve(async (req) => {
         const { data: renter } = await renterQuery.maybeSingle();
 
         if (renter) {
+          let paymentMethodId: string | null = null;
+          if (setupIntentId) {
+            const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
+            paymentMethodId = typeof setupIntent.payment_method === "string"
+              ? setupIntent.payment_method
+              : setupIntent.payment_method?.id ?? null;
+          }
+
+          if (customerId && paymentMethodId) {
+            await stripe.customers.update(customerId, {
+              invoice_settings: {
+                default_payment_method: paymentMethodId,
+              },
+            });
+
+            if (renter.stripe_subscription_id) {
+              await stripe.subscriptions.update(renter.stripe_subscription_id, {
+                default_payment_method: paymentMethodId,
+              });
+            }
+          }
+
           await supabase
             .from("renters")
             .update({ has_payment_method: true })
@@ -114,7 +140,9 @@ serve(async (req) => {
             renter_id: renter.id,
             user_id: userId,
             type: "payment_method_saved",
-            description: "Card saved via Stripe checkout",
+            description: renter.stripe_subscription_id
+              ? "Payment method updated for future autopay"
+              : "Payment method saved for autopay",
           });
         }
       }

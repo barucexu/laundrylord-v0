@@ -1,13 +1,13 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PaymentSourceBadge } from "@/components/PaymentSourceBadge";
 import { supabase } from "@/integrations/supabase/client";
-import { useRenter, useUpdateRenter, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection, useEntityCustomFields } from "@/hooks/useSupabaseData";
+import { useRenter, useUpdateRenter, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection, useEntityCustomFields, useRenterBalanceAdjustments, useAddRenterBalanceAdjustment } from "@/hooks/useSupabaseData";
 import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
-import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil, Globe, Plug, Archive, ArchiveRestore } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil, Globe, Plug, Archive, ArchiveRestore, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -15,6 +15,7 @@ import { EditRenterDialog } from "@/components/EditRenterDialog";
 import { RecordPaymentDialog } from "@/components/RecordPaymentDialog";
 import { RenterMachineAssignments } from "@/components/RenterMachineAssignments";
 import { getErrorMessage } from "@/lib/errors";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,7 +43,7 @@ const timelineIcons: Record<string, typeof User> = {
 
 export default function RenterDetail() {
   const { id } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { data: renter, isLoading } = useRenter(id);
@@ -50,13 +51,16 @@ export default function RenterDetail() {
   const { data: timeline = [] } = useTimelineEvents(id);
   const { data: maintenance = [] } = useMaintenanceForRenter(id);
   const { data: renterPayments = [] } = usePaymentsForRenter(id);
+  const { data: balanceAdjustments = [] } = useRenterBalanceAdjustments(id);
   const { data: stripeStatus } = useStripeConnection();
   const updateRenter = useUpdateRenter();
+  const addBalanceAdjustment = useAddRenterBalanceAdjustment();
   const [sendingSetup, setSendingSetup] = useState(false);
   const [activating, setActivating] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [feeForm, setFeeForm] = useState({ description: "", amount: "" });
 
   const handleArchive = useCallback(async () => {
     if (!renter) return;
@@ -86,12 +90,41 @@ export default function RenterDetail() {
     }
   }, [renter, updateRenter]);
 
-  // Show toast on setup return
+  const hasSubscription = !!renter?.stripe_subscription_id;
   const setupResult = searchParams.get("setup");
-  if (setupResult === "success") {
-    toast.success("Card saved successfully! You can now activate billing.");
-    window.history.replaceState({}, "", `/renters/${id}`);
-  }
+
+  useEffect(() => {
+    if (setupResult !== "success" || !id) return;
+
+    let cancelled = false;
+    const syncAfterSetupReturn = async () => {
+      try {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["renters", id] }),
+          queryClient.invalidateQueries({ queryKey: ["timeline_events", id] }),
+          queryClient.invalidateQueries({ queryKey: ["stripe-connection"] }),
+        ]);
+        if (!cancelled) {
+          toast.success(
+            hasSubscription
+              ? "Payment method updated for future autopay."
+              : "Payment method saved. You can now start autopay.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          const nextParams = new URLSearchParams(searchParams);
+          nextParams.delete("setup");
+          setSearchParams(nextParams, { replace: true });
+        }
+      }
+    };
+
+    void syncAfterSetupReturn();
+    return () => {
+      cancelled = true;
+    };
+  }, [hasSubscription, id, queryClient, searchParams, setSearchParams, setupResult]);
 
   const handleSendSetupLink = async () => {
     setSendingSetup(true);
@@ -121,12 +154,46 @@ export default function RenterDetail() {
         const msg = typeof data === "object" && data?.error ? data.error : error.message;
         throw new Error(msg || "Failed to activate billing");
       }
-      toast.success(data?.already_active ? "Autopay is already active for this renter." : `Billing activated! Next due: ${data.next_due}`);
+      toast.success(
+        data?.already_active
+          ? "Autopay is already active for this renter."
+          : data?.charged_current_balance
+            ? `Autopay started and current balance charged. Next recurring charge: ${data.next_due}`
+            : `Autopay started. Next recurring charge: ${data.next_due}`,
+      );
       queryClient.invalidateQueries({ queryKey: ["renters", id] });
+      queryClient.invalidateQueries({ queryKey: ["payments", "renter", id] });
+      queryClient.invalidateQueries({ queryKey: ["timeline_events", id] });
+      queryClient.invalidateQueries({ queryKey: ["renter_balance_adjustments", id] });
     } catch (err: unknown) {
       toast.error(getErrorMessage(err, "Failed to activate billing"));
     } finally {
       setActivating(false);
+    }
+  };
+
+  const handleAddFee = async () => {
+    const amount = parseFloat(feeForm.amount);
+    if (!id) return;
+    if (!feeForm.description.trim()) {
+      toast.error("Fee description is required");
+      return;
+    }
+    if (!amount || amount <= 0) {
+      toast.error("Enter a valid positive fee amount");
+      return;
+    }
+
+    try {
+      await addBalanceAdjustment.mutateAsync({
+        renter_id: id,
+        description: feeForm.description.trim(),
+        amount,
+      });
+      toast.success(`Added $${amount.toFixed(2)} to current balance`);
+      setFeeForm({ description: "", amount: "" });
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Failed to add fee"));
     }
   };
 
@@ -157,8 +224,6 @@ export default function RenterDetail() {
   const stripeConnected = stripeStatus?.connected === true;
   const renterBillingReady = stripeStatus?.renter_billing_ready === true;
   const hasCard = !!renter.has_payment_method;
-  const hasSubscription = !!renter.stripe_subscription_id;
-
   const getBillingState = () => {
     if (!stripeConnected) return "no_stripe";
     if (!renterBillingReady) return "webhook_incomplete";
@@ -256,6 +321,50 @@ export default function RenterDetail() {
 
               {billingState === "no_autopay" && (
                 <>
+                  <div className="rounded-md border border-border/60 bg-background/80 p-3 space-y-3">
+                    <div>
+                      <p className="text-sm font-medium">Current balance to charge now</p>
+                      <p className="text-xs text-muted-foreground">
+                        Add any positive fee add-ons you want included before autopay starts.
+                      </p>
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-[1fr_120px_auto]">
+                      <Input
+                        value={feeForm.description}
+                        onChange={(e) => setFeeForm((current) => ({ ...current, description: e.target.value }))}
+                        placeholder="Fee description"
+                      />
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={feeForm.amount}
+                        onChange={(e) => setFeeForm((current) => ({ ...current, amount: e.target.value }))}
+                        placeholder="Amount"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleAddFee}
+                        disabled={addBalanceAdjustment.isPending}
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add Fee
+                      </Button>
+                    </div>
+                    {balanceAdjustments.length > 0 && (
+                      <div className="space-y-1">
+                        {balanceAdjustments.map((adjustment) => (
+                          <div key={adjustment.id} className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>{adjustment.description}</span>
+                            <span className="font-mono">${Number(adjustment.amount).toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="text-xs text-muted-foreground">
+                      Current balance: <span className="font-mono text-foreground">${Number(renter.balance ?? 0).toFixed(2)}</span>
+                    </div>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" onClick={handleActivateBilling} disabled={activating}>
                       {activating ? (
@@ -263,14 +372,16 @@ export default function RenterDetail() {
                       ) : (
                         <Play className="h-4 w-4" />
                       )}
-                      Start Autopay
+                      Start Autopay and Charge Current Balance
                     </Button>
                     <Button size="sm" variant="outline" onClick={handleSendSetupLink} disabled={sendingSetup}>
                       <Send className="h-4 w-4" />
                       Resend Setup Link
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">→ Payment method on file ✓ — Start auto-charging ${Number(renter.monthly_rate).toFixed(2)}/mo</p>
+                  <p className="text-xs text-muted-foreground">
+                    → Payment method on file ✓ — charge today&apos;s current balance now, then start recurring auto-charging ${Number(renter.monthly_rate).toFixed(2)}/mo on the next cycle
+                  </p>
                   <p className="text-xs text-muted-foreground">{BANK_ACCOUNT_RECOMMENDATION}</p>
                 </>
               )}

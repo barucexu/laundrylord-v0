@@ -76,7 +76,9 @@ Assignment writes should go through the guarded assignment hooks in `useSupabase
 
 1. **Stripe webhook** (`stripe-webhook`): Receives Stripe events on an operator-specific endpoint URL, verifies the matching operator signing secret, dedupes events, then updates `renters`, inserts `payments`, and inserts `timeline_events`
 2. **Billing reminders** (`send-billing-reminders`): Scheduled/cron → checks active renters → inserts `billing_reminders`, applies late fees, sends emails via Lovable API
-3. **Payment recording** (UI): `RecordPaymentDialog` → inserts `payments` row via authenticated client
+3. **Payment recording** (UI): `RecordPaymentDialog` → authenticated RPC records the payment, updates renter balance/state, and inserts a timeline event in one authoritative write path
+4. **Pre-autopay fee add-ons**: `renter_balance_adjustments` stores positive fee add-ons that increase `renters.balance` before autopay starts
+5. **Autopay start** (`create-subscription`): Charges the renter's current balance immediately, then starts recurring autopay for the next billing cycle
 
 Renter billing readiness now means:
 
@@ -85,6 +87,13 @@ Renter billing readiness now means:
 3. Operator-specific webhook endpoint URL configured in Stripe
 
 Until all three are true, renter setup-link and autopay actions stay blocked.
+
+Autopay start behavior now means:
+
+1. Operator can add positive fee add-ons before autopay starts
+2. `Start autopay and charge current balance` charges the renter's current balance immediately
+3. Recurring autopay then begins on the next cycle using the saved default payment method
+4. Later setup-link completions replace the default payment method for future autopay charges
 
 ### Canonical Value Sets
 

@@ -69,22 +69,31 @@ serve(async (req) => {
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
-    const cardMethods = await stripe.paymentMethods.list({
-      customer: renter.stripe_customer_id,
-      type: "card",
-    });
-    const bankMethods = await stripe.paymentMethods.list({
-      customer: renter.stripe_customer_id,
-      type: "us_bank_account",
-    });
-    const defaultMethod = cardMethods.data[0] || bankMethods.data[0];
-    if (!defaultMethod) {
+    const customer = await stripe.customers.retrieve(renter.stripe_customer_id);
+    const customerDefaultMethod = !customer.deleted && typeof customer.invoice_settings?.default_payment_method === "string"
+      ? customer.invoice_settings.default_payment_method
+      : null;
+
+    let defaultMethodId = customerDefaultMethod;
+    if (!defaultMethodId) {
+      const cardMethods = await stripe.paymentMethods.list({
+        customer: renter.stripe_customer_id,
+        type: "card",
+      });
+      const bankMethods = await stripe.paymentMethods.list({
+        customer: renter.stripe_customer_id,
+        type: "us_bank_account",
+      });
+      defaultMethodId = cardMethods.data[0]?.id || bankMethods.data[0]?.id || null;
+    }
+
+    if (!defaultMethodId) {
       throw new Error("No payment method on file. Send setup link first.");
     }
 
     await stripe.customers.update(renter.stripe_customer_id, {
       invoice_settings: {
-        default_payment_method: defaultMethod.id,
+        default_payment_method: defaultMethodId,
       },
     });
 
@@ -107,35 +116,88 @@ serve(async (req) => {
       }
     }
 
+    const normalizedAnchorDay = Math.min(anchorDay, 28);
+    const now = new Date();
+    const nextRecurringChargeDate = (() => {
+      const candidateThisMonth = new Date(Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        normalizedAnchorDay,
+      ));
+      if (
+        candidateThisMonth.getUTCDate() === normalizedAnchorDay &&
+        candidateThisMonth.getTime() > now.getTime()
+      ) {
+        return candidateThisMonth;
+      }
+      return new Date(Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth() + 1,
+        normalizedAnchorDay,
+      ));
+    })();
+
+    const currentBalanceCents = Math.round(Number(renter.balance || 0) * 100);
+    if (currentBalanceCents > 0) {
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: currentBalanceCents,
+        currency: "usd",
+        confirm: true,
+        off_session: true,
+        customer: renter.stripe_customer_id,
+        payment_method: defaultMethodId,
+        description: `LaundryLord current balance charge for ${renter.name}`,
+        metadata: {
+          renter_id: renter.id,
+          user_id: user.id,
+          charge_kind: "starting_balance",
+        },
+      });
+
+      if (paymentIntent.status !== "succeeded") {
+        throw new Error("Current balance charge did not succeed");
+      }
+
+      const today = now.toISOString().split("T")[0];
+      await adminClient.from("payments").insert({
+        renter_id: renter.id,
+        user_id: user.id,
+        amount: Number(renter.balance || 0),
+        due_date: today,
+        paid_date: today,
+        status: "paid",
+        type: "other",
+        payment_source: "stripe",
+        payment_notes: "Current balance charge when autopay started",
+      });
+
+      await adminClient
+        .from("renters")
+        .update({
+          balance: 0,
+        })
+        .eq("id", renter_id)
+        .eq("user_id", user.id);
+
+      await adminClient.from("timeline_events").insert({
+        renter_id: renter.id,
+        user_id: user.id,
+        type: "payment_succeeded",
+        description: `Charged current balance of $${Number(renter.balance || 0).toFixed(2)} and prepared autopay`,
+        date: today,
+      });
+    }
+
     const subscription = await stripe.subscriptions.create({
       customer: renter.stripe_customer_id,
       items: [{ price: price.id }],
-      billing_cycle_anchor_config: {
-        day_of_month: Math.min(anchorDay, 28),
-      },
+      trial_end: Math.floor(nextRecurringChargeDate.getTime() / 1000),
       proration_behavior: "none",
-      metadata: { renter_id: renter.id, user_id: user.id },
+      default_payment_method: defaultMethodId,
+      metadata: { renter_id: renter.id, user_id: user.id, charge_kind: "recurring_rent" },
     });
 
-    const subscriptionPeriodEnd = typeof subscription.current_period_end === "number"
-      ? new Date(subscription.current_period_end * 1000)
-      : null;
-
-    let nextDue: string;
-    if (subscriptionPeriodEnd && !isNaN(subscriptionPeriodEnd.getTime())) {
-      nextDue = subscriptionPeriodEnd.toISOString().split("T")[0];
-    } else {
-      const fallbackBase = renter.lease_start_date
-        ? new Date(`${renter.lease_start_date}T00:00:00Z`)
-        : new Date();
-      const safeBase = !isNaN(fallbackBase.getTime()) ? fallbackBase : new Date();
-      const fallbackDue = new Date(Date.UTC(
-        safeBase.getUTCFullYear(),
-        safeBase.getUTCMonth() + 1,
-        Math.min(anchorDay, 28)
-      ));
-      nextDue = fallbackDue.toISOString().split("T")[0];
-    }
+    const nextDue = nextRecurringChargeDate.toISOString().split("T")[0];
 
     await adminClient
       .from("renters")
@@ -147,10 +209,21 @@ serve(async (req) => {
       .eq("id", renter_id)
       .eq("user_id", user.id);
 
+    await adminClient.from("timeline_events").insert({
+      renter_id: renter.id,
+      user_id: user.id,
+      type: "note",
+      description: currentBalanceCents > 0
+        ? `Autopay started. Charged current balance and next recurring charge is ${nextDue}`
+        : `Autopay started. Next recurring charge is ${nextDue}`,
+      date: now.toISOString().split("T")[0],
+    });
+
     return new Response(JSON.stringify({
       subscription_id: subscription.id,
       status: subscription.status,
       next_due: nextDue,
+      charged_current_balance: currentBalanceCents > 0,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,

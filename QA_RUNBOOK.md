@@ -59,3 +59,18 @@ Use this runbook before merging any plan/billing enforcement change.
 - Wrong Stripe signature fails closed
 - Replayed Stripe event is ignored after the first successful process
 - If webhook setup is incomplete, renter setup-link and autopay actions are blocked in both UI and backend
+
+## 8) Post-smoke billing trust checks
+
+- Update payment method for an already-autopay renter and confirm the next charge uses the newly saved method
+- Returning from Stripe setup/update flow shows one success message only and does not temporarily show webhook setup as incomplete
+- Record a manual payment and confirm renter detail updates immediately:
+  - balance changes
+  - renter-scoped payment history refreshes
+  - timeline shows the manual payment
+- At plan cap, upgrade CTA performs a direct plan upgrade and charges immediately instead of only routing to the generic billing portal
+- Before autopay starts, add one or more positive fee add-ons and confirm they increase current balance
+- Start autopay and charge current balance:
+  - current balance is charged immediately
+  - renter balance updates clearly
+  - recurring autopay is scheduled for the next cycle

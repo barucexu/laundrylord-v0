@@ -43,7 +43,7 @@ export function UpgradeConfirmDialog({
             </p>
             {isUpgrade && (
               <p>
-                Any unused time on your current plan will be credited, and you'll be charged the prorated difference today.
+                Your card or bank account will be charged now, and your new billing cycle will restart today.
               </p>
             )}
             {!isUpgrade && (

@@ -94,7 +94,11 @@ serve(async (req) => {
       payment_method_types: ["us_bank_account", "card"],
       success_url: `${origin}/renters/${renter_id}?setup=success`,
       cancel_url: `${origin}/renters/${renter_id}?setup=canceled`,
-      metadata: { renter_id: renter.id, user_id: user.id },
+      metadata: {
+        renter_id: renter.id,
+        user_id: user.id,
+        setup_purpose: renter.stripe_subscription_id ? "update_payment_method" : "initial_setup",
+      },
     });
 
     return new Response(JSON.stringify({ url: session.url }), {

@@ -13,6 +13,7 @@ export type MachineRow = Database["public"]["Tables"]["machines"]["Row"];
 type MachineInsert = Database["public"]["Tables"]["machines"]["Insert"];
 type PaymentRow = Database["public"]["Tables"]["payments"]["Row"];
 type PaymentInsert = Database["public"]["Tables"]["payments"]["Insert"];
+export type RenterBalanceAdjustmentRow = Database["public"]["Tables"]["renter_balance_adjustments"]["Row"];
 type MaintenanceRow = Database["public"]["Tables"]["maintenance_logs"]["Row"];
 type TimelineRow = Database["public"]["Tables"]["timeline_events"]["Row"];
 type CustomFieldDefinitionRow = Database["public"]["Tables"]["custom_field_definitions"]["Row"];
@@ -369,6 +370,78 @@ export function useCreatePayment() {
   });
 }
 
+export function useRecordManualPayment() {
+  const queryClient = useQueryClient();
+  const demo = useDemo();
+
+  return useMutation({
+    mutationFn: async (args: {
+      renter_id: string;
+      amount: number;
+      paid_date: string;
+      type: string;
+      payment_source: string;
+      payment_notes?: string;
+    }) => {
+      if (demo?.isDemo) {
+        const payment = demo.addPayment({
+          renter_id: args.renter_id,
+          amount: args.amount,
+          due_date: args.paid_date,
+          paid_date: args.paid_date,
+          status: "paid",
+          type: args.type,
+          payment_source: args.payment_source,
+          payment_notes: args.payment_notes ?? "",
+        } as Parameters<typeof demo.addPayment>[0]);
+
+        const renter = demo.data.renters.find((entry) => entry.id === args.renter_id);
+        if (renter) {
+          const nextBalance = Math.max(0, Number(renter.balance ?? 0) - args.amount);
+          demo.updateRenter(args.renter_id, {
+            balance: nextBalance,
+            rent_collected: args.type === "rent"
+              ? Number(renter.rent_collected ?? 0) + args.amount
+              : renter.rent_collected,
+            paid_through_date: args.type === "rent" && nextBalance === 0 ? args.paid_date : renter.paid_through_date,
+            days_late: args.type === "rent" && nextBalance === 0 ? 0 : renter.days_late,
+            status: renter.status === "late" && nextBalance === 0 ? "active" : renter.status,
+          });
+          demo.addTimelineEvent({
+            renter_id: args.renter_id,
+            type: "payment_succeeded",
+            description: `Manual ${args.type.replace("_", " ")} payment recorded: $${args.amount.toFixed(2)} via ${args.payment_source}`,
+            date: args.paid_date,
+          });
+        }
+
+        return payment;
+      }
+
+      const { data, error } = await supabase.rpc("record_manual_payment", {
+        p_renter_id: args.renter_id,
+        p_amount: args.amount,
+        p_paid_date: args.paid_date,
+        p_type: args.type,
+        p_payment_source: args.payment_source,
+        p_payment_notes: args.payment_notes ?? null,
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      if (!demo?.isDemo) {
+        queryClient.invalidateQueries({ queryKey: ["payments"] });
+        queryClient.invalidateQueries({ queryKey: ["payments", "renter", variables.renter_id] });
+        queryClient.invalidateQueries({ queryKey: ["renters"] });
+        queryClient.invalidateQueries({ queryKey: ["renters", variables.renter_id] });
+        queryClient.invalidateQueries({ queryKey: ["timeline_events", variables.renter_id] });
+      }
+    },
+  });
+}
+
 export function useMaintenanceLogs() {
   const demo = useDemo();
   const supaQuery = useQuery({
@@ -433,6 +506,74 @@ export function usePaymentsForRenter(renterId: string | undefined) {
     return { ...supaQuery, data: renterId ? filtered : undefined, isLoading: false, error: null };
   }
   return supaQuery;
+}
+
+export function useRenterBalanceAdjustments(renterId: string | undefined) {
+  const demo = useDemo();
+  const supaQuery = useQuery({
+    queryKey: ["renter_balance_adjustments", renterId],
+    enabled: !!renterId && !demo?.isDemo,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("renter_balance_adjustments")
+        .select("*")
+        .eq("renter_id", renterId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as RenterBalanceAdjustmentRow[];
+    },
+  });
+  if (demo?.isDemo) {
+    return { ...supaQuery, data: [], isLoading: false, error: null };
+  }
+  return supaQuery;
+}
+
+export function useAddRenterBalanceAdjustment() {
+  const queryClient = useQueryClient();
+  const demo = useDemo();
+
+  return useMutation({
+    mutationFn: async (args: {
+      renter_id: string;
+      description: string;
+      amount: number;
+    }) => {
+      if (demo?.isDemo) {
+        const renter = demo.data.renters.find((entry) => entry.id === args.renter_id);
+        if (!renter) throw new Error("Renter not found");
+        const nextBalance = Number(renter.balance ?? 0) + args.amount;
+        demo.updateRenter(args.renter_id, { balance: nextBalance });
+        demo.addTimelineEvent({
+          renter_id: args.renter_id,
+          type: "note",
+          description: `Added fee add-on: ${args.description} ($${args.amount.toFixed(2)})`,
+          date: new Date().toISOString(),
+        });
+        return {
+          adjustment_id: crypto.randomUUID(),
+          renter_id: args.renter_id,
+          balance: nextBalance,
+        };
+      }
+
+      const { data, error } = await supabase.rpc("add_renter_balance_adjustment", {
+        p_renter_id: args.renter_id,
+        p_description: args.description,
+        p_amount: args.amount,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      if (!demo?.isDemo) {
+        queryClient.invalidateQueries({ queryKey: ["renter_balance_adjustments", variables.renter_id] });
+        queryClient.invalidateQueries({ queryKey: ["renters"] });
+        queryClient.invalidateQueries({ queryKey: ["renters", variables.renter_id] });
+        queryClient.invalidateQueries({ queryKey: ["timeline_events", variables.renter_id] });
+      }
+    },
+  });
 }
 
 export function useMaintenanceForRenter(renterId: string | undefined) {
@@ -621,7 +762,7 @@ export function useStripeConnection() {
         webhook_url: string | null;
       }> => {
       const { data, error } = await supabase.functions.invoke("check-stripe-connection");
-      if (error) return { connected: false, webhook_configured: false, renter_billing_ready: false, reason: "error", account_name: null, account_id: null, stripe_livemode: null, webhook_url: null };
+      if (error) throw error;
       return data;
     },
     staleTime: 5 * 60 * 1000,
