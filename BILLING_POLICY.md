@@ -8,6 +8,7 @@ This document defines billing behavior in plain language.
 2. **Payments are non-refundable.**
 3. Plan eligibility should be based on documented count rules.
 4. If on a paid plan, UI should clearly show current billed plan.
+5. Plan-change confirmation should show the best available Stripe-backed preview of what is due today instead of generic charge wording.
 
 ## B) Count semantics
 
@@ -45,4 +46,3 @@ Any path that can create renters must enforce same plan logic:
 3. Any future bulk/API renter creation flow
 
 No exceptions.
-

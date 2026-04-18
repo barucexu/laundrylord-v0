@@ -291,6 +291,8 @@ export default function SettingsPage() {
           tierLabel={selectedUpgradeTier.label}
           isUpgrade={true}
           loading={false}
+          preview={subscription.upgradePreview}
+          previewLoading={subscription.upgradePreviewLoading}
           onConfirm={() => {
             void subscription.confirmUpgrade();
           }}

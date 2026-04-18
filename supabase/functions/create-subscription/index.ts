@@ -138,14 +138,12 @@ serve(async (req) => {
     })();
 
     const currentBalanceCents = Math.round(Number(renter.balance || 0) * 100);
+    let currentBalanceStatus: "none" | "paid" | "processing" = "none";
     if (currentBalanceCents > 0) {
-      const paymentIntent = await stripe.paymentIntents.create({
+      const invoiceItem = await stripe.invoiceItems.create({
+        customer: renter.stripe_customer_id,
         amount: currentBalanceCents,
         currency: "usd",
-        confirm: true,
-        off_session: true,
-        customer: renter.stripe_customer_id,
-        payment_method: defaultMethodId,
         description: `LaundryLord current balance charge for ${renter.name}`,
         metadata: {
           renter_id: renter.id,
@@ -154,38 +152,52 @@ serve(async (req) => {
         },
       });
 
-      if (paymentIntent.status !== "succeeded") {
-        throw new Error("Current balance charge did not succeed");
+      const draftInvoice = await stripe.invoices.create({
+        customer: renter.stripe_customer_id,
+        collection_method: "charge_automatically",
+        auto_advance: false,
+        default_payment_method: defaultMethodId,
+        description: `LaundryLord current balance charge for ${renter.name}`,
+        metadata: {
+          renter_id: renter.id,
+          user_id: user.id,
+          charge_kind: "starting_balance",
+          invoice_item_id: invoiceItem.id,
+        },
+      });
+
+      const finalizedInvoice = await stripe.invoices.finalizeInvoice(draftInvoice.id);
+      const paidInvoice = await stripe.invoices.pay(finalizedInvoice.id, {
+        payment_method: defaultMethodId,
+      });
+
+      const paymentIntentId = typeof paidInvoice.payment_intent === "string"
+        ? paidInvoice.payment_intent
+        : paidInvoice.payment_intent?.id ?? null;
+
+      let paymentIntentStatus: string | null = null;
+      if (paymentIntentId) {
+        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+        paymentIntentStatus = paymentIntent.status;
       }
 
-      const today = now.toISOString().split("T")[0];
-      await adminClient.from("payments").insert({
-        renter_id: renter.id,
-        user_id: user.id,
-        amount: Number(renter.balance || 0),
-        due_date: today,
-        paid_date: today,
-        status: "paid",
-        type: "other",
-        payment_source: "stripe",
-        payment_notes: "Current balance charge when autopay started",
-      });
-
-      await adminClient
-        .from("renters")
-        .update({
-          balance: 0,
-        })
-        .eq("id", renter_id)
-        .eq("user_id", user.id);
-
-      await adminClient.from("timeline_events").insert({
-        renter_id: renter.id,
-        user_id: user.id,
-        type: "payment_succeeded",
-        description: `Charged current balance of $${Number(renter.balance || 0).toFixed(2)} and prepared autopay`,
-        date: today,
-      });
+      if (paidInvoice.status === "paid") {
+        currentBalanceStatus = "paid";
+      } else if (paymentIntentStatus === "processing") {
+        currentBalanceStatus = "processing";
+      } else {
+        if (paidInvoice.status === "open") {
+          await stripe.invoices.voidInvoice(paidInvoice.id);
+        }
+        return new Response(JSON.stringify({
+          error: "Current balance charge failed, so autopay was not started.",
+          current_balance_charge_failed: true,
+          autopay_started: false,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
     }
 
     const subscription = await stripe.subscriptions.create({
@@ -213,9 +225,11 @@ serve(async (req) => {
       renter_id: renter.id,
       user_id: user.id,
       type: "note",
-      description: currentBalanceCents > 0
+      description: currentBalanceStatus === "paid"
         ? `Autopay started. Charged current balance and next recurring charge is ${nextDue}`
-        : `Autopay started. Next recurring charge is ${nextDue}`,
+        : currentBalanceStatus === "processing"
+          ? `Autopay started. Current balance payment is processing and next recurring charge is ${nextDue}`
+          : `Autopay started. Next recurring charge is ${nextDue}`,
       date: now.toISOString().split("T")[0],
     });
 
@@ -223,7 +237,9 @@ serve(async (req) => {
       subscription_id: subscription.id,
       status: subscription.status,
       next_due: nextDue,
-      charged_current_balance: currentBalanceCents > 0,
+      charged_current_balance: currentBalanceStatus === "paid",
+      current_balance_status: currentBalanceStatus,
+      autopay_started: true,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,

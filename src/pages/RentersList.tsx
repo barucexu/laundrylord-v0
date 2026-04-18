@@ -19,7 +19,19 @@ export default function RentersList() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: renters = [], isLoading } = useRenters();
-  const { canAddRenter, billableCount, capacityTier, nextUpgradeTier, loading: planLoading, initiateUpgrade, upgradeIntent, confirmUpgrade, cancelUpgrade } = useSubscription();
+  const {
+    canAddRenter,
+    billableCount,
+    capacityTier,
+    nextUpgradeTier,
+    loading: planLoading,
+    initiateUpgrade,
+    upgradeIntent,
+    upgradePreview,
+    upgradePreviewLoading,
+    confirmUpgrade,
+    cancelUpgrade,
+  } = useSubscription();
 
   const filtered = renters.filter(r => {
     const matchesSearch = r.name.toLowerCase().includes(search.toLowerCase()) || (r.phone || "").includes(search);
@@ -151,6 +163,8 @@ export default function RentersList() {
           tierLabel={nextUpgradeTier.label}
           isUpgrade={true}
           loading={false}
+          preview={upgradePreview}
+          previewLoading={upgradePreviewLoading}
           onConfirm={() => {
             void confirmUpgrade();
           }}

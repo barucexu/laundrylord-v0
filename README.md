@@ -77,8 +77,8 @@ Assignment writes should go through the guarded assignment hooks in `useSupabase
 1. **Stripe webhook** (`stripe-webhook`): Receives Stripe events on an operator-specific endpoint URL, verifies the matching operator signing secret, dedupes events, then updates `renters`, inserts `payments`, and inserts `timeline_events`
 2. **Billing reminders** (`send-billing-reminders`): Scheduled/cron → checks active renters → inserts `billing_reminders`, applies late fees, sends emails via Lovable API
 3. **Payment recording** (UI): `RecordPaymentDialog` → authenticated RPC records the payment, updates renter balance/state, and inserts a timeline event in one authoritative write path
-4. **Pre-autopay fee add-ons**: `renter_balance_adjustments` stores positive fee add-ons that increase `renters.balance` before autopay starts
-5. **Autopay start** (`create-subscription`): Charges the renter's current balance immediately, then starts recurring autopay for the next billing cycle
+4. **Pre-autopay fee add-ons**: `renter_balance_adjustments` stores positive fee add-ons that increase `renters.balance` before autopay starts, and those items can be removed before autopay begins
+5. **Autopay start** (`create-subscription`): Collects the renter's current balance through Stripe Invoicing, then starts recurring autopay for the next billing cycle
 
 Renter billing readiness now means:
 
@@ -91,9 +91,11 @@ Until all three are true, renter setup-link and autopay actions stay blocked.
 Autopay start behavior now means:
 
 1. Operator can add positive fee add-ons before autopay starts
-2. `Start autopay and charge current balance` charges the renter's current balance immediately
-3. Recurring autopay then begins on the next cycle using the saved default payment method
-4. Later setup-link completions replace the default payment method for future autopay charges
+2. If they want first month rent charged now, they add it as a current-balance item before starting autopay
+3. `Start autopay and charge current balance` attempts the renter's current-balance invoice right away using the saved default payment method
+4. Current-balance payment can settle immediately or remain processing for ACH; the operator gets explicit status messaging either way
+5. Recurring autopay then begins on the next cycle using the saved default payment method
+6. Later setup-link completions replace the default payment method for future autopay charges
 
 ### Canonical Value Sets
 

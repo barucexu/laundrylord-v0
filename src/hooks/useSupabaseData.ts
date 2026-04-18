@@ -576,6 +576,37 @@ export function useAddRenterBalanceAdjustment() {
   });
 }
 
+export function useRemoveRenterBalanceAdjustment() {
+  const queryClient = useQueryClient();
+  const demo = useDemo();
+
+  return useMutation({
+    mutationFn: async (args: {
+      renter_id: string;
+      adjustment_id: string;
+    }) => {
+      if (demo?.isDemo) {
+        throw new Error("Removing balance adjustments is not available in demo mode");
+      }
+
+      const { data, error } = await supabase.rpc("remove_renter_balance_adjustment", {
+        p_renter_id: args.renter_id,
+        p_adjustment_id: args.adjustment_id,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      if (!demo?.isDemo) {
+        queryClient.invalidateQueries({ queryKey: ["renter_balance_adjustments", variables.renter_id] });
+        queryClient.invalidateQueries({ queryKey: ["renters"] });
+        queryClient.invalidateQueries({ queryKey: ["renters", variables.renter_id] });
+        queryClient.invalidateQueries({ queryKey: ["timeline_events", variables.renter_id] });
+      }
+    },
+  });
+}
+
 export function useMaintenanceForRenter(renterId: string | undefined) {
   const demo = useDemo();
   const supaQuery = useQuery({
