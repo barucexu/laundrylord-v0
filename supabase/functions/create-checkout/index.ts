@@ -141,16 +141,16 @@ serve(async (req) => {
           },
         });
 
-        const prorationLines = previewInvoice.lines.data.filter((line) => {
+        const prorationLines = previewInvoice.lines.data.filter((line: Stripe.InvoiceLineItem) => {
           const parent = line.parent as { subscription_item_details?: { proration?: boolean } } | null;
           return parent?.subscription_item_details?.proration === true;
         });
         const positiveProration = prorationLines
-          .filter((line) => line.amount > 0)
-          .reduce((sum, line) => sum + line.amount, 0);
+          .filter((line: Stripe.InvoiceLineItem) => line.amount > 0)
+          .reduce((sum: number, line: Stripe.InvoiceLineItem) => sum + line.amount, 0);
         const negativeProration = prorationLines
-          .filter((line) => line.amount < 0)
-          .reduce((sum, line) => sum + Math.abs(line.amount), 0);
+          .filter((line: Stripe.InvoiceLineItem) => line.amount < 0)
+          .reduce((sum: number, line: Stripe.InvoiceLineItem) => sum + Math.abs(line.amount), 0);
 
         return new Response(JSON.stringify({
           preview: {

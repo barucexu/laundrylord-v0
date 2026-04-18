@@ -1171,10 +1171,6 @@ export type Database = {
           read_ct: number
         }[]
       }
-      remove_renter_balance_adjustment: {
-        Args: { p_adjustment_id: string; p_renter_id: string }
-        Returns: Json
-      }
       record_manual_payment: {
         Args: {
           p_amount: number
@@ -1184,6 +1180,10 @@ export type Database = {
           p_renter_id: string
           p_type: string
         }
+        Returns: Json
+      }
+      remove_renter_balance_adjustment: {
+        Args: { p_adjustment_id: string; p_renter_id: string }
         Returns: Json
       }
     }
