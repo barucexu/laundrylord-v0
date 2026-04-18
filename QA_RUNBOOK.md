@@ -69,8 +69,11 @@ Use this runbook before merging any plan/billing enforcement change.
   - renter-scoped payment history refreshes
   - timeline shows the manual payment
 - At plan cap, upgrade CTA performs a direct plan upgrade and charges immediately instead of only routing to the generic billing portal
+- Upgrade confirmation shows the Stripe-backed amount due today, including proration credit/charge context when available
 - Before autopay starts, add one or more positive fee add-ons and confirm they increase current balance
+- Before autopay starts, remove a current-balance item and confirm renter balance drops back down and the item disappears
 - Start autopay and charge current balance:
-  - current balance is charged immediately
-  - renter balance updates clearly
+  - current balance charge succeeds for card defaults
+  - current balance charge can show as processing for ACH defaults without a raw runtime error
+  - renter balance updates clearly after Stripe confirms the payment
   - recurring autopay is scheduled for the next cycle

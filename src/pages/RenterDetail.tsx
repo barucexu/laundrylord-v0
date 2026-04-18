@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PaymentSourceBadge } from "@/components/PaymentSourceBadge";
 import { supabase } from "@/integrations/supabase/client";
-import { useRenter, useUpdateRenter, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection, useEntityCustomFields, useRenterBalanceAdjustments, useAddRenterBalanceAdjustment } from "@/hooks/useSupabaseData";
+import { useRenter, useUpdateRenter, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection, useEntityCustomFields, useRenterBalanceAdjustments, useAddRenterBalanceAdjustment, useRemoveRenterBalanceAdjustment } from "@/hooks/useSupabaseData";
 import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
-import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil, Globe, Plug, Archive, ArchiveRestore, Plus } from "lucide-react";
+import { getAutopayActivationMessage } from "@/lib/renter-billing";
+import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil, Globe, Plug, Archive, ArchiveRestore, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -55,6 +56,7 @@ export default function RenterDetail() {
   const { data: stripeStatus } = useStripeConnection();
   const updateRenter = useUpdateRenter();
   const addBalanceAdjustment = useAddRenterBalanceAdjustment();
+  const removeBalanceAdjustment = useRemoveRenterBalanceAdjustment();
   const [sendingSetup, setSendingSetup] = useState(false);
   const [activating, setActivating] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -154,13 +156,7 @@ export default function RenterDetail() {
         const msg = typeof data === "object" && data?.error ? data.error : error.message;
         throw new Error(msg || "Failed to activate billing");
       }
-      toast.success(
-        data?.already_active
-          ? "Autopay is already active for this renter."
-          : data?.charged_current_balance
-            ? `Autopay started and current balance charged. Next recurring charge: ${data.next_due}`
-            : `Autopay started. Next recurring charge: ${data.next_due}`,
-      );
+      toast.success(getAutopayActivationMessage(data ?? {}));
       queryClient.invalidateQueries({ queryKey: ["renters", id] });
       queryClient.invalidateQueries({ queryKey: ["payments", "renter", id] });
       queryClient.invalidateQueries({ queryKey: ["timeline_events", id] });
@@ -194,6 +190,20 @@ export default function RenterDetail() {
       setFeeForm({ description: "", amount: "" });
     } catch (err: unknown) {
       toast.error(getErrorMessage(err, "Failed to add fee"));
+    }
+  };
+
+  const handleRemoveFee = async (adjustmentId: string) => {
+    if (!id) return;
+
+    try {
+      await removeBalanceAdjustment.mutateAsync({
+        renter_id: id,
+        adjustment_id: adjustmentId,
+      });
+      toast.success("Removed item from current balance");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Failed to remove current balance item"));
     }
   };
 
@@ -323,16 +333,19 @@ export default function RenterDetail() {
                 <>
                   <div className="rounded-md border border-border/60 bg-background/80 p-3 space-y-3">
                     <div>
-                      <p className="text-sm font-medium">Current balance to charge now</p>
+                      <p className="text-sm font-medium">Current balance items</p>
                       <p className="text-xs text-muted-foreground">
-                        Add any positive fee add-ons you want included before autopay starts.
+                        If you want to charge first month&apos;s rent now, add it below before autopay starts.
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Common items: first month rent, install fee, deposit.
                       </p>
                     </div>
                     <div className="grid gap-2 md:grid-cols-[1fr_120px_auto]">
                       <Input
                         value={feeForm.description}
                         onChange={(e) => setFeeForm((current) => ({ ...current, description: e.target.value }))}
-                        placeholder="Fee description"
+                        placeholder="Current balance item"
                       />
                       <Input
                         type="number"
@@ -354,9 +367,20 @@ export default function RenterDetail() {
                     {balanceAdjustments.length > 0 && (
                       <div className="space-y-1">
                         {balanceAdjustments.map((adjustment) => (
-                          <div key={adjustment.id} className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>{adjustment.description}</span>
-                            <span className="font-mono">${Number(adjustment.amount).toFixed(2)}</span>
+                          <div key={adjustment.id} className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                            <span className="flex-1">{adjustment.description}</span>
+                            <span className="font-mono text-foreground">${Number(adjustment.amount).toFixed(2)}</span>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              onClick={() => void handleRemoveFee(adjustment.id)}
+                              disabled={removeBalanceAdjustment.isPending}
+                              aria-label={`Remove ${adjustment.description}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
                           </div>
                         ))}
                       </div>
@@ -380,7 +404,7 @@ export default function RenterDetail() {
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    → Payment method on file ✓ — charge today&apos;s current balance now, then start recurring auto-charging ${Number(renter.monthly_rate).toFixed(2)}/mo on the next cycle
+                    → Payment method on file ✓ — charge today&apos;s current balance now, then start recurring auto-charging ${Number(renter.monthly_rate).toFixed(2)}/mo on the next cycle.
                   </p>
                   <p className="text-xs text-muted-foreground">{BANK_ACCOUNT_RECOMMENDATION}</p>
                 </>

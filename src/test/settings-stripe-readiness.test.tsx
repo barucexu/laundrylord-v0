@@ -45,6 +45,8 @@ vi.mock("@/hooks/useSubscription", () => ({
     manageSubscription: vi.fn(),
     initiateUpgrade: vi.fn(),
     upgradeIntent: null,
+    upgradePreview: null,
+    upgradePreviewLoading: false,
     confirmUpgrade: vi.fn(),
     cancelUpgrade: vi.fn(),
     refresh: vi.fn(),

@@ -1095,6 +1095,10 @@ export type Database = {
       }
     }
     Functions: {
+      add_renter_balance_adjustment: {
+        Args: { p_amount: number; p_description: string; p_renter_id: string }
+        Returns: Json
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -1119,6 +1123,10 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      remove_renter_balance_adjustment: {
+        Args: { p_adjustment_id: string; p_renter_id: string }
+        Returns: Json
       }
     }
     Enums: {

@@ -297,3 +297,86 @@ BEGIN
   );
 END;
 $$;
+
+CREATE OR REPLACE FUNCTION public.remove_renter_balance_adjustment(
+  p_renter_id uuid,
+  p_adjustment_id uuid
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_renter public.renters%ROWTYPE;
+  v_adjustment public.renter_balance_adjustments%ROWTYPE;
+  v_next_balance numeric;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  SELECT *
+  INTO v_renter
+  FROM public.renters
+  WHERE id = p_renter_id
+    AND user_id = v_user_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Renter not found';
+  END IF;
+
+  IF v_renter.stripe_subscription_id IS NOT NULL THEN
+    RAISE EXCEPTION 'Fee add-ons in this flow are only available before autopay starts';
+  END IF;
+
+  SELECT *
+  INTO v_adjustment
+  FROM public.renter_balance_adjustments
+  WHERE id = p_adjustment_id
+    AND renter_id = p_renter_id
+    AND user_id = v_user_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Balance adjustment not found';
+  END IF;
+
+  DELETE FROM public.renter_balance_adjustments
+  WHERE id = v_adjustment.id;
+
+  v_next_balance := GREATEST(0, COALESCE(v_renter.balance, 0) - COALESCE(v_adjustment.amount, 0));
+
+  UPDATE public.renters
+  SET balance = v_next_balance
+  WHERE id = p_renter_id
+    AND user_id = v_user_id;
+
+  INSERT INTO public.timeline_events (
+    user_id,
+    renter_id,
+    type,
+    description,
+    date
+  )
+  VALUES (
+    v_user_id,
+    p_renter_id,
+    'note',
+    format(
+      'Removed fee add-on: %s ($%s)',
+      trim(v_adjustment.description),
+      to_char(v_adjustment.amount, 'FM999999990.00')
+    ),
+    now()
+  );
+
+  RETURN jsonb_build_object(
+    'adjustment_id', v_adjustment.id,
+    'renter_id', p_renter_id,
+    'balance', v_next_balance
+  );
+END;
+$$;

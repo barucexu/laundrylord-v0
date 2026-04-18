@@ -6,6 +6,7 @@ import { useDemo } from "@/contexts/DemoContext";
 import { useRenters } from "@/hooks/useSupabaseData";
 import { BILLABLE_RENTER_COUNT_QUERY_KEY, countBillableRenters } from "@/lib/billing-counts";
 import { getNextUpgradeTierForCount, getRequiredTierForCount, getTierByProductId, TIERS, type PricingTier } from "@/lib/pricing-tiers";
+import type { SaasUpgradePreview } from "@/lib/saas-upgrade-preview";
 import { toast } from "sonner";
 
 export interface SubscriptionCapacityState {
@@ -62,10 +63,12 @@ interface SubscriptionState {
   subscriptionEnd: string | null;
   productId: string | null;
   canAddRenter: boolean;
-  checkout: (targetPriceId?: string) => Promise<void>;
+  checkout: (targetPriceId?: string, prorationDate?: number) => Promise<void>;
   manageSubscription: () => Promise<void>;
   initiateUpgrade: (targetPriceId: string) => void;
   upgradeIntent: { priceId: string } | null;
+  upgradePreview: SaasUpgradePreview | null;
+  upgradePreviewLoading: boolean;
   confirmUpgrade: () => Promise<void>;
   cancelUpgrade: () => void;
   refresh: () => Promise<void>;
@@ -81,6 +84,8 @@ export function useSubscription(): SubscriptionState {
   const [subscriptionEnd, setSubscriptionEnd] = useState<string | null>(null);
   const [productId, setProductId] = useState<string | null>(null);
   const [upgradeIntent, setUpgradeIntent] = useState<{ priceId: string } | null>(null);
+  const [upgradePreview, setUpgradePreview] = useState<SaasUpgradePreview | null>(null);
+  const [upgradePreviewLoading, setUpgradePreviewLoading] = useState(false);
   const aggressivePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const aggressiveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -187,12 +192,15 @@ export function useSubscription(): SubscriptionState {
     }, 60_000);
   }, [checkSubscription, queryClient]);
 
-  const checkout = useCallback(async (targetPriceId?: string) => {
+  const checkout = useCallback(async (targetPriceId?: string, prorationDate?: number) => {
     if (isDemo) return;
     const priceId = targetPriceId ?? capacity.effectiveTier.price_id;
     if (!priceId) return;
     const { data, error } = await supabase.functions.invoke("create-checkout", {
-      body: { price_id: priceId },
+      body: {
+        price_id: priceId,
+        proration_date: prorationDate,
+      },
     });
     if (error) throw error;
     if (data?.updated) {
@@ -225,14 +233,59 @@ export function useSubscription(): SubscriptionState {
     setUpgradeIntent({ priceId: targetPriceId });
   }, []);
 
+  useEffect(() => {
+    if (!upgradeIntent?.priceId || isDemo) {
+      setUpgradePreview(null);
+      setUpgradePreviewLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setUpgradePreview(null);
+    setUpgradePreviewLoading(true);
+
+    const fetchPreview = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("create-checkout", {
+          body: {
+            price_id: upgradeIntent.priceId,
+            action: "preview",
+          },
+        });
+        if (error) throw error;
+        if (!cancelled) {
+          setUpgradePreview(data?.preview ?? null);
+        }
+      } catch (err) {
+        console.error("upgrade preview error:", err);
+        if (!cancelled) {
+          toast.error("Couldn't calculate today's charge. You can still continue to Stripe.");
+          setUpgradePreview(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setUpgradePreviewLoading(false);
+        }
+      }
+    };
+
+    void fetchPreview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isDemo, upgradeIntent?.priceId]);
+
   const confirmUpgrade = useCallback(async () => {
     if (!upgradeIntent?.priceId) return;
-    await checkout(upgradeIntent.priceId);
+    await checkout(upgradeIntent.priceId, upgradePreview?.prorationDate ?? undefined);
     setUpgradeIntent(null);
-  }, [checkout, upgradeIntent?.priceId]);
+    setUpgradePreview(null);
+  }, [checkout, upgradeIntent?.priceId, upgradePreview?.prorationDate]);
 
   const cancelUpgrade = useCallback(() => {
     setUpgradeIntent(null);
+    setUpgradePreview(null);
   }, []);
 
   const realModeLoading = !isDemo && (loading || billableCountQuery.isLoading);
@@ -262,6 +315,8 @@ export function useSubscription(): SubscriptionState {
     manageSubscription,
     initiateUpgrade,
     upgradeIntent,
+    upgradePreview,
+    upgradePreviewLoading,
     confirmUpgrade,
     cancelUpgrade,
     refresh,

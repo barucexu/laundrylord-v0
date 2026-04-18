@@ -19,6 +19,12 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+function getInvoiceChargeKind(invoice: Stripe.Invoice): string {
+  return invoice.metadata?.charge_kind
+    ?? invoice.parent?.subscription_details?.metadata?.charge_kind
+    ?? "recurring_rent";
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -152,6 +158,7 @@ serve(async (req) => {
       const invoice = event.data.object;
       const customerId = typeof invoice.customer === "string" ? invoice.customer : null;
       const amountPaid = (invoice.amount_paid || 0) / 100;
+      const chargeKind = getInvoiceChargeKind(invoice);
 
       if (customerId) {
         const { data: renter } = await supabase
@@ -162,6 +169,38 @@ serve(async (req) => {
           .maybeSingle();
 
         if (renter) {
+          if (chargeKind === "starting_balance") {
+            await supabase
+              .from("renters")
+              .update({
+                status: "active",
+                balance: Math.max(0, Number(renter.balance) - amountPaid),
+              })
+              .eq("id", renter.id)
+              .eq("user_id", userId);
+
+            await supabase.from("payments").insert({
+              renter_id: renter.id,
+              user_id: userId,
+              amount: amountPaid,
+              due_date: new Date().toISOString().split("T")[0],
+              paid_date: new Date().toISOString().split("T")[0],
+              status: "paid",
+              type: "other",
+              payment_source: "stripe",
+              payment_notes: "Current balance charge when autopay started",
+            });
+
+            await supabase.from("timeline_events").insert({
+              renter_id: renter.id,
+              user_id: userId,
+              type: "payment_succeeded",
+              description: `Charged current balance of $${amountPaid.toFixed(2)} when autopay started`,
+            });
+
+            return jsonResponse({ received: true });
+          }
+
           const periodEnd = invoice.lines?.data?.[0]?.period?.end;
           const nextDue = periodEnd ? new Date(periodEnd * 1000).toISOString().split("T")[0] : null;
           const paidThrough = invoice.lines?.data?.[0]?.period?.start
@@ -205,6 +244,7 @@ serve(async (req) => {
       const invoice = event.data.object;
       const customerId = typeof invoice.customer === "string" ? invoice.customer : null;
       const amountDue = (invoice.amount_due || 0) / 100;
+      const chargeKind = getInvoiceChargeKind(invoice);
 
       if (customerId) {
         const { data: renter } = await supabase
@@ -215,6 +255,28 @@ serve(async (req) => {
           .maybeSingle();
 
         if (renter) {
+          if (chargeKind === "starting_balance") {
+            await supabase.from("payments").insert({
+              renter_id: renter.id,
+              user_id: userId,
+              amount: amountDue,
+              due_date: new Date().toISOString().split("T")[0],
+              status: "failed",
+              type: "other",
+              payment_source: "stripe",
+              payment_notes: "Current balance charge failed when autopay was starting",
+            });
+
+            await supabase.from("timeline_events").insert({
+              renter_id: renter.id,
+              user_id: userId,
+              type: "payment_failed",
+              description: `Current balance charge of $${amountDue.toFixed(2)} failed`,
+            });
+
+            return jsonResponse({ received: true });
+          }
+
           await supabase
             .from("renters")
             .update({

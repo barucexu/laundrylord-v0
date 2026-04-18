@@ -55,7 +55,7 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated or email not available");
     logStep("User authenticated", { email: user.email });
 
-    const { price_id } = await req.json();
+    const { price_id, action, proration_date } = await req.json();
     if (!price_id) throw new Error("price_id is required");
     if (!SAAS_PRICE_IDS.has(price_id)) throw new Error("Invalid SaaS price_id");
     logStep("Price ID", { price_id });
@@ -95,6 +95,9 @@ serve(async (req) => {
       );
     if (persistError) throw new Error(`Failed to persist SaaS customer ID: ${persistError.message}`);
 
+    const targetPrice = await stripe.prices.retrieve(price_id);
+    const targetProductId = getProductId(targetPrice.product);
+
     if (resolvedCustomer.activeSubscription) {
       const activeSubscription = resolvedCustomer.activeSubscription as unknown as Stripe.Subscription;
       const currentItem = activeSubscription.items.data[0];
@@ -123,8 +126,48 @@ serve(async (req) => {
         });
       }
 
-      const targetPrice = await stripe.prices.retrieve(price_id);
-      const targetProductId = getProductId(targetPrice.product);
+      if (action === "preview") {
+        const previewProrationDate = typeof proration_date === "number"
+          ? proration_date
+          : Math.floor(Date.now() / 1000);
+        const previewInvoice = await stripe.invoices.createPreview({
+          customer: customerId,
+          subscription: activeSubscription.id,
+          subscription_details: {
+            billing_cycle_anchor: "now",
+            items: [{ id: currentItem.id, price: price_id }],
+            proration_behavior: "always_invoice",
+            proration_date: previewProrationDate,
+          },
+        });
+
+        const prorationLines = previewInvoice.lines.data.filter((line) => {
+          const parent = line.parent as { subscription_item_details?: { proration?: boolean } } | null;
+          return parent?.subscription_item_details?.proration === true;
+        });
+        const positiveProration = prorationLines
+          .filter((line) => line.amount > 0)
+          .reduce((sum, line) => sum + line.amount, 0);
+        const negativeProration = prorationLines
+          .filter((line) => line.amount < 0)
+          .reduce((sum, line) => sum + Math.abs(line.amount), 0);
+
+        return new Response(JSON.stringify({
+          preview: {
+            amount_due_now: (previewInvoice.amount_due ?? 0) / 100,
+            current_plan_name: currentItem.price.nickname ?? activeSubscription.items.data[0]?.price.nickname ?? null,
+            target_plan_name: targetPrice.nickname ?? null,
+            next_renewal_amount: (targetPrice.unit_amount ?? 0) / 100,
+            unused_time_credit: negativeProration / 100,
+            prorated_charge: positiveProration / 100,
+            currency: previewInvoice.currency ?? "usd",
+            is_credit: (previewInvoice.amount_due ?? 0) < 0,
+            proration_date: previewProrationDate,
+          },
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
       logStep("Updating active SaaS subscription immediately", {
         subscriptionId: activeSubscription.id,
@@ -136,6 +179,7 @@ serve(async (req) => {
       const updatedSubscription = await stripe.subscriptions.update(activeSubscription.id, {
         items: [{ id: currentItem.id, price: price_id }],
         billing_cycle_anchor: "now",
+        proration_date: typeof proration_date === "number" ? proration_date : undefined,
         proration_behavior: "always_invoice",
         payment_behavior: "error_if_incomplete",
         cancel_at_period_end: false,
@@ -165,6 +209,24 @@ serve(async (req) => {
         updated: true,
         product_id: targetProductId,
         subscription_end: nextSubscriptionEnd,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "preview") {
+      return new Response(JSON.stringify({
+        preview: {
+          amount_due_now: (targetPrice.unit_amount ?? 0) / 100,
+          current_plan_name: null,
+          target_plan_name: targetPrice.nickname ?? null,
+          next_renewal_amount: (targetPrice.unit_amount ?? 0) / 100,
+          unused_time_credit: 0,
+          prorated_charge: 0,
+          currency: targetPrice.currency ?? "usd",
+          is_credit: false,
+          proration_date: null,
+        },
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

@@ -7,7 +7,18 @@ import { Button } from "@/components/ui/button";
 import { UpgradeConfirmDialog } from "@/components/UpgradeConfirmDialog";
 
 export function PlanBanner() {
-  const { billableCount, subscribed, loading, currentBilledTier, initiateUpgrade, upgradeIntent, confirmUpgrade, cancelUpgrade } = useSubscription();
+  const {
+    billableCount,
+    subscribed,
+    loading,
+    currentBilledTier,
+    initiateUpgrade,
+    upgradeIntent,
+    upgradePreview,
+    upgradePreviewLoading,
+    confirmUpgrade,
+    cancelUpgrade,
+  } = useSubscription();
   const [dismissed, setDismissed] = useState<string | null>(null);
   const upgradeTarget = getNextUpgradeTierForCount(billableCount);
 
@@ -73,6 +84,8 @@ export function PlanBanner() {
           tierLabel={upgradeTarget.label}
           isUpgrade={true}
           loading={false}
+          preview={upgradePreview}
+          previewLoading={upgradePreviewLoading}
           onConfirm={() => {
             void confirmUpgrade();
           }}
