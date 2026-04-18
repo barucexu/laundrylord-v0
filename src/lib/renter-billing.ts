@@ -24,3 +24,7 @@ export function getAutopayActivationMessage(result: AutopayActivationResult): st
 
   return `Autopay started. Next recurring charge: ${nextDue}`;
 }
+
+export function getAchProcessingExplanation(): string {
+  return "Bank account charges can take a few business days to settle. Autopay can still start while that payment is processing, and the renter should only be treated as failed or late if Stripe later reports the charge failed.";
+}

@@ -36,6 +36,9 @@ export function UpgradeConfirmDialog({
   onConfirm,
 }: UpgradeConfirmDialogProps) {
   const amountDueToday = preview ? formatCurrency(Math.abs(preview.amountDueNow), preview.currency) : null;
+  const nextRenewalAmount = preview?.nextRenewalAmount !== null && preview
+    ? formatCurrency(preview.nextRenewalAmount, preview.currency)
+    : null;
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -67,9 +70,9 @@ export function UpgradeConfirmDialog({
                     Includes {formatCurrency(preview.proratedCharge, preview.currency)} in proration adjustments.
                   </p>
                 )}
-                {preview.nextRenewalAmount !== null && (
+                {nextRenewalAmount && (
                   <p>
-                    Your next full renewal will be {formatCurrency(preview.nextRenewalAmount, preview.currency)}.
+                    Your next full renewal will be {nextRenewalAmount}.
                   </p>
                 )}
               </>

@@ -131,6 +131,8 @@ Before wrapping up, confirm:
 2. Before large changes, confirm the starting branch and HEAD commit SHA
 3. If working in a cloud or detached environment, do not assume the repo is current without an explicit branch/SHA check
 4. If the environment cannot verify remote state, say so clearly before continuing with risky work
+5. If the user has asked for implementation rather than planning-only, default to committing, pushing, opening a PR, and merging after validation passes unless the user explicitly says not to publish yet
+6. After publishing code needed for Lovable testing, give the user a tiny Lovable-ready redeploy message naming only the changed edge functions that need redeploy
 
 ## Database access guidance
 

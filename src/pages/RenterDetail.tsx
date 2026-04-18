@@ -7,7 +7,7 @@ import { PaymentSourceBadge } from "@/components/PaymentSourceBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { useRenter, useUpdateRenter, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection, useEntityCustomFields, useRenterBalanceAdjustments, useAddRenterBalanceAdjustment, useRemoveRenterBalanceAdjustment } from "@/hooks/useSupabaseData";
 import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
-import { getAutopayActivationMessage } from "@/lib/renter-billing";
+import { getAchProcessingExplanation, getAutopayActivationMessage } from "@/lib/renter-billing";
 import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil, Globe, Plug, Archive, ArchiveRestore, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -405,6 +405,9 @@ export default function RenterDetail() {
                   </div>
                   <p className="text-xs text-muted-foreground">
                     → Payment method on file ✓ — charge today&apos;s current balance now, then start recurring auto-charging ${Number(renter.monthly_rate).toFixed(2)}/mo on the next cycle.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {getAchProcessingExplanation()}
                   </p>
                   <p className="text-xs text-muted-foreground">{BANK_ACCOUNT_RECOMMENDATION}</p>
                 </>
