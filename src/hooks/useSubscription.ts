@@ -6,7 +6,7 @@ import { useDemo } from "@/contexts/DemoContext";
 import { useRenters } from "@/hooks/useSupabaseData";
 import { BILLABLE_RENTER_COUNT_QUERY_KEY, countBillableRenters } from "@/lib/billing-counts";
 import { getNextUpgradeTierForCount, getRequiredTierForCount, getTierByProductId, TIERS, type PricingTier } from "@/lib/pricing-tiers";
-import type { SaasUpgradePreview } from "@/lib/saas-upgrade-preview";
+import { normalizeSaasUpgradePreview, type SaasUpgradePreview } from "@/lib/saas-upgrade-preview";
 import { toast } from "sonner";
 
 export interface SubscriptionCapacityState {
@@ -254,7 +254,7 @@ export function useSubscription(): SubscriptionState {
         });
         if (error) throw error;
         if (!cancelled) {
-          setUpgradePreview(data?.preview ?? null);
+          setUpgradePreview(normalizeSaasUpgradePreview(data?.preview));
         }
       } catch (err) {
         console.error("upgrade preview error:", err);

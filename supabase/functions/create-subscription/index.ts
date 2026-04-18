@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isRenterBillingReady } from "../_shared/renter-billing.ts";
+import { getStartingBalanceAction } from "../_shared/starting-balance.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -167,27 +168,72 @@ serve(async (req) => {
       });
 
       const finalizedInvoice = await stripe.invoices.finalizeInvoice(draftInvoice.id);
-      const paidInvoice = await stripe.invoices.pay(finalizedInvoice.id, {
-        payment_method: defaultMethodId,
-      });
-
-      const paymentIntentId = typeof paidInvoice.payment_intent === "string"
-        ? paidInvoice.payment_intent
-        : paidInvoice.payment_intent?.id ?? null;
+      const finalizedPaymentIntentId = typeof finalizedInvoice.payment_intent === "string"
+        ? finalizedInvoice.payment_intent
+        : finalizedInvoice.payment_intent?.id ?? null;
 
       let paymentIntentStatus: string | null = null;
-      if (paymentIntentId) {
-        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      if (finalizedPaymentIntentId) {
+        const paymentIntent = await stripe.paymentIntents.retrieve(finalizedPaymentIntentId);
         paymentIntentStatus = paymentIntent.status;
       }
 
-      if (paidInvoice.status === "paid") {
+      const startingBalanceAction = getStartingBalanceAction(
+        finalizedInvoice.status,
+        paymentIntentStatus,
+      );
+
+      if (startingBalanceAction === "paid") {
         currentBalanceStatus = "paid";
-      } else if (paymentIntentStatus === "processing") {
+      } else if (startingBalanceAction === "processing") {
         currentBalanceStatus = "processing";
+      } else if (startingBalanceAction === "pay") {
+        try {
+          const collectedInvoice = await stripe.invoices.pay(finalizedInvoice.id, {
+            payment_method: defaultMethodId,
+          });
+          const collectedPaymentIntentId = typeof collectedInvoice.payment_intent === "string"
+            ? collectedInvoice.payment_intent
+            : collectedInvoice.payment_intent?.id ?? null;
+          const collectedPaymentIntentStatus = collectedPaymentIntentId
+            ? (await stripe.paymentIntents.retrieve(collectedPaymentIntentId)).status
+            : null;
+          const collectedAction = getStartingBalanceAction(
+            collectedInvoice.status,
+            collectedPaymentIntentStatus,
+          );
+
+          if (collectedAction === "paid") {
+            currentBalanceStatus = "paid";
+          } else if (collectedAction === "processing") {
+            currentBalanceStatus = "processing";
+          } else {
+            return new Response(JSON.stringify({
+              error: "Current balance charge failed, so autopay was not started.",
+              current_balance_charge_failed: true,
+              autopay_started: false,
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 400,
+            });
+          }
+        } catch (_error) {
+          const latestInvoice = await stripe.invoices.retrieve(finalizedInvoice.id);
+          if (latestInvoice.status === "open") {
+            await stripe.invoices.voidInvoice(latestInvoice.id);
+          }
+          return new Response(JSON.stringify({
+            error: "Current balance charge failed, so autopay was not started.",
+            current_balance_charge_failed: true,
+            autopay_started: false,
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 400,
+          });
+        }
       } else {
-        if (paidInvoice.status === "open") {
-          await stripe.invoices.voidInvoice(paidInvoice.id);
+        if (finalizedInvoice.status === "open") {
+          await stripe.invoices.voidInvoice(finalizedInvoice.id);
         }
         return new Response(JSON.stringify({
           error: "Current balance charge failed, so autopay was not started.",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getAutopayActivationMessage } from "@/lib/renter-billing";
+import { getAchProcessingExplanation, getAutopayActivationMessage } from "@/lib/renter-billing";
 
 describe("getAutopayActivationMessage", () => {
   it("returns the paid message when the current balance was collected", () => {
@@ -28,5 +28,10 @@ describe("getAutopayActivationMessage", () => {
         next_due: "2026-05-01",
       }),
     ).toBe("Autopay started. Next recurring charge: 2026-05-01");
+  });
+
+  it("explains ACH processing in founder-friendly language", () => {
+    expect(getAchProcessingExplanation()).toContain("Bank account charges can take a few business days to settle.");
+    expect(getAchProcessingExplanation()).toContain("only be treated as failed or late if Stripe later reports the charge failed");
   });
 });
