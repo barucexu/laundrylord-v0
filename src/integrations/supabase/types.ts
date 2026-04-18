@@ -869,6 +869,53 @@ export type Database = {
       }
     }
     Views: {
+      v_audit_payments: {
+        Row: {
+          amount: number | null
+          business_name: string | null
+          created_at: string | null
+          due_date: string | null
+          owner_email: string | null
+          paid_date: string | null
+          payment_id: string | null
+          payment_notes: string | null
+          payment_source: string | null
+          payment_status: string | null
+          payment_type: string | null
+          renter_email: string | null
+          renter_id: string | null
+          renter_name: string | null
+          renter_phone: string | null
+          renter_status: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "renters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_renters_for_admin"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_renters_with_owner"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_machines_with_owner: {
         Row: {
           assigned_renter_id: string | null
@@ -1126,6 +1173,17 @@ export type Database = {
       }
       remove_renter_balance_adjustment: {
         Args: { p_adjustment_id: string; p_renter_id: string }
+        Returns: Json
+      }
+      record_manual_payment: {
+        Args: {
+          p_amount: number
+          p_paid_date: string
+          p_payment_notes?: string
+          p_payment_source?: string
+          p_renter_id: string
+          p_type: string
+        }
         Returns: Json
       }
     }
