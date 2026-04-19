@@ -140,7 +140,16 @@ serve(async (req) => {
 
     const currentBalanceCents = Math.round(Number(renter.balance || 0) * 100);
     let currentBalanceStatus: "none" | "paid" | "processing" = "none";
+    let chargedAdjustmentIds: string[] = [];
     if (currentBalanceCents > 0) {
+      const { data: adjustmentRows, error: adjustmentError } = await adminClient
+        .from("renter_balance_adjustments")
+        .select("id")
+        .eq("renter_id", renter.id);
+
+      if (adjustmentError) throw adjustmentError;
+      chargedAdjustmentIds = (adjustmentRows ?? []).map((row) => row.id);
+
       const invoiceItem = await stripe.invoiceItems.create({
         customer: renter.stripe_customer_id,
         amount: currentBalanceCents,
@@ -150,6 +159,7 @@ serve(async (req) => {
           renter_id: renter.id,
           user_id: user.id,
           charge_kind: "starting_balance",
+          adjustment_ids: JSON.stringify(chargedAdjustmentIds),
         },
       });
 
@@ -164,6 +174,7 @@ serve(async (req) => {
           user_id: user.id,
           charge_kind: "starting_balance",
           invoice_item_id: invoiceItem.id,
+          adjustment_ids: JSON.stringify(chargedAdjustmentIds),
         },
       });
 
@@ -252,7 +263,7 @@ serve(async (req) => {
       trial_end: Math.floor(nextRecurringChargeDate.getTime() / 1000),
       proration_behavior: "none",
       default_payment_method: defaultMethodId,
-      metadata: { renter_id: renter.id, user_id: user.id, charge_kind: "recurring_rent" },
+      metadata: { renter_id: renter.id, user_id: user.id, charge_kind: "recurring_payment" },
     });
 
     const nextDue = nextRecurringChargeDate.toISOString().split("T")[0];
@@ -261,7 +272,7 @@ serve(async (req) => {
       .from("renters")
       .update({
         stripe_subscription_id: subscription.id,
-        status: "active",
+        status: currentBalanceStatus === "processing" ? "autopay_pending" : "active",
         next_due_date: nextDue,
       })
       .eq("id", renter_id)
@@ -274,7 +285,7 @@ serve(async (req) => {
       description: currentBalanceStatus === "paid"
         ? `Autopay started. Charged current balance and next recurring charge is ${nextDue}`
         : currentBalanceStatus === "processing"
-          ? `Autopay started. Current balance payment is processing and next recurring charge is ${nextDue}`
+          ? `Autopay pending. Bank payment is still processing. Autopay will activate after confirmation. Next recurring charge is ${nextDue}`
           : `Autopay started. Next recurring charge is ${nextDue}`,
       date: now.toISOString().split("T")[0],
     });
@@ -285,6 +296,7 @@ serve(async (req) => {
       next_due: nextDue,
       charged_current_balance: currentBalanceStatus === "paid",
       current_balance_status: currentBalanceStatus,
+      autopay_state: currentBalanceStatus === "processing" ? "pending" : "active",
       autopay_started: true,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

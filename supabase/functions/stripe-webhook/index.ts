@@ -22,7 +22,7 @@ function jsonResponse(body: unknown, status = 200) {
 function getInvoiceChargeKind(invoice: Stripe.Invoice): string {
   return invoice.metadata?.charge_kind
     ?? invoice.parent?.subscription_details?.metadata?.charge_kind
-    ?? "recurring_rent";
+    ?? "recurring_payment";
 }
 
 serve(async (req) => {
@@ -159,6 +159,16 @@ serve(async (req) => {
       const customerId = typeof invoice.customer === "string" ? invoice.customer : null;
       const amountPaid = (invoice.amount_paid || 0) / 100;
       const chargeKind = getInvoiceChargeKind(invoice);
+      const adjustmentIds = (() => {
+        const raw = invoice.metadata?.adjustment_ids;
+        if (!raw) return [];
+        try {
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+        } catch {
+          return [];
+        }
+      })();
 
       if (customerId) {
         const { data: renter } = await supabase
@@ -179,6 +189,14 @@ serve(async (req) => {
               .eq("id", renter.id)
               .eq("user_id", userId);
 
+            if (adjustmentIds.length > 0) {
+              await supabase
+                .from("renter_balance_adjustments")
+                .delete()
+                .eq("renter_id", renter.id)
+                .in("id", adjustmentIds);
+            }
+
             await supabase.from("payments").insert({
               renter_id: renter.id,
               user_id: userId,
@@ -186,9 +204,9 @@ serve(async (req) => {
               due_date: new Date().toISOString().split("T")[0],
               paid_date: new Date().toISOString().split("T")[0],
               status: "paid",
-              type: "other",
+              type: "payment",
               payment_source: "stripe",
-              payment_notes: "Current balance charge when autopay started",
+              payment_notes: "Starting payment succeeded when autopay was activating",
             });
 
             await supabase.from("timeline_events").insert({
@@ -227,7 +245,9 @@ serve(async (req) => {
             due_date: paidThrough || new Date().toISOString().split("T")[0],
             paid_date: new Date().toISOString().split("T")[0],
             status: "paid",
-            type: "rent",
+            type: "payment",
+            payment_source: "stripe",
+            payment_notes: "Recurring autopay payment",
           });
 
           await supabase.from("timeline_events").insert({
@@ -249,30 +269,55 @@ serve(async (req) => {
       if (customerId) {
         const { data: renter } = await supabase
           .from("renters")
-          .select("id, user_id, balance, days_late")
+          .select("id, user_id, balance, days_late, stripe_subscription_id")
           .eq("user_id", userId)
           .eq("stripe_customer_id", customerId)
           .maybeSingle();
 
         if (renter) {
           if (chargeKind === "starting_balance") {
+            if (renter.stripe_subscription_id) {
+              const stripe = new Stripe(stripeKeyRow.encrypted_key, {
+                apiVersion: "2025-08-27.basil",
+              });
+              await stripe.subscriptions.cancel(renter.stripe_subscription_id);
+            }
+
+            await supabase
+              .from("renters")
+              .update({
+                stripe_subscription_id: null,
+                status: "closed",
+                next_due_date: null,
+              })
+              .eq("id", renter.id)
+              .eq("user_id", userId);
+
             await supabase.from("payments").insert({
               renter_id: renter.id,
               user_id: userId,
               amount: amountDue,
               due_date: new Date().toISOString().split("T")[0],
               status: "failed",
-              type: "other",
+              type: "payment",
               payment_source: "stripe",
-              payment_notes: "Current balance charge failed when autopay was starting",
+              payment_notes: "Starting payment failed while autopay was activating",
             });
 
-            await supabase.from("timeline_events").insert({
-              renter_id: renter.id,
-              user_id: userId,
-              type: "payment_failed",
-              description: `Current balance charge of $${amountDue.toFixed(2)} failed`,
-            });
+            await supabase.from("timeline_events").insert([
+              {
+                renter_id: renter.id,
+                user_id: userId,
+                type: "payment_failed",
+                description: `Current balance charge of $${amountDue.toFixed(2)} failed`,
+              },
+              {
+                renter_id: renter.id,
+                user_id: userId,
+                type: "note",
+                description: "Autopay not activated. Starting payment failed.",
+              },
+            ]);
 
             return jsonResponse({ received: true });
           }
@@ -293,7 +338,9 @@ serve(async (req) => {
             amount: amountDue,
             due_date: new Date().toISOString().split("T")[0],
             status: "failed",
-            type: "rent",
+            type: "payment",
+            payment_source: "stripe",
+            payment_notes: "Recurring autopay payment failed",
           });
 
           await supabase.from("timeline_events").insert({
@@ -313,12 +360,12 @@ serve(async (req) => {
       if (customerId) {
         const { data: renter } = await supabase
           .from("renters")
-          .select("id, user_id")
+          .select("id, user_id, stripe_subscription_id")
           .eq("user_id", userId)
           .eq("stripe_customer_id", customerId)
           .maybeSingle();
 
-        if (renter) {
+        if (renter?.stripe_subscription_id) {
           await supabase
             .from("renters")
             .update({

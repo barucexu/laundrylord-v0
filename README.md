@@ -93,8 +93,8 @@ Autopay start behavior now means:
 1. Operator can add positive fee add-ons before autopay starts
 2. If they want first month rent charged now, they add it as a current-balance item before starting autopay
 3. `Start autopay and charge current balance` attempts the renter's current-balance invoice right away using the saved default payment method
-4. Current-balance payment can settle immediately or remain processing for ACH; the operator gets explicit status messaging either way
-5. Recurring autopay then begins on the next cycle using the saved default payment method
+4. Card current-balance payments can settle immediately; ACH current-balance payments can remain processing while the renter stays in an explicit `Autopay Pending` state until Stripe confirms success
+5. A real Stripe subscription is created immediately for successful starts, but the app only treats ACH autopay as active after Stripe confirms the starting payment
 6. Later setup-link completions replace the default payment method for future autopay charges
 
 ### Canonical Value Sets
@@ -103,7 +103,7 @@ Autopay start behavior now means:
 |--------|--------|
 | `machines.type` | `washer`, `dryer`, `set` |
 | `machines.status` | `available`, `assigned`, `maintenance`, `retired` |
-| `payments.type` | `rent`, `install_fee`, `deposit`, `late_fee`, `other` |
+| `payments.type` | `payment`, `rent`, `install_fee`, `deposit`, `late_fee`, `other` |
 | `payments.status` | `upcoming`, `due_soon`, `overdue`, `failed`, `paid` |
 | `timeline_events.type` | `created`, `machine_assigned`, `payment_succeeded`, `payment_failed`, `payment_method_saved`, `late_fee`, `maintenance_opened`, `maintenance_resolved`, `pickup_scheduled`, `pickup_completed`, `note` |
 

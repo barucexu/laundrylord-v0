@@ -1,26 +1,24 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import RenterDetail from "@/pages/RenterDetail";
-
-const removeBalanceAdjustmentSpy = vi.fn();
 
 vi.mock("@/hooks/useSupabaseData", () => ({
   useRenter: () => ({
     data: {
       id: "renter-1",
-      name: "Aaron de Brie",
-      status: "active",
-      phone: "(253) 248-5258",
-      email: "aaron@example.com",
-      address: "10908 Glenwood Dr SW, Lakewood, WA 98498",
+      name: "Crystal Nocket",
+      status: "autopay_pending",
+      phone: "(907) 727-4990",
+      email: "crystal@example.com",
+      address: "2481 Mann Ave B, JBLM, WA 98433",
       lease_start_date: null,
       min_term_end_date: null,
-      monthly_rate: 150,
+      monthly_rate: 70,
       rent_collected: 0,
-      balance: 250,
-      next_due_date: null,
+      balance: 130,
+      next_due_date: "2026-05-18",
       paid_through_date: null,
       late_fee: 25,
       install_fee: 75,
@@ -28,8 +26,8 @@ vi.mock("@/hooks/useSupabaseData", () => ({
       deposit_amount: 0,
       deposit_collected: false,
       has_payment_method: true,
-      stripe_subscription_id: null,
-      notes: "Base note",
+      stripe_subscription_id: "sub_123",
+      notes: null,
       install_notes: null,
       dryer_outlet: "3-prong",
     },
@@ -46,11 +44,11 @@ vi.mock("@/hooks/useSupabaseData", () => ({
   useMaintenanceForRenter: () => ({ data: [], isLoading: false }),
   usePaymentsForRenter: () => ({ data: [], isLoading: false }),
   useRenterBalanceAdjustments: () => ({
-    data: [{ id: "adj-1", description: "First month rent", amount: 150 }],
+    data: [{ id: "adj-1", description: "First payment", amount: 70 }],
     isLoading: false,
   }),
   useAddRenterBalanceAdjustment: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useRemoveRenterBalanceAdjustment: () => ({ mutateAsync: removeBalanceAdjustmentSpy, isPending: false }),
+  useRemoveRenterBalanceAdjustment: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useStripeConnection: () => ({
     data: {
       connected: true,
@@ -83,11 +81,8 @@ vi.mock("sonner", () => ({
   },
 }));
 
-describe("RenterDetail current balance items", () => {
-  it("shows first-month guidance and removes pre-autopay items through the mutation hook", async () => {
-    removeBalanceAdjustmentSpy.mockReset();
-    removeBalanceAdjustmentSpy.mockResolvedValue(undefined);
-
+describe("RenterDetail autopay pending state", () => {
+  it("shows the pending autopay guidance while still allowing balance edits", async () => {
     const client = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -105,17 +100,10 @@ describe("RenterDetail current balance items", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByText("Current balance items")).toBeInTheDocument();
-    expect(screen.getByText(/Add itemized charges or credits to the current balance at any time/i)).toBeInTheDocument();
-    expect(screen.getByText(/Common items: first payment, install fee, deposit/i)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /remove first month rent/i }));
-
-    await waitFor(() => {
-      expect(removeBalanceAdjustmentSpy).toHaveBeenCalledWith({
-        renter_id: "renter-1",
-        adjustment_id: "adj-1",
-      });
-    });
+    expect(screen.getAllByText("Autopay Pending")).toHaveLength(2);
+    expect(screen.getByText(/Bank payment is still processing. Autopay will activate after confirmation./i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /update payment method/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add item/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /start autopay/i })).not.toBeInTheDocument();
   });
 });
