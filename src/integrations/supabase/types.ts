@@ -916,6 +916,46 @@ export type Database = {
           },
         ]
       }
+      v_audit_timeline_events: {
+        Row: {
+          business_name: string | null
+          created_at: string | null
+          description: string | null
+          event_at: string | null
+          event_type: string | null
+          owner_email: string | null
+          renter_email: string | null
+          renter_id: string | null
+          renter_name: string | null
+          renter_phone: string | null
+          renter_status: string | null
+          timeline_event_id: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timeline_events_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "renters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_events_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_renters_for_admin"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_events_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_renters_with_owner"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_machines_with_owner: {
         Row: {
           assigned_renter_id: string | null
