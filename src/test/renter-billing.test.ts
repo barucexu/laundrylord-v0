@@ -15,10 +15,11 @@ describe("getAutopayActivationMessage", () => {
   it("returns the processing message when an ACH payment is still settling", () => {
     expect(
       getAutopayActivationMessage({
+        autopay_state: "pending",
         current_balance_status: "processing",
         next_due: "2026-05-01",
       }),
-    ).toBe("Autopay started. Current balance payment is processing. Next recurring charge: 2026-05-01");
+    ).toBe("Autopay setup started. Bank payment is processing. Autopay will activate after confirmation. Next recurring charge: 2026-05-01");
   });
 
   it("returns the simple message when there is no starting balance charge", () => {
@@ -31,7 +32,7 @@ describe("getAutopayActivationMessage", () => {
   });
 
   it("explains ACH processing in founder-friendly language", () => {
-    expect(getAchProcessingExplanation()).toContain("Bank account charges can take a few business days to settle.");
-    expect(getAchProcessingExplanation()).toContain("only be treated as failed or late if Stripe later reports the charge failed");
+    expect(getAchProcessingExplanation()).toContain("Bank payment is still processing.");
+    expect(getAchProcessingExplanation()).toContain("Autopay will activate after confirmation.");
   });
 });

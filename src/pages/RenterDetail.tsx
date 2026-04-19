@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRenter, useUpdateRenter, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection, useEntityCustomFields, useRenterBalanceAdjustments, useAddRenterBalanceAdjustment, useRemoveRenterBalanceAdjustment } from "@/hooks/useSupabaseData";
 import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
 import { getAchProcessingExplanation, getAutopayActivationMessage } from "@/lib/renter-billing";
+import { getPaymentTypeLabel } from "@/lib/payment-display";
 import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil, Globe, Plug, Archive, ArchiveRestore, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -63,6 +64,16 @@ export default function RenterDetail() {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [feeForm, setFeeForm] = useState({ description: "", amount: "" });
+  const activationPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const activationPollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const awaitingPendingResolutionRef = useRef(false);
+  const hasSubscription = !!renter?.stripe_subscription_id;
+  const isAutopayPending = renter?.status === "autopay_pending" && hasSubscription;
+  const latestAutopayStartFailure = renterPayments.find((payment) =>
+    payment.payment_source === "stripe"
+    && payment.status === "failed"
+    && payment.payment_notes?.includes("Starting payment failed while autopay was activating"),
+  );
 
   const handleArchive = useCallback(async () => {
     if (!renter) return;
@@ -92,8 +103,39 @@ export default function RenterDetail() {
     }
   }, [renter, updateRenter]);
 
-  const hasSubscription = !!renter?.stripe_subscription_id;
   const setupResult = searchParams.get("setup");
+
+  useEffect(() => {
+    return () => {
+      if (activationPollRef.current) clearInterval(activationPollRef.current);
+      if (activationPollTimeoutRef.current) clearTimeout(activationPollTimeoutRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!awaitingPendingResolutionRef.current) return;
+
+    if (isAutopayPending) {
+      return;
+    }
+
+    if (!hasSubscription && latestAutopayStartFailure) {
+      toast.error("Autopay not activated. Starting payment failed.");
+      awaitingPendingResolutionRef.current = false;
+    } else if (hasSubscription) {
+      toast.success(`Autopay is now active. Next recurring charge: ${renter?.next_due_date || "—"}`);
+      awaitingPendingResolutionRef.current = false;
+    }
+
+    if (!awaitingPendingResolutionRef.current && activationPollRef.current) {
+      clearInterval(activationPollRef.current);
+      activationPollRef.current = null;
+    }
+    if (!awaitingPendingResolutionRef.current && activationPollTimeoutRef.current) {
+      clearTimeout(activationPollTimeoutRef.current);
+      activationPollTimeoutRef.current = null;
+    }
+  }, [hasSubscription, isAutopayPending, latestAutopayStartFailure, renter?.next_due_date]);
 
   useEffect(() => {
     if (setupResult !== "success" || !id) return;
@@ -156,11 +198,33 @@ export default function RenterDetail() {
         const msg = typeof data === "object" && data?.error ? data.error : error.message;
         throw new Error(msg || "Failed to activate billing");
       }
-      toast.success(getAutopayActivationMessage(data ?? {}));
+      if (data?.autopay_state === "pending") {
+        awaitingPendingResolutionRef.current = true;
+        toast.info(getAutopayActivationMessage(data ?? {}));
+      } else {
+        toast.success(getAutopayActivationMessage(data ?? {}));
+      }
       queryClient.invalidateQueries({ queryKey: ["renters", id] });
       queryClient.invalidateQueries({ queryKey: ["payments", "renter", id] });
       queryClient.invalidateQueries({ queryKey: ["timeline_events", id] });
       queryClient.invalidateQueries({ queryKey: ["renter_balance_adjustments", id] });
+      if (id) {
+        if (activationPollRef.current) clearInterval(activationPollRef.current);
+        if (activationPollTimeoutRef.current) clearTimeout(activationPollTimeoutRef.current);
+        activationPollRef.current = setInterval(() => {
+          queryClient.invalidateQueries({ queryKey: ["renters", id] });
+          queryClient.invalidateQueries({ queryKey: ["payments", "renter", id] });
+          queryClient.invalidateQueries({ queryKey: ["timeline_events", id] });
+          queryClient.invalidateQueries({ queryKey: ["renter_balance_adjustments", id] });
+        }, 5_000);
+        activationPollTimeoutRef.current = setTimeout(() => {
+          if (activationPollRef.current) {
+            clearInterval(activationPollRef.current);
+            activationPollRef.current = null;
+          }
+          awaitingPendingResolutionRef.current = false;
+        }, 60_000);
+      }
     } catch (err: unknown) {
       toast.error(getErrorMessage(err, "Failed to activate billing"));
     } finally {
@@ -238,11 +302,73 @@ export default function RenterDetail() {
     if (!stripeConnected) return "no_stripe";
     if (!renterBillingReady) return "webhook_incomplete";
     if (!hasCard) return "no_card";
+    if (isAutopayPending) return "pending";
     if (!hasSubscription) return "no_autopay";
     return "active";
   };
 
   const billingState = getBillingState();
+  const currentBalanceEditor = (
+    <div className="rounded-md border border-border/60 bg-background/80 p-3 space-y-3">
+      <div>
+        <p className="text-sm font-medium">Current balance items</p>
+        <p className="text-xs text-muted-foreground">
+          Add itemized charges or credits to the current balance at any time.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Common items: first payment, install fee, deposit.
+        </p>
+      </div>
+      <div className="grid gap-2 md:grid-cols-[1fr_120px_auto]">
+        <Input
+          value={feeForm.description}
+          onChange={(e) => setFeeForm((current) => ({ ...current, description: e.target.value }))}
+          placeholder="Current balance item"
+        />
+        <Input
+          type="number"
+          step="0.01"
+          value={feeForm.amount}
+          onChange={(e) => setFeeForm((current) => ({ ...current, amount: e.target.value }))}
+          placeholder="Amount"
+        />
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleAddFee}
+          disabled={addBalanceAdjustment.isPending}
+        >
+          <Plus className="h-4 w-4" />
+          Add Item
+        </Button>
+      </div>
+      {balanceAdjustments.length > 0 && (
+        <div className="space-y-1">
+          {balanceAdjustments.map((adjustment) => (
+            <div key={adjustment.id} className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span className="flex-1">{adjustment.description}</span>
+              <span className="font-mono text-foreground">${Number(adjustment.amount).toFixed(2)}</span>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                onClick={() => void handleRemoveFee(adjustment.id)}
+                disabled={removeBalanceAdjustment.isPending}
+                aria-label={`Remove ${adjustment.description}`}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="text-xs text-muted-foreground">
+        Current balance: <span className="font-mono text-foreground">${Number(renter.balance ?? 0).toFixed(2)}</span>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-5">
       <Link to="/renters" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -331,64 +457,12 @@ export default function RenterDetail() {
 
               {billingState === "no_autopay" && (
                 <>
-                  <div className="rounded-md border border-border/60 bg-background/80 p-3 space-y-3">
-                    <div>
-                      <p className="text-sm font-medium">Current balance items</p>
-                      <p className="text-xs text-muted-foreground">
-                        If you want to charge first month&apos;s rent now, add it below before autopay starts.
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Common items: first month rent, install fee, deposit.
-                      </p>
+                  {currentBalanceEditor}
+                  {latestAutopayStartFailure && (
+                    <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+                      Autopay not activated. Starting payment failed.
                     </div>
-                    <div className="grid gap-2 md:grid-cols-[1fr_120px_auto]">
-                      <Input
-                        value={feeForm.description}
-                        onChange={(e) => setFeeForm((current) => ({ ...current, description: e.target.value }))}
-                        placeholder="Current balance item"
-                      />
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={feeForm.amount}
-                        onChange={(e) => setFeeForm((current) => ({ ...current, amount: e.target.value }))}
-                        placeholder="Amount"
-                      />
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleAddFee}
-                        disabled={addBalanceAdjustment.isPending}
-                      >
-                        <Plus className="h-4 w-4" />
-                        Add Fee
-                      </Button>
-                    </div>
-                    {balanceAdjustments.length > 0 && (
-                      <div className="space-y-1">
-                        {balanceAdjustments.map((adjustment) => (
-                          <div key={adjustment.id} className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                            <span className="flex-1">{adjustment.description}</span>
-                            <span className="font-mono text-foreground">${Number(adjustment.amount).toFixed(2)}</span>
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7"
-                              onClick={() => void handleRemoveFee(adjustment.id)}
-                              disabled={removeBalanceAdjustment.isPending}
-                              aria-label={`Remove ${adjustment.description}`}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="text-xs text-muted-foreground">
-                      Current balance: <span className="font-mono text-foreground">${Number(renter.balance ?? 0).toFixed(2)}</span>
-                    </div>
-                  </div>
+                  )}
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" onClick={handleActivateBilling} disabled={activating}>
                       {activating ? (
@@ -413,8 +487,32 @@ export default function RenterDetail() {
                 </>
               )}
 
+              {billingState === "pending" && (
+                <>
+                  {currentBalanceEditor}
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-warning/10 text-warning text-sm font-medium">
+                      <Clock className="h-3.5 w-3.5" />
+                      Autopay Pending
+                    </span>
+                    <Button size="sm" variant="ghost" onClick={handleSendSetupLink} disabled={sendingSetup}>
+                      <Send className="h-4 w-4" />
+                      Update Payment Method
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Bank payment is still processing. Autopay will activate after confirmation.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Next recurring charge: {renter.next_due_date || "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{BANK_ACCOUNT_RECOMMENDATION}</p>
+                </>
+              )}
+
               {billingState === "active" && (
                 <>
+                  {currentBalanceEditor}
                   <div className="flex items-center gap-2">
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-success/10 text-success text-sm font-medium">
                       <CheckCircle className="h-3.5 w-3.5" />
@@ -514,7 +612,7 @@ export default function RenterDetail() {
                   {renterPayments.slice(0, 8).map(p => (
                     <div key={p.id} className="flex items-center justify-between py-2.5">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm capitalize">{p.type === 'rent' ? 'Rent' : p.type.replace('_', ' ')}</span>
+                        <span className="text-sm">{getPaymentTypeLabel(p.type)}</span>
                         <span className="text-xs text-muted-foreground font-mono">{p.due_date}</span>
                         <PaymentSourceBadge source={p.payment_source} />
                       </div>

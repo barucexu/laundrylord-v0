@@ -74,6 +74,8 @@ Use this runbook before merging any plan/billing enforcement change.
 - Before autopay starts, remove a current-balance item and confirm renter balance drops back down and the item disappears
 - Start autopay and charge current balance:
   - current balance charge succeeds for card defaults
-  - current balance charge can show as processing for ACH defaults without a raw runtime error
-  - renter balance updates clearly after Stripe confirms the payment
+  - ACH starts show `Autopay Pending` until Stripe confirms the bank payment
+  - no success toast claims autopay is active before ACH confirmation
+  - renter balance updates clearly after Stripe confirms the payment, with no temporary duplication
+  - a failed starting payment does not leave an active autopay subscription behind
   - recurring autopay is scheduled for the next cycle

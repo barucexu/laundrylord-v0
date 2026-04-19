@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { StatusBadge } from "@/components/StatusBadge";
 import { PaymentSourceBadge } from "@/components/PaymentSourceBadge";
 import { usePayments } from "@/hooks/useSupabaseData";
+import { getPaymentTypeLabel } from "@/lib/payment-display";
 
 export default function PaymentsView() {
   const [statusFilter, setStatusFilter] = useState("all");
@@ -77,7 +78,7 @@ export default function PaymentsView() {
             <TableBody>
               {filtered.map(p => (
                 <TableRow key={p.id}>
-                  <TableCell className="text-sm capitalize font-medium">{p.type.replace('_', ' ')}</TableCell>
+                  <TableCell className="text-sm font-medium">{getPaymentTypeLabel(p.type)}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{p.due_date}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{p.paid_date || '—'}</TableCell>
                   <TableCell><PaymentSourceBadge source={p.payment_source} /></TableCell>
