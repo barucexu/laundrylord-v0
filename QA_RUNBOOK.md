@@ -76,6 +76,8 @@ Use this runbook before merging any plan/billing enforcement change.
   - current balance charge succeeds for card defaults
   - ACH starts show `Autopay Pending` until Stripe confirms the bank payment
   - no success toast claims autopay is active before ACH confirmation
+  - pending ACH keeps itemized balance rows visible but blocks balance mutations until resolution
   - renter balance updates clearly after Stripe confirms the payment, with no temporary duplication
+  - zero-dollar Stripe invoice artifacts do not create payment rows or timeline events
   - a failed starting payment does not leave an active autopay subscription behind
   - recurring autopay is scheduled for the next cycle

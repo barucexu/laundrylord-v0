@@ -75,11 +75,12 @@ Use the workflow in `WORKFLOW.md` for non-trivial work. At minimum, a written pl
 
 1. Problem statement
 2. Scope and non-goals
-3. Constraints pulled from repo docs
-4. Touched files or modules
-5. Risks and likely regressions
-6. Validation plan
-7. If large enough, a phased rollout with explicit stop points
+3. Invariants that must remain true
+4. Likely failure modes and regressions
+5. Constraints pulled from repo docs
+6. Touched files or modules
+7. Validation plan
+8. If large enough, a phased rollout with explicit stop points
 
 Do not start large or risky implementation before this plan exists.
 
@@ -88,6 +89,8 @@ Do not start large or risky implementation before this plan exists.
 Use `REVIEW_STANDARD.md`.
 
 For medium or large work, use a fresh review context between planning and implementation when the client/runtime supports it. If the environment cannot create a fresh reviewer, perform a strict self-review and explicitly say that the independent review step was unavailable.
+
+After implementing any change, add or update tests for each identified invariant where practical, run the relevant tests, summarize what passed and what remains untested, then do a fresh-review pass that actively tries to break the solution.
 
 For multi-phase work, stop after each declared phase and verify that:
 

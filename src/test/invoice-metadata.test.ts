@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getInvoiceAdjustmentIds, getInvoiceChargeKind } from "../../supabase/functions/_shared/invoice-metadata";
+import { getInvoiceAdjustmentIds, getInvoiceChargeKind, isMeaningfulInvoiceAmount } from "../../supabase/functions/_shared/invoice-metadata";
 
 describe("invoice metadata helpers", () => {
   it("reads starting-balance metadata from invoice-line invoice item details", () => {
@@ -28,5 +28,11 @@ describe("invoice metadata helpers", () => {
   it("falls back to recurring payments when no starting-balance metadata exists", () => {
     expect(getInvoiceChargeKind({ metadata: {}, lines: { data: [] } })).toBe("recurring_payment");
     expect(getInvoiceAdjustmentIds({ metadata: {}, lines: { data: [] } })).toEqual([]);
+  });
+
+  it("treats zero-dollar invoice events as non-ledger artifacts", () => {
+    expect(isMeaningfulInvoiceAmount(0)).toBe(false);
+    expect(isMeaningfulInvoiceAmount(null)).toBe(false);
+    expect(isMeaningfulInvoiceAmount(8900)).toBe(true);
   });
 });

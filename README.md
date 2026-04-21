@@ -95,7 +95,9 @@ Autopay start behavior now means:
 3. `Start autopay and charge current balance` attempts the renter's current-balance invoice right away using the saved default payment method
 4. Card current-balance payments can settle immediately; ACH current-balance payments can remain processing while the renter stays in an explicit `Autopay Pending` state until Stripe confirms success
 5. A real Stripe subscription is created immediately for successful starts, but the app only treats ACH autopay as active after Stripe confirms the starting payment
-6. Later setup-link completions replace the default payment method for future autopay charges
+6. While ACH is pending, current-balance items stay visible but balance mutations are locked until Stripe reports success or failure
+7. Current-balance items clear only after a successful starting-balance payment; failed starts preserve the balance and itemized rows for retry
+8. Later setup-link completions replace the default payment method for future autopay charges
 
 ### Canonical Value Sets
 

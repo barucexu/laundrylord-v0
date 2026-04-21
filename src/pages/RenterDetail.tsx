@@ -9,6 +9,7 @@ import { useRenter, useUpdateRenter, useTimelineEvents, useMaintenanceForRenter,
 import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
 import { getAchProcessingExplanation, getAutopayActivationMessage } from "@/lib/renter-billing";
 import { getPaymentTypeLabel } from "@/lib/payment-display";
+import { formatTimelineDate } from "@/lib/timeline-date";
 import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil, Globe, Plug, Archive, ArchiveRestore, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -64,11 +65,13 @@ export default function RenterDetail() {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [feeForm, setFeeForm] = useState({ description: "", amount: "" });
+  const [optimisticBillingState, setOptimisticBillingState] = useState<"pending" | null>(null);
   const activationPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const activationPollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const awaitingPendingResolutionRef = useRef(false);
   const hasSubscription = !!renter?.stripe_subscription_id;
-  const isAutopayPending = renter?.status === "autopay_pending" && hasSubscription;
+  const isPersistedAutopayPending = renter?.status === "autopay_pending";
+  const isAutopayPending = isPersistedAutopayPending || optimisticBillingState === "pending";
   const latestAutopayStartFailure = renterPayments.find((payment) =>
     payment.payment_source === "stripe"
     && payment.status === "failed"
@@ -115,16 +118,20 @@ export default function RenterDetail() {
   useEffect(() => {
     if (!awaitingPendingResolutionRef.current) return;
 
-    if (isAutopayPending) {
+    if (isPersistedAutopayPending) {
       return;
     }
 
     if (!hasSubscription && latestAutopayStartFailure) {
       toast.error("Autopay not activated. Starting payment failed.");
       awaitingPendingResolutionRef.current = false;
-    } else if (hasSubscription) {
+      setOptimisticBillingState(null);
+    } else if (hasSubscription && renter?.status !== "autopay_pending") {
       toast.success(`Autopay is now active. Next recurring charge: ${renter?.next_due_date || "—"}`);
       awaitingPendingResolutionRef.current = false;
+      setOptimisticBillingState(null);
+    } else {
+      return;
     }
 
     if (!awaitingPendingResolutionRef.current && activationPollRef.current) {
@@ -135,7 +142,7 @@ export default function RenterDetail() {
       clearTimeout(activationPollTimeoutRef.current);
       activationPollTimeoutRef.current = null;
     }
-  }, [hasSubscription, isAutopayPending, latestAutopayStartFailure, renter?.next_due_date]);
+  }, [hasSubscription, isPersistedAutopayPending, latestAutopayStartFailure, renter?.next_due_date, renter?.status]);
 
   useEffect(() => {
     if (setupResult !== "success" || !id) return;
@@ -200,8 +207,10 @@ export default function RenterDetail() {
       }
       if (data?.autopay_state === "pending") {
         awaitingPendingResolutionRef.current = true;
+        setOptimisticBillingState("pending");
         toast.info(getAutopayActivationMessage(data ?? {}));
       } else {
+        setOptimisticBillingState(null);
         toast.success(getAutopayActivationMessage(data ?? {}));
       }
       queryClient.invalidateQueries({ queryKey: ["renters", id] });
@@ -226,6 +235,7 @@ export default function RenterDetail() {
         }, 60_000);
       }
     } catch (err: unknown) {
+      setOptimisticBillingState(null);
       toast.error(getErrorMessage(err, "Failed to activate billing"));
     } finally {
       setActivating(false);
@@ -308,6 +318,7 @@ export default function RenterDetail() {
   };
 
   const billingState = getBillingState();
+  const balanceMutationsFrozen = billingState === "pending";
   const currentBalanceEditor = (
     <div className="rounded-md border border-border/60 bg-background/80 p-3 space-y-3">
       <div>
@@ -324,6 +335,7 @@ export default function RenterDetail() {
           value={feeForm.description}
           onChange={(e) => setFeeForm((current) => ({ ...current, description: e.target.value }))}
           placeholder="Current balance item"
+          disabled={balanceMutationsFrozen}
         />
         <Input
           type="number"
@@ -331,12 +343,13 @@ export default function RenterDetail() {
           value={feeForm.amount}
           onChange={(e) => setFeeForm((current) => ({ ...current, amount: e.target.value }))}
           placeholder="Amount"
+          disabled={balanceMutationsFrozen}
         />
         <Button
           size="sm"
           variant="outline"
           onClick={handleAddFee}
-          disabled={addBalanceAdjustment.isPending}
+          disabled={balanceMutationsFrozen || addBalanceAdjustment.isPending}
         >
           <Plus className="h-4 w-4" />
           Add Item
@@ -354,7 +367,7 @@ export default function RenterDetail() {
                 variant="ghost"
                 className="h-7 w-7"
                 onClick={() => void handleRemoveFee(adjustment.id)}
-                disabled={removeBalanceAdjustment.isPending}
+                disabled={balanceMutationsFrozen || removeBalanceAdjustment.isPending}
                 aria-label={`Remove ${adjustment.description}`}
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -366,6 +379,11 @@ export default function RenterDetail() {
       <div className="text-xs text-muted-foreground">
         Current balance: <span className="font-mono text-foreground">${Number(renter.balance ?? 0).toFixed(2)}</span>
       </div>
+      {balanceMutationsFrozen && (
+        <p className="text-xs text-warning">
+          Current balance items are locked while this bank payment is processing.
+        </p>
+      )}
     </div>
   );
 
@@ -490,22 +508,24 @@ export default function RenterDetail() {
               {billingState === "pending" && (
                 <>
                   {currentBalanceEditor}
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-warning/10 text-warning text-sm font-medium">
-                      <Clock className="h-3.5 w-3.5" />
-                      Autopay Pending
-                    </span>
+                  <div className="rounded-md border border-warning/30 bg-warning/10 p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-md text-warning text-sm font-medium">
+                        <Clock className="h-3.5 w-3.5" />
+                        Autopay Pending
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Bank payment is still processing. Autopay will activate after confirmation.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Next recurring charge: {renter.next_due_date || "—"}
+                    </p>
                     <Button size="sm" variant="ghost" onClick={handleSendSetupLink} disabled={sendingSetup}>
                       <Send className="h-4 w-4" />
                       Update Payment Method
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Bank payment is still processing. Autopay will activate after confirmation.
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Next recurring charge: {renter.next_due_date || "—"}
-                  </p>
                   <p className="text-xs text-muted-foreground">{BANK_ACCOUNT_RECOMMENDATION}</p>
                 </>
               )}
@@ -579,14 +599,10 @@ export default function RenterDetail() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4 pt-4 border-t">
                 <div>
                   <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Start Date</div>
                   <div className="text-sm font-mono mt-0.5">{renter.lease_start_date || '—'}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Paid Through</div>
-                  <div className="text-sm font-mono mt-0.5">{renter.paid_through_date || '—'}</div>
                 </div>
                 <div>
                   <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Late Fee</div>
@@ -648,7 +664,7 @@ export default function RenterDetail() {
                         </div>
                         <div className="pb-1">
                           <div className="text-sm">{event.description}</div>
-                          <div className="text-[11px] text-muted-foreground font-mono">{new Date(event.date).toLocaleDateString()}</div>
+                          <div className="text-[11px] text-muted-foreground font-mono">{formatTimelineDate(event.date)}</div>
                         </div>
                       </div>
                     );

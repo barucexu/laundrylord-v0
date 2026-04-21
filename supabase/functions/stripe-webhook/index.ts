@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { getInvoiceAdjustmentIds, getInvoiceChargeKind } from "../_shared/invoice-metadata.ts";
+import { getInvoiceAdjustmentIds, getInvoiceChargeKind, isMeaningfulInvoiceAmount } from "../_shared/invoice-metadata.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -163,9 +163,16 @@ serve(async (req) => {
     if (event.type === "invoice.payment_succeeded") {
       const invoice = event.data.object;
       const customerId = typeof invoice.customer === "string" ? invoice.customer : null;
-      const amountPaid = (invoice.amount_paid || 0) / 100;
+      const amountPaidCents = invoice.amount_paid || 0;
       const chargeKind = getInvoiceChargeKind(invoice);
       const adjustmentIds = getInvoiceAdjustmentIds(invoice);
+
+      if (!isMeaningfulInvoiceAmount(amountPaidCents)) {
+        console.log(`[WEBHOOK] Ignoring zero-dollar invoice.payment_succeeded ${invoice.id}`);
+        return jsonResponse({ received: true, ignored_zero_amount: true });
+      }
+
+      const amountPaid = amountPaidCents / 100;
 
       if (customerId) {
         const { data: renter } = await supabase
@@ -260,8 +267,15 @@ serve(async (req) => {
     if (event.type === "invoice.payment_failed") {
       const invoice = event.data.object;
       const customerId = typeof invoice.customer === "string" ? invoice.customer : null;
-      const amountDue = (invoice.amount_due || 0) / 100;
+      const amountDueCents = invoice.amount_due || 0;
       const chargeKind = getInvoiceChargeKind(invoice);
+
+      if (!isMeaningfulInvoiceAmount(amountDueCents)) {
+        console.log(`[WEBHOOK] Ignoring zero-dollar invoice.payment_failed ${invoice.id}`);
+        return jsonResponse({ received: true, ignored_zero_amount: true });
+      }
+
+      const amountDue = amountDueCents / 100;
 
       if (customerId) {
         const { data: renter } = await supabase
