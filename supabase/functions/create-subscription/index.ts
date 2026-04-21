@@ -309,11 +309,11 @@ serve(async (req) => {
       user_id: user.id,
       type: "note",
       description: currentBalanceStatus === "paid"
-        ? `Autopay started. Charged current balance and next recurring charge is ${nextDue}`
+        ? `Autopay started. Next recurring charge is ${nextDue}`
         : currentBalanceStatus === "processing"
           ? `Autopay pending. Bank payment is still processing. Autopay will activate after confirmation. Next recurring charge is ${nextDue}`
           : `Autopay started. Next recurring charge is ${nextDue}`,
-      date: now.toISOString().split("T")[0],
+      date: now.toISOString(),
     });
 
     return new Response(JSON.stringify({

@@ -108,6 +108,7 @@ describe("RenterDetail current balance items", () => {
     expect(screen.getByText("Current balance items")).toBeInTheDocument();
     expect(screen.getByText(/Add itemized charges or credits to the current balance at any time/i)).toBeInTheDocument();
     expect(screen.getByText(/Common items: first payment, install fee, deposit/i)).toBeInTheDocument();
+    expect(screen.queryByText("Paid Through")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /remove first month rent/i }));
 

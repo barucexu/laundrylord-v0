@@ -21,6 +21,10 @@ type InvoiceLike = {
   } | null;
 };
 
+export function isMeaningfulInvoiceAmount(amountCents: number | null | undefined): boolean {
+  return Number(amountCents ?? 0) > 0;
+}
+
 function firstInvoiceLineMetadata(invoice: InvoiceLike, key: string): string | undefined {
   for (const line of invoice.lines?.data ?? []) {
     const lineValue = line.metadata?.[key];

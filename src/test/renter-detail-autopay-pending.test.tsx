@@ -82,7 +82,7 @@ vi.mock("sonner", () => ({
 }));
 
 describe("RenterDetail autopay pending state", () => {
-  it("shows the pending autopay guidance while still allowing balance edits", async () => {
+  it("shows persistent pending guidance while freezing balance mutations", async () => {
     const client = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -103,7 +103,9 @@ describe("RenterDetail autopay pending state", () => {
     expect(screen.getAllByText("Autopay Pending")).toHaveLength(2);
     expect(screen.getByText(/Bank payment is still processing. Autopay will activate after confirmation./i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /update payment method/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /add item/i })).toBeInTheDocument();
+    expect(screen.getByText("First payment")).toBeInTheDocument();
+    expect(screen.getByText(/Current balance items are locked while this bank payment is processing./i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add item/i })).toBeDisabled();
     expect(screen.queryByRole("button", { name: /start autopay/i })).not.toBeInTheDocument();
   });
 });
