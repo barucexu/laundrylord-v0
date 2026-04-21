@@ -1,4 +1,5 @@
 export type StartingBalanceAction = "paid" | "processing" | "pay" | "failed";
+export type StartingBalanceStatus = "paid" | "processing" | "failed";
 
 export function getStartingBalanceAction(
   invoiceStatus: string | null | undefined,
@@ -14,6 +15,21 @@ export function getStartingBalanceAction(
 
   if (invoiceStatus === "open") {
     return "pay";
+  }
+
+  return "failed";
+}
+
+export function getStartingBalanceStatus(
+  action: StartingBalanceAction,
+  isBankAccountPaymentMethod: boolean,
+): StartingBalanceStatus {
+  if (action === "paid") {
+    return isBankAccountPaymentMethod ? "processing" : "paid";
+  }
+
+  if (action === "processing") {
+    return "processing";
   }
 
   return "failed";

@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isRenterBillingReady } from "../_shared/renter-billing.ts";
-import { getStartingBalanceAction } from "../_shared/starting-balance.ts";
+import { getStartingBalanceAction, getStartingBalanceStatus } from "../_shared/starting-balance.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -97,6 +97,9 @@ serve(async (req) => {
         default_payment_method: defaultMethodId,
       },
     });
+
+    const defaultPaymentMethod = await stripe.paymentMethods.retrieve(defaultMethodId);
+    const isBankAccountPaymentMethod = defaultPaymentMethod.type === "us_bank_account";
 
     const amountCents = Math.round(Number(renter.monthly_rate) * 100);
     const price = await stripe.prices.create({
@@ -194,10 +197,13 @@ serve(async (req) => {
         paymentIntentStatus,
       );
 
-      if (startingBalanceAction === "paid") {
-        currentBalanceStatus = "paid";
-      } else if (startingBalanceAction === "processing") {
-        currentBalanceStatus = "processing";
+      const startingBalanceStatus = getStartingBalanceStatus(
+        startingBalanceAction,
+        isBankAccountPaymentMethod,
+      );
+
+      if (startingBalanceStatus === "paid" || startingBalanceStatus === "processing") {
+        currentBalanceStatus = startingBalanceStatus;
       } else if (startingBalanceAction === "pay") {
         try {
           const collectedInvoice = await stripe.invoices.pay(finalizedInvoice.id, {
@@ -214,10 +220,13 @@ serve(async (req) => {
             collectedPaymentIntentStatus,
           );
 
-          if (collectedAction === "paid") {
-            currentBalanceStatus = "paid";
-          } else if (collectedAction === "processing") {
-            currentBalanceStatus = "processing";
+          const collectedStatus = getStartingBalanceStatus(
+            collectedAction,
+            isBankAccountPaymentMethod,
+          );
+
+          if (collectedStatus === "paid" || collectedStatus === "processing") {
+            currentBalanceStatus = collectedStatus;
           } else {
             return new Response(JSON.stringify({
               error: "Current balance charge failed, so autopay was not started.",
@@ -267,12 +276,29 @@ serve(async (req) => {
     });
 
     const nextDue = nextRecurringChargeDate.toISOString().split("T")[0];
+    let nextRenterStatus = currentBalanceStatus === "processing" ? "autopay_pending" : "active";
+
+    if (currentBalanceStatus === "processing") {
+      const { data: latestRenter, error: latestRenterError } = await adminClient
+        .from("renters")
+        .select("status, balance")
+        .eq("id", renter_id)
+        .eq("user_id", user.id)
+        .single();
+
+      if (latestRenterError) throw latestRenterError;
+
+      if (latestRenter?.status === "active" && Number(latestRenter.balance ?? 0) < Number(renter.balance ?? 0)) {
+        nextRenterStatus = "active";
+        currentBalanceStatus = "paid";
+      }
+    }
 
     await adminClient
       .from("renters")
       .update({
         stripe_subscription_id: subscription.id,
-        status: currentBalanceStatus === "processing" ? "autopay_pending" : "active",
+        status: nextRenterStatus,
         next_due_date: nextDue,
       })
       .eq("id", renter_id)

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { getInvoiceAdjustmentIds, getInvoiceChargeKind } from "../_shared/invoice-metadata.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,10 +20,15 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-function getInvoiceChargeKind(invoice: Stripe.Invoice): string {
-  return invoice.metadata?.charge_kind
-    ?? invoice.parent?.subscription_details?.metadata?.charge_kind
-    ?? "recurring_payment";
+async function requireWrite<T>(
+  operation: string,
+  query: PromiseLike<{ data: T; error: { message?: string } | null }>,
+): Promise<T> {
+  const { data, error } = await query;
+  if (error) {
+    throw new Error(`${operation} failed: ${error.message ?? JSON.stringify(error)}`);
+  }
+  return data;
 }
 
 serve(async (req) => {
@@ -136,20 +142,20 @@ serve(async (req) => {
             }
           }
 
-          await supabase
+          await requireWrite("mark payment method saved", supabase
             .from("renters")
             .update({ has_payment_method: true })
             .eq("id", renter.id)
-            .eq("user_id", userId);
+            .eq("user_id", userId));
 
-          await supabase.from("timeline_events").insert({
+          await requireWrite("insert payment method timeline", supabase.from("timeline_events").insert({
             renter_id: renter.id,
             user_id: userId,
             type: "payment_method_saved",
             description: renter.stripe_subscription_id
               ? "Payment method updated for future autopay"
               : "Payment method saved for autopay",
-          });
+          }));
         }
       }
     }
@@ -159,16 +165,7 @@ serve(async (req) => {
       const customerId = typeof invoice.customer === "string" ? invoice.customer : null;
       const amountPaid = (invoice.amount_paid || 0) / 100;
       const chargeKind = getInvoiceChargeKind(invoice);
-      const adjustmentIds = (() => {
-        const raw = invoice.metadata?.adjustment_ids;
-        if (!raw) return [];
-        try {
-          const parsed = JSON.parse(raw);
-          return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
-        } catch {
-          return [];
-        }
-      })();
+      const adjustmentIds = getInvoiceAdjustmentIds(invoice);
 
       if (customerId) {
         const { data: renter } = await supabase
@@ -180,24 +177,24 @@ serve(async (req) => {
 
         if (renter) {
           if (chargeKind === "starting_balance") {
-            await supabase
+            await requireWrite("activate renter after starting balance success", supabase
               .from("renters")
               .update({
                 status: "active",
                 balance: Math.max(0, Number(renter.balance) - amountPaid),
               })
               .eq("id", renter.id)
-              .eq("user_id", userId);
+              .eq("user_id", userId));
 
             if (adjustmentIds.length > 0) {
-              await supabase
+              await requireWrite("delete settled starting-balance adjustments", supabase
                 .from("renter_balance_adjustments")
                 .delete()
                 .eq("renter_id", renter.id)
-                .in("id", adjustmentIds);
+                .in("id", adjustmentIds));
             }
 
-            await supabase.from("payments").insert({
+            await requireWrite("insert starting-balance payment", supabase.from("payments").insert({
               renter_id: renter.id,
               user_id: userId,
               amount: amountPaid,
@@ -207,14 +204,14 @@ serve(async (req) => {
               type: "payment",
               payment_source: "stripe",
               payment_notes: "Starting payment succeeded when autopay was activating",
-            });
+            }));
 
-            await supabase.from("timeline_events").insert({
+            await requireWrite("insert starting-balance success timeline", supabase.from("timeline_events").insert({
               renter_id: renter.id,
               user_id: userId,
               type: "payment_succeeded",
               description: `Charged current balance of $${amountPaid.toFixed(2)} when autopay started`,
-            });
+            }));
 
             return jsonResponse({ received: true });
           }
@@ -225,7 +222,7 @@ serve(async (req) => {
             ? new Date(invoice.lines.data[0].period.start * 1000).toISOString().split("T")[0]
             : null;
 
-          await supabase
+          await requireWrite("update renter after recurring payment success", supabase
             .from("renters")
             .update({
               status: "active",
@@ -236,9 +233,9 @@ serve(async (req) => {
               next_due_date: nextDue,
             })
             .eq("id", renter.id)
-            .eq("user_id", userId);
+            .eq("user_id", userId));
 
-          await supabase.from("payments").insert({
+          await requireWrite("insert recurring autopay payment", supabase.from("payments").insert({
             renter_id: renter.id,
             user_id: userId,
             amount: amountPaid,
@@ -248,14 +245,14 @@ serve(async (req) => {
             type: "payment",
             payment_source: "stripe",
             payment_notes: "Recurring autopay payment",
-          });
+          }));
 
-          await supabase.from("timeline_events").insert({
+          await requireWrite("insert recurring payment success timeline", supabase.from("timeline_events").insert({
             renter_id: renter.id,
             user_id: userId,
             type: "payment_succeeded",
             description: `Payment of $${amountPaid.toFixed(2)} succeeded`,
-          });
+          }));
         }
       }
     }
@@ -283,7 +280,7 @@ serve(async (req) => {
               await stripe.subscriptions.cancel(renter.stripe_subscription_id);
             }
 
-            await supabase
+            await requireWrite("mark starting-balance failure", supabase
               .from("renters")
               .update({
                 stripe_subscription_id: null,
@@ -291,9 +288,9 @@ serve(async (req) => {
                 next_due_date: null,
               })
               .eq("id", renter.id)
-              .eq("user_id", userId);
+              .eq("user_id", userId));
 
-            await supabase.from("payments").insert({
+            await requireWrite("insert starting-balance failed payment", supabase.from("payments").insert({
               renter_id: renter.id,
               user_id: userId,
               amount: amountDue,
@@ -302,9 +299,9 @@ serve(async (req) => {
               type: "payment",
               payment_source: "stripe",
               payment_notes: "Starting payment failed while autopay was activating",
-            });
+            }));
 
-            await supabase.from("timeline_events").insert([
+            await requireWrite("insert starting-balance failure timeline", supabase.from("timeline_events").insert([
               {
                 renter_id: renter.id,
                 user_id: userId,
@@ -317,12 +314,12 @@ serve(async (req) => {
                 type: "note",
                 description: "Autopay not activated. Starting payment failed.",
               },
-            ]);
+            ]));
 
             return jsonResponse({ received: true });
           }
 
-          await supabase
+          await requireWrite("mark recurring autopay failure", supabase
             .from("renters")
             .update({
               status: "late",
@@ -330,9 +327,9 @@ serve(async (req) => {
               days_late: Number(renter.days_late) + 1,
             })
             .eq("id", renter.id)
-            .eq("user_id", userId);
+            .eq("user_id", userId));
 
-          await supabase.from("payments").insert({
+          await requireWrite("insert recurring failed payment", supabase.from("payments").insert({
             renter_id: renter.id,
             user_id: userId,
             amount: amountDue,
@@ -341,14 +338,14 @@ serve(async (req) => {
             type: "payment",
             payment_source: "stripe",
             payment_notes: "Recurring autopay payment failed",
-          });
+          }));
 
-          await supabase.from("timeline_events").insert({
+          await requireWrite("insert recurring payment failure timeline", supabase.from("timeline_events").insert({
             renter_id: renter.id,
             user_id: userId,
             type: "payment_failed",
             description: `Payment of $${amountDue.toFixed(2)} failed`,
-          });
+          }));
         }
       }
     }
@@ -366,21 +363,21 @@ serve(async (req) => {
           .maybeSingle();
 
         if (renter?.stripe_subscription_id) {
-          await supabase
+          await requireWrite("mark subscription deleted", supabase
             .from("renters")
             .update({
               stripe_subscription_id: null,
               status: "closed",
             })
             .eq("id", renter.id)
-            .eq("user_id", userId);
+            .eq("user_id", userId));
 
-          await supabase.from("timeline_events").insert({
+          await requireWrite("insert subscription canceled timeline", supabase.from("timeline_events").insert({
             renter_id: renter.id,
             user_id: userId,
             type: "note",
             description: "Subscription canceled",
-          });
+          }));
         }
       }
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getStartingBalanceAction } from "../..//supabase/functions/_shared/starting-balance";
+import { getStartingBalanceAction, getStartingBalanceStatus } from "../../supabase/functions/_shared/starting-balance";
 
 describe("getStartingBalanceAction", () => {
   it("treats an already-paid invoice as paid so we do not pay it twice", () => {
@@ -12,5 +12,10 @@ describe("getStartingBalanceAction", () => {
 
   it("only requests an explicit pay attempt when the invoice is still open and not processing", () => {
     expect(getStartingBalanceAction("open", "requires_payment_method")).toBe("pay");
+  });
+
+  it("keeps bank-account starts pending even when the first invoice response says paid", () => {
+    expect(getStartingBalanceStatus("paid", true)).toBe("processing");
+    expect(getStartingBalanceStatus("paid", false)).toBe("paid");
   });
 });
