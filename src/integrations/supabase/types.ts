@@ -51,6 +51,13 @@ export type Database = {
             foreignKeyName: "billing_reminders_renter_id_fkey"
             columns: ["renter_id"]
             isOneToOne: false
+            referencedRelation: "v_audit_renters"
+            referencedColumns: ["renter_id"]
+          },
+          {
+            foreignKeyName: "billing_reminders_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
             referencedRelation: "v_renters_for_admin"
             referencedColumns: ["id"]
           },
@@ -297,6 +304,13 @@ export type Database = {
             foreignKeyName: "machines_assigned_renter_id_fkey"
             columns: ["assigned_renter_id"]
             isOneToOne: false
+            referencedRelation: "v_audit_renters"
+            referencedColumns: ["renter_id"]
+          },
+          {
+            foreignKeyName: "machines_assigned_renter_id_fkey"
+            columns: ["assigned_renter_id"]
+            isOneToOne: false
             referencedRelation: "v_renters_for_admin"
             referencedColumns: ["id"]
           },
@@ -376,6 +390,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "renters"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_logs_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_audit_renters"
+            referencedColumns: ["renter_id"]
           },
           {
             foreignKeyName: "maintenance_logs_renter_id_fkey"
@@ -535,6 +556,13 @@ export type Database = {
             foreignKeyName: "payments_renter_id_fkey"
             columns: ["renter_id"]
             isOneToOne: false
+            referencedRelation: "v_audit_renters"
+            referencedColumns: ["renter_id"]
+          },
+          {
+            foreignKeyName: "payments_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
             referencedRelation: "v_renters_for_admin"
             referencedColumns: ["id"]
           },
@@ -585,6 +613,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "renters"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renter_balance_adjustments_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_audit_renters"
+            referencedColumns: ["renter_id"]
           },
           {
             foreignKeyName: "renter_balance_adjustments_renter_id_fkey"
@@ -855,6 +890,13 @@ export type Database = {
             foreignKeyName: "timeline_events_renter_id_fkey"
             columns: ["renter_id"]
             isOneToOne: false
+            referencedRelation: "v_audit_renters"
+            referencedColumns: ["renter_id"]
+          },
+          {
+            foreignKeyName: "timeline_events_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
             referencedRelation: "v_renters_for_admin"
             referencedColumns: ["id"]
           },
@@ -904,6 +946,13 @@ export type Database = {
             foreignKeyName: "payments_renter_id_fkey"
             columns: ["renter_id"]
             isOneToOne: false
+            referencedRelation: "v_audit_renters"
+            referencedColumns: ["renter_id"]
+          },
+          {
+            foreignKeyName: "payments_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
             referencedRelation: "v_renters_for_admin"
             referencedColumns: ["id"]
           },
@@ -912,6 +961,57 @@ export type Database = {
             columns: ["renter_id"]
             isOneToOne: false
             referencedRelation: "v_renters_with_owner"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_audit_renters: {
+        Row: {
+          address: string | null
+          archived_at: string | null
+          balance: number | null
+          billable_until: string | null
+          business_name: string | null
+          created_at: string | null
+          days_late: number | null
+          deposit_amount: number | null
+          has_payment_method: boolean | null
+          install_fee: number | null
+          install_notes: string | null
+          language: string | null
+          lease_start_date: string | null
+          legacy_machine_id: string | null
+          min_term_end_date: string | null
+          monthly_rate: number | null
+          next_due_date: string | null
+          notes: string | null
+          owner_email: string | null
+          paid_through_date: string | null
+          rent_collected: number | null
+          renter_email: string | null
+          renter_id: string | null
+          renter_name: string | null
+          renter_phone: string | null
+          renter_status: string | null
+          secondary_contact: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_renters_machine"
+            columns: ["legacy_machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_renters_machine"
+            columns: ["legacy_machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_machines_with_owner"
             referencedColumns: ["id"]
           },
         ]
@@ -939,6 +1039,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "renters"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_events_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_audit_renters"
+            referencedColumns: ["renter_id"]
           },
           {
             foreignKeyName: "timeline_events_renter_id_fkey"
@@ -982,6 +1089,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "renters"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machines_assigned_renter_id_fkey"
+            columns: ["assigned_renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_audit_renters"
+            referencedColumns: ["renter_id"]
           },
           {
             foreignKeyName: "machines_assigned_renter_id_fkey"
