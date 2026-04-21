@@ -13,9 +13,10 @@ A pass is one bounded step with one job.
 1. Planning pass: produce the plan only
 2. Review pass: critique a plan or implementation only
 3. Implementation pass: make the approved code changes only
-4. Validation pass: run checks and summarize evidence only
+4. Test pass: add or update tests for the invariants affected by the change
+5. Validation pass: run checks and summarize evidence only
 
-Avoid mixing all four jobs together on medium or large work unless the user explicitly wants speed over rigor.
+Avoid mixing these jobs together on medium or large work unless the user explicitly wants speed over rigor.
 
 ## Task sizing
 
@@ -106,18 +107,24 @@ Before implementation:
 1. Read `README.md`, `RULES.md`, and `ARCHITECTURE.md`
 2. Add `BILLING_POLICY.md` and `QA_RUNBOOK.md` for billing/import/enforcement work
 3. Inspect the current implementation before editing; do not rely on memory
+4. Identify the invariants that must remain true
+5. Identify likely failure modes, edge cases, and regression paths
 
 During implementation:
 
 1. Keep real and demo flows in mind when changing shell, sidebar, or route behavior
 2. Keep add/create and import paths aligned when changing enforcement
 3. Keep server-enforced behavior aligned with frontend messaging
+4. Add or update tests for each identified invariant where practical
 
 Before wrapping up:
 
 1. Run relevant validation
-2. Summarize risks, assumptions, and any skipped checks
-3. Confirm docs are updated when logic or policy changed
+2. Summarize which invariant tests passed
+3. Summarize what remains untested and why
+4. Do a fresh-review pass that tries to break the implemented solution
+5. Summarize risks, assumptions, and any skipped checks
+6. Confirm docs are updated when logic or policy changed
 
 ## Branch and SHA workflow
 
@@ -174,6 +181,9 @@ Database note:
 A task is not done unless:
 
 1. The requested behavior is implemented
-2. Relevant validations have been run or explicitly skipped with reason
-3. Docs are updated if logic or policy changed
-4. The result has been reviewed at the level appropriate to the task size
+2. Invariants and failure modes were identified before implementation
+3. Tests were added or updated for each practical invariant
+4. Relevant validations have been run or explicitly skipped with reason
+5. Passing checks and untested areas have been summarized
+6. Docs are updated if logic or policy changed
+7. The result has been reviewed at the level appropriate to the task size, including a fresh-review pass that tries to break the solution

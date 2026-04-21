@@ -20,7 +20,9 @@ A plan is acceptable only if it:
 2. Names the likely regression surfaces
 3. Keeps scope tight
 4. Includes validation
-5. Uses phases only when those phases are independently reviewable
+5. Identifies invariants that must remain true
+6. Names likely failure modes and edge cases
+7. Uses phases only when those phases are independently reviewable
 
 Reject or revise the plan if it:
 
@@ -40,6 +42,10 @@ Check for:
 4. Logic duplication
 5. Docs/tests drift
 6. Real/demo drift where a shared behavior should stay aligned
+7. Missing or weak tests for identified invariants
+8. Failure modes that were named before implementation but not exercised or explicitly left untested
+
+The implementation review should make a fresh attempt to break the solution, especially around the invariants, failure modes, and regression paths identified before implementation. If no fresh reviewer is available, perform this as a strict self-review and say so.
 
 ## Repo-specific review checklist
 
