@@ -26,7 +26,7 @@ vi.mock("@/hooks/useSupabaseData", () => ({
       deposit_amount: 0,
       deposit_collected: false,
       has_payment_method: true,
-      stripe_subscription_id: null,
+      stripe_subscription_id: "sub_stale_after_failed_start",
       notes: null,
       install_notes: null,
       dryer_outlet: "3-prong",
@@ -51,6 +51,7 @@ vi.mock("@/hooks/useSupabaseData", () => ({
         payment_notes: "Starting payment failed while autopay was activating",
         type: "payment",
         due_date: "2026-04-18",
+        created_at: "2026-04-18T14:00:00.000Z",
         amount: 210,
       },
     ],
@@ -98,7 +99,7 @@ vi.mock("sonner", () => ({
 }));
 
 describe("RenterDetail failed autopay start state", () => {
-  it("shows the failed-start warning while keeping retry and balance edits available", async () => {
+  it("keeps a failed start out of active autopay while keeping retry and balance edits available", async () => {
     const client = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -117,6 +118,7 @@ describe("RenterDetail failed autopay start state", () => {
     );
 
     expect(screen.getByText("Autopay not activated. Starting payment failed.")).toBeInTheDocument();
+    expect(screen.queryByText("Autopay Active")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /start autopay and charge current balance/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /add item/i })).toBeInTheDocument();
     expect(screen.getByText("Current balance items")).toBeInTheDocument();

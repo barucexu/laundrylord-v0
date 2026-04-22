@@ -30,3 +30,41 @@ export function getAutopayActivationMessage(result: AutopayActivationResult): st
 export function getAchProcessingExplanation(): string {
   return "Bank payment is still processing. Autopay will activate after confirmation. If Stripe later reports the payment failed, keep the renter out of autopay and let the operator retry cleanly.";
 }
+
+export function getProjectedNextRecurringDate(
+  leaseStartDate: string | null | undefined,
+  now: Date = new Date(),
+): string {
+  let anchorDay = now.getUTCDate();
+
+  if (leaseStartDate) {
+    const parsed = new Date(`${leaseStartDate}T00:00:00Z`);
+    if (!Number.isNaN(parsed.getTime())) {
+      anchorDay = parsed.getUTCDate();
+    }
+  }
+
+  const normalizedAnchorDay = Math.min(anchorDay, 28);
+  const candidateThisMonth = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    normalizedAnchorDay,
+  ));
+
+  const nextChargeDate = candidateThisMonth.getTime() > now.getTime()
+    ? candidateThisMonth
+    : new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth() + 1,
+      normalizedAnchorDay,
+    ));
+
+  return nextChargeDate.toISOString().split("T")[0];
+}
+
+export function formatProjectedRecurringCharge(
+  monthlyRate: number | string | null | undefined,
+  nextDueDate: string | null | undefined,
+): string {
+  return `$${Number(monthlyRate ?? 0).toFixed(2)} on ${nextDueDate ?? "—"}`;
+}

@@ -10,6 +10,17 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+async function requireWrite<T>(
+  operation: string,
+  query: PromiseLike<{ data: T; error: { message?: string } | null }>,
+): Promise<T> {
+  const { data, error } = await query;
+  if (error) {
+    throw new Error(`${operation} failed: ${error.message ?? JSON.stringify(error)}`);
+  }
+  return data;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -46,6 +57,30 @@ serve(async (req) => {
     if (renterError || !renter) throw new Error("Renter not found");
     if (!renter.stripe_customer_id) throw new Error("Renter has no card on file. Send setup link first.");
     if (renter.stripe_subscription_id) {
+      if (renter.status === "autopay_pending") {
+        return new Response(JSON.stringify({
+          subscription_id: renter.stripe_subscription_id,
+          status: renter.status,
+          next_due: renter.next_due_date,
+          current_balance_status: "processing",
+          autopay_state: "pending",
+          autopay_started: true,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
+
+      if (["closed", "archived"].includes(renter.status)) {
+        return new Response(JSON.stringify({
+          error: "Autopay is not active yet. Wait for the starting payment to resolve or retry after a failed start.",
+          autopay_started: false,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 409,
+        });
+      }
+
       return new Response(JSON.stringify({
         subscription_id: renter.stripe_subscription_id,
         status: renter.status,
@@ -100,6 +135,7 @@ serve(async (req) => {
 
     const defaultPaymentMethod = await stripe.paymentMethods.retrieve(defaultMethodId);
     const isBankAccountPaymentMethod = defaultPaymentMethod.type === "us_bank_account";
+    const activationStartedAt = new Date().toISOString();
 
     const amountCents = Math.round(Number(renter.monthly_rate) * 100);
     const price = await stripe.prices.create({
@@ -122,6 +158,7 @@ serve(async (req) => {
 
     const normalizedAnchorDay = Math.min(anchorDay, 28);
     const now = new Date();
+    const rentalStartDate = renter.lease_start_date ?? now.toISOString().split("T")[0];
     const nextRecurringChargeDate = (() => {
       const candidateThisMonth = new Date(Date.UTC(
         now.getUTCFullYear(),
@@ -144,6 +181,23 @@ serve(async (req) => {
     const currentBalanceCents = Math.round(Number(renter.balance || 0) * 100);
     let currentBalanceStatus: "none" | "paid" | "processing" = "none";
     let chargedAdjustmentIds: string[] = [];
+    const findStartingBalanceFailure = async () => {
+      const { data, error } = await adminClient
+        .from("payments")
+        .select("id")
+        .eq("renter_id", renter.id)
+        .eq("user_id", user.id)
+        .eq("payment_source", "stripe")
+        .eq("status", "failed")
+        .ilike("payment_notes", "%Starting payment failed while autopay was activating%")
+        .gte("created_at", activationStartedAt)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    };
+
     if (currentBalanceCents > 0) {
       const { data: adjustmentRows, error: adjustmentError } = await adminClient
         .from("renter_balance_adjustments")
@@ -266,6 +320,17 @@ serve(async (req) => {
       }
     }
 
+    if (currentBalanceStatus === "processing" && await findStartingBalanceFailure()) {
+      return new Response(JSON.stringify({
+        error: "Current balance charge failed, so autopay was not started.",
+        current_balance_charge_failed: true,
+        autopay_started: false,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
+    }
+
     const subscription = await stripe.subscriptions.create({
       customer: renter.stripe_customer_id,
       items: [{ price: price.id }],
@@ -276,35 +341,99 @@ serve(async (req) => {
     });
 
     const nextDue = nextRecurringChargeDate.toISOString().split("T")[0];
-    let nextRenterStatus = currentBalanceStatus === "processing" ? "autopay_pending" : "active";
+    const failStartedSubscription = async () => {
+      try {
+        await stripe.subscriptions.cancel(subscription.id);
+      } catch (cancelError) {
+        console.error("[create-subscription] Failed to cancel subscription after starting-balance failure:", cancelError);
+      }
+
+      await requireWrite("clear failed autopay subscription", adminClient
+        .from("renters")
+        .update({
+          stripe_subscription_id: null,
+          status: "closed",
+          next_due_date: null,
+        })
+        .eq("id", renter_id)
+        .eq("user_id", user.id));
+
+      return new Response(JSON.stringify({
+        error: "Current balance charge failed, so autopay was not started.",
+        current_balance_charge_failed: true,
+        autopay_started: false,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
+    };
 
     if (currentBalanceStatus === "processing") {
-      const { data: latestRenter, error: latestRenterError } = await adminClient
+      if (await findStartingBalanceFailure()) {
+        return await failStartedSubscription();
+      }
+
+      const { data: pendingRows, error: pendingUpdateError } = await adminClient
         .from("renters")
-        .select("status, balance")
+        .update({
+          stripe_subscription_id: subscription.id,
+          status: "autopay_pending",
+          next_due_date: nextDue,
+          lease_start_date: rentalStartDate,
+        })
         .eq("id", renter_id)
         .eq("user_id", user.id)
-        .single();
+        .gte("balance", Number(renter.balance ?? 0))
+        .select("status, balance");
 
-      if (latestRenterError) throw latestRenterError;
-
-      if (latestRenter?.status === "active" && Number(latestRenter.balance ?? 0) < Number(renter.balance ?? 0)) {
-        nextRenterStatus = "active";
-        currentBalanceStatus = "paid";
+      if (pendingUpdateError) {
+        throw new Error(`mark renter autopay pending failed: ${pendingUpdateError.message ?? JSON.stringify(pendingUpdateError)}`);
       }
+
+      if (await findStartingBalanceFailure()) {
+        return await failStartedSubscription();
+      }
+
+      if (!pendingRows || pendingRows.length === 0) {
+        const { data: latestRenter, error: latestRenterError } = await adminClient
+          .from("renters")
+          .select("status, balance")
+          .eq("id", renter_id)
+          .eq("user_id", user.id)
+          .single();
+
+        if (latestRenterError) throw latestRenterError;
+
+        if (Number(latestRenter?.balance ?? 0) < Number(renter.balance ?? 0)) {
+          currentBalanceStatus = "paid";
+          await requireWrite("store resolved autopay subscription", adminClient
+            .from("renters")
+            .update({
+              stripe_subscription_id: subscription.id,
+              status: "active",
+              next_due_date: nextDue,
+              lease_start_date: rentalStartDate,
+            })
+            .eq("id", renter_id)
+            .eq("user_id", user.id));
+        } else {
+          throw new Error("Unable to persist pending autopay state.");
+        }
+      }
+    } else {
+      await requireWrite("activate renter autopay", adminClient
+        .from("renters")
+        .update({
+          stripe_subscription_id: subscription.id,
+          status: "active",
+          next_due_date: nextDue,
+          lease_start_date: rentalStartDate,
+        })
+        .eq("id", renter_id)
+        .eq("user_id", user.id));
     }
 
-    await adminClient
-      .from("renters")
-      .update({
-        stripe_subscription_id: subscription.id,
-        status: nextRenterStatus,
-        next_due_date: nextDue,
-      })
-      .eq("id", renter_id)
-      .eq("user_id", user.id);
-
-    await adminClient.from("timeline_events").insert({
+    await requireWrite("insert autopay start timeline", adminClient.from("timeline_events").insert({
       renter_id: renter.id,
       user_id: user.id,
       type: "note",
@@ -314,7 +443,7 @@ serve(async (req) => {
           ? `Autopay pending. Bank payment is still processing. Autopay will activate after confirmation. Next recurring charge is ${nextDue}`
           : `Autopay started. Next recurring charge is ${nextDue}`,
       date: now.toISOString(),
-    });
+    }));
 
     return new Response(JSON.stringify({
       subscription_id: subscription.id,

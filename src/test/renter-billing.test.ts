@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getAchProcessingExplanation, getAutopayActivationMessage } from "@/lib/renter-billing";
+import { formatProjectedRecurringCharge, getAchProcessingExplanation, getAutopayActivationMessage, getProjectedNextRecurringDate } from "@/lib/renter-billing";
 
 describe("getAutopayActivationMessage", () => {
   it("returns the paid message when the current balance was collected", () => {
@@ -34,5 +34,15 @@ describe("getAutopayActivationMessage", () => {
   it("explains ACH processing in founder-friendly language", () => {
     expect(getAchProcessingExplanation()).toContain("Bank payment is still processing.");
     expect(getAchProcessingExplanation()).toContain("Autopay will activate after confirmation.");
+  });
+});
+
+describe("pending autopay recurring charge projection", () => {
+  it("projects the next monthly charge from the rental start day", () => {
+    expect(getProjectedNextRecurringDate("2026-04-18", new Date("2026-04-21T12:00:00Z"))).toBe("2026-05-18");
+  });
+
+  it("formats the pending charge with amount and date", () => {
+    expect(formatProjectedRecurringCharge(70, "2026-05-18")).toBe("$70.00 on 2026-05-18");
   });
 });

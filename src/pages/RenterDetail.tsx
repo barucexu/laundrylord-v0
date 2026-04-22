@@ -7,7 +7,7 @@ import { PaymentSourceBadge } from "@/components/PaymentSourceBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { useRenter, useUpdateRenter, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection, useEntityCustomFields, useRenterBalanceAdjustments, useAddRenterBalanceAdjustment, useRemoveRenterBalanceAdjustment } from "@/hooks/useSupabaseData";
 import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
-import { getAchProcessingExplanation, getAutopayActivationMessage } from "@/lib/renter-billing";
+import { formatProjectedRecurringCharge, getAchProcessingExplanation, getAutopayActivationMessage, getProjectedNextRecurringDate } from "@/lib/renter-billing";
 import { getPaymentTypeLabel } from "@/lib/payment-display";
 import { formatTimelineDate } from "@/lib/timeline-date";
 import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil, Globe, Plug, Archive, ArchiveRestore, Plus, Trash2 } from "lucide-react";
@@ -66,17 +66,27 @@ export default function RenterDetail() {
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [feeForm, setFeeForm] = useState({ description: "", amount: "" });
   const [optimisticBillingState, setOptimisticBillingState] = useState<"pending" | null>(null);
+  const [optimisticPendingNextDue, setOptimisticPendingNextDue] = useState<string | null>(null);
+  const [optimisticRentalStartDate, setOptimisticRentalStartDate] = useState<string | null>(null);
   const activationPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const activationPollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const awaitingPendingResolutionRef = useRef(false);
   const hasSubscription = !!renter?.stripe_subscription_id;
   const isPersistedAutopayPending = renter?.status === "autopay_pending";
   const isAutopayPending = isPersistedAutopayPending || optimisticBillingState === "pending";
-  const latestAutopayStartFailure = renterPayments.find((payment) =>
-    payment.payment_source === "stripe"
-    && payment.status === "failed"
-    && payment.payment_notes?.includes("Starting payment failed while autopay was activating"),
-  );
+  const latestAutopayStartPayment = [...renterPayments]
+    .filter((payment) =>
+      payment.payment_source === "stripe"
+      && payment.payment_notes?.includes("Starting payment")
+      && payment.payment_notes?.includes("autopay was activating"))
+    .sort((a, b) => {
+      const aDate = a.created_at ?? a.paid_date ?? a.due_date ?? "";
+      const bDate = b.created_at ?? b.paid_date ?? b.due_date ?? "";
+      return bDate.localeCompare(aDate);
+    })[0] ?? null;
+  const latestAutopayStartFailure = latestAutopayStartPayment?.status === "failed"
+    ? latestAutopayStartPayment
+    : null;
 
   const handleArchive = useCallback(async () => {
     if (!renter) return;
@@ -122,14 +132,16 @@ export default function RenterDetail() {
       return;
     }
 
-    if (!hasSubscription && latestAutopayStartFailure) {
+    if (latestAutopayStartFailure) {
       toast.error("Autopay not activated. Starting payment failed.");
       awaitingPendingResolutionRef.current = false;
       setOptimisticBillingState(null);
+      setOptimisticPendingNextDue(null);
     } else if (hasSubscription && renter?.status !== "autopay_pending") {
       toast.success(`Autopay is now active. Next recurring charge: ${renter?.next_due_date || "—"}`);
       awaitingPendingResolutionRef.current = false;
       setOptimisticBillingState(null);
+      setOptimisticPendingNextDue(null);
     } else {
       return;
     }
@@ -208,9 +220,15 @@ export default function RenterDetail() {
       if (data?.autopay_state === "pending") {
         awaitingPendingResolutionRef.current = true;
         setOptimisticBillingState("pending");
+        setOptimisticPendingNextDue(data?.next_due ?? null);
+        setOptimisticRentalStartDate((current) => current ?? new Date().toISOString().split("T")[0]);
         toast.info(getAutopayActivationMessage(data ?? {}));
       } else {
         setOptimisticBillingState(null);
+        setOptimisticPendingNextDue(null);
+        if (data?.autopay_started) {
+          setOptimisticRentalStartDate((current) => current ?? new Date().toISOString().split("T")[0]);
+        }
         toast.success(getAutopayActivationMessage(data ?? {}));
       }
       queryClient.invalidateQueries({ queryKey: ["renters", id] });
@@ -236,6 +254,7 @@ export default function RenterDetail() {
       }
     } catch (err: unknown) {
       setOptimisticBillingState(null);
+      setOptimisticPendingNextDue(null);
       toast.error(getErrorMessage(err, "Failed to activate billing"));
     } finally {
       setActivating(false);
@@ -308,12 +327,19 @@ export default function RenterDetail() {
   const stripeConnected = stripeStatus?.connected === true;
   const renterBillingReady = stripeStatus?.renter_billing_ready === true;
   const hasCard = !!renter.has_payment_method;
+  const displayedRentalStartDate = renter.lease_start_date ?? optimisticRentalStartDate;
+  const projectedPendingNextDue = renter.next_due_date
+    ?? optimisticPendingNextDue
+    ?? getProjectedNextRecurringDate(displayedRentalStartDate);
+  const projectedRecurringCharge = formatProjectedRecurringCharge(renter.monthly_rate, projectedPendingNextDue);
   const getBillingState = () => {
     if (!stripeConnected) return "no_stripe";
     if (!renterBillingReady) return "webhook_incomplete";
     if (!hasCard) return "no_card";
     if (isAutopayPending) return "pending";
+    if (latestAutopayStartFailure) return "no_autopay";
     if (!hasSubscription) return "no_autopay";
+    if (["closed", "archived"].includes(renter.status)) return "no_autopay";
     return "active";
   };
 
@@ -398,7 +424,7 @@ export default function RenterDetail() {
           <h1 className="text-xl font-semibold tracking-tight">{renter.name}</h1>
           <div className="flex items-center gap-3 mt-1.5">
             <StatusBadge status={renter.status} />
-            {renter.lease_start_date && <span className="text-xs text-muted-foreground font-mono">Since {renter.lease_start_date}</span>}
+            {displayedRentalStartDate && <span className="text-xs text-muted-foreground font-mono">Since {displayedRentalStartDate}</span>}
           </div>
         </div>
         <div className="flex gap-2">
@@ -519,7 +545,7 @@ export default function RenterDetail() {
                       Bank payment is still processing. Autopay will activate after confirmation.
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Next recurring charge: {renter.next_due_date || "—"}
+                      Next recurring charge: {projectedRecurringCharge}
                     </p>
                     <Button size="sm" variant="ghost" onClick={handleSendSetupLink} disabled={sendingSetup}>
                       <Send className="h-4 w-4" />
@@ -602,7 +628,7 @@ export default function RenterDetail() {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4 pt-4 border-t">
                 <div>
                   <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Start Date</div>
-                  <div className="text-sm font-mono mt-0.5">{renter.lease_start_date || '—'}</div>
+                  <div className="text-sm font-mono mt-0.5">{displayedRentalStartDate || '—'}</div>
                 </div>
                 <div>
                   <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Late Fee</div>
@@ -760,7 +786,7 @@ export default function RenterDetail() {
             <CardContent className="space-y-2.5">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground text-xs">Start Date</span>
-                <span className="font-mono text-xs">{renter.lease_start_date || '—'}</span>
+                <span className="font-mono text-xs">{displayedRentalStartDate || '—'}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground text-xs">Min Term End</span>

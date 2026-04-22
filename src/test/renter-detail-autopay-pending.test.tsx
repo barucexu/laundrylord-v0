@@ -102,6 +102,7 @@ describe("RenterDetail autopay pending state", () => {
 
     expect(screen.getAllByText("Autopay Pending")).toHaveLength(2);
     expect(screen.getByText(/Bank payment is still processing. Autopay will activate after confirmation./i)).toBeInTheDocument();
+    expect(screen.getByText("Next recurring charge: $70.00 on 2026-05-18")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /update payment method/i })).toBeInTheDocument();
     expect(screen.getByText("First payment")).toBeInTheDocument();
     expect(screen.getByText(/Current balance items are locked while this bank payment is processing./i)).toBeInTheDocument();
