@@ -75,8 +75,11 @@ Use this runbook before merging any plan/billing enforcement change.
 - Start autopay and charge current balance:
   - current balance charge succeeds for card defaults
   - ACH starts show `Autopay Pending` until Stripe confirms the bank payment
+  - pending ACH survives refresh from persisted `renters.status = 'autopay_pending'`
+  - pending ACH shows the projected monthly recurring charge amount and date
   - no success toast claims autopay is active before ACH confirmation
   - pending ACH keeps itemized balance rows visible but blocks balance mutations until resolution
+  - Start Date is set when the operator first starts autopay, not when ACH later settles
   - renter balance updates clearly after Stripe confirms the payment, with no temporary duplication
   - zero-dollar Stripe invoice artifacts do not create payment rows or timeline events
   - a failed starting payment does not leave an active autopay subscription behind

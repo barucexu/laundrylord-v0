@@ -94,15 +94,17 @@ Autopay start behavior now means:
 2. If they want first month rent charged now, they add it as a current-balance item before starting autopay
 3. `Start autopay and charge current balance` attempts the renter's current-balance invoice right away using the saved default payment method
 4. Card current-balance payments can settle immediately; ACH current-balance payments can remain processing while the renter stays in an explicit `Autopay Pending` state until Stripe confirms success
-5. A real Stripe subscription is created immediately for successful starts, but the app only treats ACH autopay as active after Stripe confirms the starting payment
+5. A real Stripe subscription is created immediately for successful starts, but the app only treats ACH autopay as active after Stripe confirms the starting payment; `stripe_subscription_id` alone is not enough to infer Active
 6. While ACH is pending, current-balance items stay visible but balance mutations are locked until Stripe reports success or failure
 7. Current-balance items clear only after a successful starting-balance payment; failed starts preserve the balance and itemized rows for retry
 8. Later setup-link completions replace the default payment method for future autopay charges
+9. `lease_start_date` is set the first time the operator starts autopay for the current balance, so Start Date reflects rental commencement rather than delayed ACH settlement
 
 ### Canonical Value Sets
 
 | Domain | Values |
 |--------|--------|
+| `renters.status` | `lead`, `scheduled`, `active`, `autopay_pending`, `late`, `maintenance`, `termination_requested`, `pickup_scheduled`, `closed`, `defaulted`, `archived` |
 | `machines.type` | `washer`, `dryer`, `set` |
 | `machines.status` | `available`, `assigned`, `maintenance`, `retired` |
 | `payments.type` | `payment`, `rent`, `install_fee`, `deposit`, `late_fee`, `other` |
