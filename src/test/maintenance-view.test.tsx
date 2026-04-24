@@ -52,7 +52,6 @@ function renter(overrides: Partial<RenterRow> = {}): RenterRow {
     late_fee: 30,
     laundrylord_email: null,
     lease_start_date: null,
-    machine_id: "legacy-machine-id",
     min_term_end_date: null,
     next_due_date: null,
     notes: null,
@@ -148,7 +147,7 @@ describe("MaintenanceView", () => {
     expect(mockArchiveMaintenanceLog).toHaveBeenCalledWith({ id: "maintenance-1" });
   });
 
-  it("does not use legacy renters.machine_id for maintenance machine behavior", () => {
+  it("uses canonical machine assignment for maintenance machine behavior", () => {
     const source = readFileSync(`${process.cwd()}/src/pages/MaintenanceView.tsx`, "utf8");
 
     expect(source).not.toContain("renter.machine_id");

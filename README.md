@@ -46,7 +46,7 @@ Vertical SaaS for washer/dryer rental operators. Billing clarity + renter system
 
 **Canonical relation**: `machines.assigned_renter_id` → `renters.id`
 
-All reads AND writes must use `machines.assigned_renter_id`. The legacy `renters.machine_id` column still exists in the schema but is NOT the source of truth for assignment display or logic.
+All reads AND writes must use `machines.assigned_renter_id`. The legacy `renters.machine_id` column was removed; do not reintroduce renter-side assignment state for assignment display or logic.
 
 Assignment writes should go through the guarded assignment hooks in `useSupabaseData` and shared helpers in `src/lib/machine-assignment.ts`. They enforce that only unassigned `available` machines can be assigned and that unassigning clears only the current renter's assignment instead of relying on UI filtering alone.
 
@@ -140,7 +140,7 @@ Autopay start behavior now means:
 1. **No silent enum/contract drift**: Any new persisted value for type/status/event fields must be added to the canonical value set above and to all UI rendering paths (e.g., `StatusBadge`, `timelineIcons`).
 2. **Edge functions must declare and enforce caller trust level**: Service-role-only functions must validate the Authorization header. User-authenticated functions rely on Supabase JWT verification.
 3. **Source-of-truth changes must be documented**: If the canonical relation for machine assignment or billing state ownership changes, update this README.
-4. **Machine assignment uses `machines.assigned_renter_id`**: Do not introduce reads via `renters.machine_id`.
+4. **Machine assignment uses `machines.assigned_renter_id`**: Do not introduce renter-side assignment fields.
 5. **Payment status `"pending"` is not valid**: The billing reminders function writes `"overdue"` for late fees.
 6. **Supabase DB changes are manual from agent output**: If a task needs DB/schema/data mutation, provide SQL for the user to run manually in Lovable's Supabase SQL interface.
 

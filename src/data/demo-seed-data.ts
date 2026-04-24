@@ -136,7 +136,6 @@ function generateRenters(): RenterRow[] {
       has_payment_method: isActive && i !== 13, // maintenance renter may not have
       stripe_customer_id: isActive && i < 10 ? `cus_demo_${i}` : null,
       stripe_subscription_id: isActive && i < 10 ? `sub_demo_${i}` : null,
-      machine_id: isActive ? demoId("mach", i) : null,
       language: i === 4 ? "es" : "en",
       dryer_outlet: i % 3 === 0 ? "4-prong" : "3-prong",
       notes: i === 0 ? "Great tenant, always pays on time." : i === 10 ? "Sent reminder last week." : null,

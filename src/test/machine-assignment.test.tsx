@@ -1,12 +1,12 @@
+import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 
 /**
  * Contract test: MachinesList must resolve assigned renter via
- * machine.assigned_renter_id → renters.id (NOT renter.machine_id).
+ * machine.assigned_renter_id -> renters.id.
  *
  * We test the lookup logic directly rather than rendering the full component,
- * because the component has deep provider dependencies. This is intentionally
- * narrow — it catches the exact drift that occurred.
+ * because the component has deep provider dependencies.
  */
 
 interface MockMachine {
@@ -16,7 +16,6 @@ interface MockMachine {
 
 interface MockRenter {
   id: string;
-  machine_id: string | null;
   name: string;
 }
 
@@ -28,8 +27,8 @@ function getRenterForMachine(machine: MockMachine, renters: MockRenter[]) {
 
 describe("Machine assignment source-of-truth", () => {
   const renters: MockRenter[] = [
-    { id: "renter-1", machine_id: "machine-A", name: "Alice" },
-    { id: "renter-2", machine_id: null, name: "Bob" },
+    { id: "renter-1", name: "Alice" },
+    { id: "renter-2", name: "Bob" },
   ];
 
   it("resolves assigned renter via machine.assigned_renter_id", () => {
@@ -44,18 +43,20 @@ describe("Machine assignment source-of-truth", () => {
     expect(result).toBeUndefined();
   });
 
-  it("does NOT use renter.machine_id for lookup", () => {
-    // Machine has no assigned_renter_id, but renter-1 has machine_id pointing to it.
-    // The canonical lookup must NOT find renter-1 via this legacy field.
-    const machine: MockMachine = { id: "machine-A", assigned_renter_id: null };
-    const result = getRenterForMachine(machine, renters);
-    expect(result).toBeUndefined();
-  });
-
-  it("handles mismatched legacy machine_id without confusion", () => {
-    // renter-1.machine_id = "machine-A", but machine-A.assigned_renter_id points elsewhere
+  it("ignores machine.id when resolving the renter", () => {
     const machine: MockMachine = { id: "machine-A", assigned_renter_id: "renter-2" };
     const result = getRenterForMachine(machine, renters);
-    expect(result?.name).toBe("Bob"); // canonical wins over legacy
+    expect(result?.name).toBe("Bob");
+  });
+
+  it("does not expose renter-side machine assignment in generated types", () => {
+    const types = readFileSync(`${process.cwd()}/src/integrations/supabase/types.ts`, "utf8");
+    const renterTableStart = types.indexOf("      renters: {");
+    const renterTableEnd = types.indexOf("      stripe_keys:", renterTableStart);
+    expect(renterTableStart).toBeGreaterThan(-1);
+    expect(renterTableEnd).toBeGreaterThan(renterTableStart);
+    const renterTable = types.slice(renterTableStart, renterTableEnd);
+
+    expect(renterTable).not.toContain("machine_id");
   });
 });
