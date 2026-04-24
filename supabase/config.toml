@@ -29,3 +29,9 @@ verify_jwt = false
 
 [functions.customer-portal]
 verify_jwt = false
+
+[functions.renter-portal-admin]
+verify_jwt = false
+
+[functions.renter-portal]
+verify_jwt = false

@@ -24,6 +24,7 @@ Vertical SaaS for washer/dryer rental operators. Billing clarity + renter system
 | `/import` | ImportPage | CSV/XLSX/image import for renters + machines |
 | `/auth` | AuthPage | Login/signup |
 | `/reset-password` | ResetPasswordPage | Password reset |
+| `/portal/:token` | RenterPortal | Public renter portal for balance, due date, autopay status, and payment-method updates |
 
 ## Real Mode vs Demo Mode
 
@@ -59,6 +60,8 @@ Assignment writes should go through the guarded assignment hooks in `useSupabase
 | `create-checkout` | User-authenticated | Standard JWT via Supabase client |
 | `create-subscription` | User-authenticated | Standard JWT |
 | `create-setup-link` | User-authenticated | Standard JWT |
+| `renter-portal-admin` | User-authenticated | Standard JWT checked inside the function |
+| `renter-portal` | Public token-based | Validates hashed portal token inside the function |
 | `customer-portal` | User-authenticated | Standard JWT |
 | `check-stripe-connection` | User-authenticated | Standard JWT |
 | `check-subscription` | User-authenticated | Standard JWT |
@@ -123,6 +126,12 @@ Autopay start behavior now means:
 - Operator-created maintenance logs use `source = 'operator'`; future renter-portal logs must use `source = 'renter_portal'`.
 - `maintenance_logs.machine_id` is optional. When the operator chooses a renter, the UI may prefill a machine only when exactly one machine has `machines.assigned_renter_id = renters.id`.
 - Maintenance archives use `archived_at`; active maintenance hooks hide archived rows by default.
+
+## Renter Portal Contract
+
+- `renter_portal_tokens` stores only a `token_hash`; raw portal links are created once and must be copied when generated.
+- Portal reads and payment-method updates go through the `renter-portal` Edge Function; the public page must not read renter tables directly from the browser.
+- Portal payment-method updates use the operator's renter-billing Stripe context from `stripe_keys`, not the SaaS billing key path.
 
 
 ## Project Operating Docs

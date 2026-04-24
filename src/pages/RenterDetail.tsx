@@ -60,6 +60,7 @@ export default function RenterDetail() {
   const addBalanceAdjustment = useAddRenterBalanceAdjustment();
   const removeBalanceAdjustment = useRemoveRenterBalanceAdjustment();
   const [sendingSetup, setSendingSetup] = useState(false);
+  const [creatingPortalLink, setCreatingPortalLink] = useState(false);
   const [activating, setActivating] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -204,6 +205,25 @@ export default function RenterDetail() {
       toast.error(getErrorMessage(err, "Failed to create setup link"));
     } finally {
       setSendingSetup(false);
+    }
+  };
+
+  const handleCopyPortalLink = async () => {
+    if (!id) return;
+
+    setCreatingPortalLink(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("renter-portal-admin", {
+        body: { action: "create", renter_id: id },
+      });
+      if (error) throw error;
+      if (!data?.url) throw new Error("Missing renter portal URL");
+      await navigator.clipboard.writeText(data.url);
+      toast.success("Renter portal link copied to clipboard.");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Failed to create renter portal link"));
+    } finally {
+      setCreatingPortalLink(false);
     }
   };
 
@@ -573,6 +593,20 @@ export default function RenterDetail() {
                   <p className="text-xs text-muted-foreground">{BANK_ACCOUNT_RECOMMENDATION}</p>
                 </>
               )}
+
+              <div className="border-t border-border/60 pt-3">
+                <Button size="sm" variant="outline" onClick={handleCopyPortalLink} disabled={creatingPortalLink}>
+                  {creatingPortalLink ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  ) : (
+                    <Globe className="h-4 w-4" />
+                  )}
+                  Copy Renter Portal Link
+                </Button>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  → Lets the renter review balance, next due date, autopay status, and update their payment method.
+                </p>
+              </div>
             </CardContent>
           </Card>
 

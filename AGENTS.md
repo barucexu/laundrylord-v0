@@ -14,9 +14,10 @@ Read these before making meaningful changes:
 2. `RULES.md` for non-negotiable engineering guardrails
 3. `ARCHITECTURE.md` for system boundaries, especially SaaS billing vs renter billing
 4. `WORKFLOW.md` for the default plan -> implement -> review operating loop
-5. `REVIEW_STANDARD.md` for what counts as an acceptable plan review or implementation review
-6. `BILLING_POLICY.md` when changing pricing, plan gating, archive semantics, or billable-count logic
-7. `QA_RUNBOOK.md` when touching pricing, billing, imports, or enforcement
+5. `PHASE_WORKFLOW.md` for multi-phase thread hygiene, handoffs, and completion packets
+6. `REVIEW_STANDARD.md` for what counts as an acceptable plan review or implementation review
+7. `BILLING_POLICY.md` when changing pricing, plan gating, archive semantics, or billable-count logic
+8. `QA_RUNBOOK.md` when touching pricing, billing, imports, or enforcement
 
 ## Current project direction
 
@@ -99,6 +100,31 @@ For multi-phase work, stop after each declared phase and verify that:
 3. Known risks for the phase are documented
 4. The next phase still makes sense given what was learned
 
+## Phase workflow / thread hygiene
+
+Use `PHASE_WORKFLOW.md`.
+
+When the user says "work on Phase X" or similar:
+
+1. First check whether the current session already has a focused Phase X handoff
+2. If not, do not begin implementation yet
+3. Instead, remind the user to start a fresh Phase X thread or session
+4. Provide the exact Phase X handoff block the user should paste there
+
+For each phase thread:
+
+1. Stay scoped to that phase only
+2. Do not start later phases unless explicitly approved
+3. After implementation, provide manual smoke tests
+4. After manual tests pass, produce a concise completion packet for the master planning thread
+
+The master planning thread remains the source of truth for:
+
+1. Phase status
+2. Phase approvals
+3. Next-phase handoffs
+4. Cross-phase re-scoping
+
 ## Validation commands
 
 This repo currently exposes these package scripts:
@@ -135,7 +161,8 @@ Before wrapping up, confirm:
 3. If working in a cloud or detached environment, do not assume the repo is current without an explicit branch/SHA check
 4. If the environment cannot verify remote state, say so clearly before continuing with risky work
 5. If the user has asked for implementation rather than planning-only, default to committing, pushing, opening a PR, and merging after validation passes unless the user explicitly says not to publish yet
-6. After publishing code needed for Lovable testing, give the user a tiny Lovable-ready redeploy message naming only the changed edge functions that need redeploy
+6. Treat push-and-merge as the normal finish state for validated implementation work so Lovable can see it immediately; do not stop at a local commit unless the user explicitly wants a checkpoint before publishing
+7. After publishing code needed for Lovable testing, give the user a tiny Lovable-ready redeploy message naming only the changed edge functions that need redeploy
 
 ## Database access guidance
 

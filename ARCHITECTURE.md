@@ -32,6 +32,8 @@ This project runs on a Lovable Cloud-managed Supabase backend. That hosting mode
 - `supabase/functions/save-stripe-key`
 - `supabase/functions/check-stripe-connection`
 - `supabase/functions/create-setup-link`
+- `supabase/functions/renter-portal-admin`
+- `supabase/functions/renter-portal`
 - `supabase/functions/create-subscription`
 - `supabase/functions/stripe-webhook`
 
