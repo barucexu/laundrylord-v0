@@ -686,21 +686,21 @@ export type Database = {
           billable_until?: string | null
           created_at?: string
           days_late?: number
-          deposit_amount?: number
+          deposit_amount: number
           deposit_collected?: boolean
           dryer_outlet?: string | null
           email?: string | null
           has_payment_method?: boolean
           id?: string
-          install_fee?: number
+          install_fee: number
           install_fee_collected?: boolean
           install_notes?: string | null
           language?: string | null
-          late_fee?: number
+          late_fee: number
           laundrylord_email?: string | null
           lease_start_date?: string | null
           min_term_end_date?: string | null
-          monthly_rate?: number
+          monthly_rate: number
           name?: string | null
           next_due_date?: string | null
           notes?: string | null
