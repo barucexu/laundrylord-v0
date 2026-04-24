@@ -29,13 +29,11 @@ export type ImportOperatorDefaults = {
 export type PreviewRowStatus =
   | "ready"
   | "review_needed"
-  | "validation_blocked"
   | "skipped_empty"
   | "deleted_by_operator";
 
 export type ImportExecutionStatus =
   | "imported"
-  | "validation_blocked"
   | "blocked_by_plan"
   | "failed_insert"
   | "skipped_empty"
@@ -53,7 +51,6 @@ export type ClassifiedRow = {
   extrasPreview: string[];
   customFields: ImportedCustomField[];
   warnings: string[];
-  validationErrors: string[];
 };
 
 export type ImportSummary = Record<ImportExecutionStatus, number> & {

@@ -86,7 +86,7 @@ describe("import engine", () => {
     });
   });
 
-  it("blocks invalid mapped renter financial values before insert", async () => {
+  it("uses operator settings defaults for invalid mapped renter financial values", async () => {
     const rows = classifyImportRows({
       headers: ["Name", "Monthly Rate"],
       rows: [["Alice", "abc"], ["Bob", "75"]],
@@ -104,8 +104,9 @@ describe("import engine", () => {
       },
     });
 
-    expect(getPreviewStatus(rows[0])).toBe("validation_blocked");
-    expect(rows[0].validationErrors).toEqual(["Monthly Rate must be a valid number"]);
+    expect(getPreviewStatus(rows[0])).toBe("review_needed");
+    expect(rows[0].warnings).toEqual(["Monthly Rate invalid"]);
+    expect(rows[0].record.monthly_rate).toBe(65);
 
     const callbacks = createImportCallbacks();
     const { summary, results } = await executeImport({
@@ -116,11 +117,11 @@ describe("import engine", () => {
       ...callbacks,
     });
 
-    expect(callbacks.insertRow).toHaveBeenCalledOnce();
-    expect(callbacks.insertRow.mock.calls[0][1]).toMatchObject({ name: "Bob", monthly_rate: 75 });
-    expect(summary.validation_blocked).toBe(1);
-    expect(summary.imported).toBe(1);
-    expect(results.map((row) => row.status)).toEqual(["validation_blocked", "imported"]);
+    expect(callbacks.insertRow).toHaveBeenCalledTimes(2);
+    expect(callbacks.insertRow.mock.calls[0][1]).toMatchObject({ name: "Alice", monthly_rate: 65 });
+    expect(callbacks.insertRow.mock.calls[1][1]).toMatchObject({ name: "Bob", monthly_rate: 75 });
+    expect(summary.imported).toBe(2);
+    expect(results.map((row) => row.status)).toEqual(["imported", "imported"]);
   });
 
   it("normalizes machine enums to DB-safe lowercase values", () => {
@@ -191,7 +192,7 @@ describe("import engine", () => {
     expect(results.map((row) => row.status)).toEqual(["imported", "blocked_by_plan"]);
   });
 
-  it("does not spend plan slots on validation-blocked renter rows", async () => {
+  it("counts invalid-financial fallback rows against plan slots after importing them", async () => {
     const rows = classifyImportRows({
       headers: ["Name", "Monthly Rate"],
       rows: [["Bad Rate", "nope"], ["Alice", "70"], ["Bob", "75"]],
@@ -213,10 +214,10 @@ describe("import engine", () => {
     });
 
     expect(callbacks.insertRow).toHaveBeenCalledOnce();
-    expect(summary.validation_blocked).toBe(1);
+    expect(callbacks.insertRow.mock.calls[0][1]).toMatchObject({ name: "Bad Rate", monthly_rate: 150 });
     expect(summary.imported).toBe(1);
-    expect(summary.blocked_by_plan).toBe(1);
-    expect(results.map((row) => row.status)).toEqual(["validation_blocked", "imported", "blocked_by_plan"]);
+    expect(summary.blocked_by_plan).toBe(2);
+    expect(results.map((row) => row.status)).toEqual(["imported", "blocked_by_plan", "blocked_by_plan"]);
   });
 
   it("keeps partial success when one row fails to insert", async () => {

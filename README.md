@@ -113,7 +113,7 @@ Autopay start behavior now means:
 
 ## Import Contracts
 
-- Renter import financial fields use explicit app values: valid mapped values win, blank or unmapped `monthly_rate`, `install_fee`, `deposit_amount`, and `late_fee` use operator settings defaults, and invalid mapped financial values are blocked before insert.
+- Renter import financial fields use explicit app values: valid mapped values win, blank, unmapped, or invalid `monthly_rate`, `install_fee`, `deposit_amount`, and `late_fee` values use operator settings defaults.
 - Extra import columns are stored as custom fields. Renter list search may include those custom-field labels and values through the batched renter custom-field query; it is not a global app search.
 
 

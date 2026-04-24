@@ -237,7 +237,6 @@ export default function ImportPage() {
     const counts: Record<PreviewRowStatus, number> = {
       ready: 0,
       review_needed: 0,
-      validation_blocked: 0,
       skipped_empty: 0,
       deleted_by_operator: 0,
     };
@@ -253,7 +252,7 @@ export default function ImportPage() {
     () =>
       classifiedRows.filter((row) => {
         const status = getPreviewStatus(row);
-        return status !== "skipped_empty" && status !== "deleted_by_operator" && status !== "validation_blocked";
+        return status !== "skipped_empty" && status !== "deleted_by_operator";
       }).length,
     [classifiedRows],
   );
@@ -438,9 +437,6 @@ export default function ImportPage() {
                 <Badge variant="outline" className="text-xs border-amber-300 text-amber-700">
                   {previewCounts.review_needed} review needed
                 </Badge>
-                <Badge variant="outline" className="text-xs border-destructive/40 text-destructive">
-                  {previewCounts.validation_blocked} validation blocked
-                </Badge>
                 <Badge variant="outline" className="text-xs text-muted-foreground">
                   {previewCounts.skipped_empty} fully empty
                 </Badge>
@@ -526,11 +522,6 @@ export default function ImportPage() {
                                 Review Needed
                               </Badge>
                             )}
-                            {status === "validation_blocked" && (
-                              <Badge variant="outline" className="text-xs text-destructive border-destructive/40">
-                                Blocked
-                              </Badge>
-                            )}
                             {status === "skipped_empty" && (
                               <Badge variant="outline" className="text-xs text-muted-foreground">
                                 Empty
@@ -543,9 +534,7 @@ export default function ImportPage() {
                             )}
                           </TableCell>
                           <TableCell className="text-xs text-amber-700">
-                            {[...row.validationErrors, ...row.warnings].length > 0
-                              ? [...row.validationErrors, ...row.warnings].join(", ")
-                              : "—"}
+                            {row.warnings.length > 0 ? row.warnings.join(", ") : "—"}
                           </TableCell>
                           <TableCell className="text-right">
                             {status === "skipped_empty" ? (
@@ -623,7 +612,6 @@ export default function ImportPage() {
               <CheckCircle className="h-12 w-12 text-primary mx-auto" />
               <div className="space-y-2 text-sm">
                 <SummaryLine label="Imported" value={result?.imported ?? 0} />
-                <SummaryLine label="Validation blocked" value={result?.validation_blocked ?? 0} highlight="destructive" />
                 <SummaryLine label="Blocked by plan" value={result?.blocked_by_plan ?? 0} highlight="destructive" />
                 <SummaryLine label="Failed insert" value={result?.failed_insert ?? 0} highlight="destructive" />
                 <SummaryLine label="Skipped empty" value={result?.skipped_empty ?? 0} />

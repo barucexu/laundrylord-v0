@@ -95,7 +95,6 @@ export function classifyImportRows(args: {
         extrasPreview: [],
         customFields: [],
         warnings: [],
-        validationErrors: [],
       };
     }
 
@@ -104,7 +103,6 @@ export function classifyImportRows(args: {
     const extras: string[] = [];
     const customFields: { key: string; label: string; value: string }[] = [];
     const warnings: string[] = [];
-    const validationErrors: string[] = [];
     let mappedNotes = "";
     let hasMappedContent = false;
 
@@ -131,9 +129,6 @@ export function classifyImportRows(args: {
 
       if (reviewWarning) warnings.push(reviewWarning);
       if (invalidNote) extras.push(invalidNote);
-      if (mode === "renters" && isRenterFinancialField(field.key) && value === null) {
-        validationErrors.push(`${field.label} must be a valid number`);
-      }
     }
 
     if (mode === "renters" && hasAnyContent) {
@@ -174,7 +169,7 @@ export function classifyImportRows(args: {
 
     return {
       index,
-      baseStatus: validationErrors.length > 0 ? "validation_blocked" : warnings.length > 0 ? "review_needed" : "ready",
+      baseStatus: warnings.length > 0 ? "review_needed" : "ready",
       decision: "active",
       hasAnyContent: true,
       hasMappedContent,
@@ -184,7 +179,6 @@ export function classifyImportRows(args: {
       extrasPreview: extras,
       customFields,
       warnings,
-      validationErrors,
     };
   });
 }
@@ -216,14 +210,6 @@ export async function executeImport(args: ExecuteImportArgs): Promise<{
       continue;
     }
 
-    if (previewStatus === "validation_blocked") {
-      const message = row.validationErrors[0] ?? "Row has validation errors.";
-      summary.validation_blocked++;
-      if (!summary.firstError) summary.firstError = message;
-      results.push({ index: row.index, status: "validation_blocked", error: message });
-      continue;
-    }
-
     if (mode === "renters" && importedRenters >= renterSlotsAvailable) {
       summary.blocked_by_plan++;
       results.push({ index: row.index, status: "blocked_by_plan" });
@@ -251,14 +237,6 @@ export async function executeImport(args: ExecuteImportArgs): Promise<{
           if (remainingStatus === "deleted_by_operator") {
             summary.deleted_by_operator++;
             results.push({ index: remainingRow.index, status: "deleted_by_operator" });
-            continue;
-          }
-
-          if (remainingStatus === "validation_blocked") {
-            const message = remainingRow.validationErrors[0] ?? "Row has validation errors.";
-            summary.validation_blocked++;
-            if (!summary.firstError) summary.firstError = message;
-            results.push({ index: remainingRow.index, status: "validation_blocked", error: message });
             continue;
           }
 
@@ -354,7 +332,6 @@ export function toggleRowDeleted(rows: ClassifiedRow[], index: number): Classifi
 export function createEmptySummary(): ImportSummary {
   return {
     imported: 0,
-    validation_blocked: 0,
     blocked_by_plan: 0,
     failed_insert: 0,
     skipped_empty: 0,
@@ -489,13 +466,9 @@ function findFieldLabel(fields: ImportField[], key: string): string {
   return fields.find((field) => field.key === key)?.label ?? key;
 }
 
-function isRenterFinancialField(key: string): key is keyof typeof RENTER_FINANCIAL_DEFAULT_FIELDS {
-  return key in RENTER_FINANCIAL_DEFAULT_FIELDS;
-}
-
 function applyRenterFinancialDefaults(record: Record<string, unknown>, operatorDefaults: ImportOperatorDefaults) {
   for (const [fieldKey, defaultKey] of Object.entries(RENTER_FINANCIAL_DEFAULT_FIELDS)) {
-    if (record[fieldKey] === undefined || record[fieldKey] === "") {
+    if (record[fieldKey] === undefined || record[fieldKey] === null || record[fieldKey] === "") {
       record[fieldKey] = operatorDefaults[defaultKey as keyof ImportOperatorDefaults];
     }
   }

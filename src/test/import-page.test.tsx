@@ -258,7 +258,7 @@ describe("ImportPage", () => {
     });
   });
 
-  it("does not insert validation-blocked renter financial rows", async () => {
+  it("imports invalid renter financial values with operator settings defaults", async () => {
     mockParseCSV.mockResolvedValue({
       headers: ["Name", "Monthly Rate"],
       rows: [["Alice", "nope"], ["Bob", "75"]],
@@ -270,17 +270,14 @@ describe("ImportPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Preview Import" }));
 
-    expect(await screen.findByText("Blocked")).toBeInTheDocument();
-    expect(
-      screen.getAllByText((_, element) => element?.textContent?.includes("Monthly Rate must be a valid number") ?? false)
-        .length,
-    ).toBeGreaterThan(0);
+    expect(await screen.findByText("Review Needed")).toBeInTheDocument();
+    expect(screen.getAllByText((_, element) => element?.textContent?.includes("Monthly Rate invalid") ?? false).length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("button", { name: "Import 1 Rows" }));
+    fireEvent.click(screen.getByRole("button", { name: "Import 2 Rows" }));
     await screen.findByRole("button", { name: "Import More" });
 
-    expect(mockInsert).toHaveBeenCalledTimes(1);
-    expect(mockInsert.mock.calls[0][0]).toMatchObject({ name: "Bob", monthly_rate: 75 });
-    expect(screen.getAllByText((_, element) => element?.textContent === "1 validation blocked").length).toBeGreaterThan(0);
+    expect(mockInsert).toHaveBeenCalledTimes(2);
+    expect(mockInsert.mock.calls[0][0]).toMatchObject({ name: "Alice", monthly_rate: 65 });
+    expect(mockInsert.mock.calls[1][0]).toMatchObject({ name: "Bob", monthly_rate: 75 });
   });
 });
