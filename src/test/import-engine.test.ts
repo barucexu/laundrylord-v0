@@ -36,7 +36,7 @@ describe("import engine", () => {
   it("keeps mapped notes intact and preserves custom columns separately", () => {
     const [row] = classifyImportRows({
       headers: ["Name", "Notes", "Referral Source", "Lease Start Date", "Monthly Rate"],
-      rows: [["Alice", "Existing note", "cousin", "George", "abc"]],
+      rows: [["Alice", "Existing note", "cousin", "George", "125"]],
       mapping: {
         name: "Name",
         notes: "Notes",
@@ -48,10 +48,79 @@ describe("import engine", () => {
     });
 
     expect(row.record.lease_start_date).toBeNull();
-    expect(row.record.monthly_rate).toBeNull();
+    expect(row.record.monthly_rate).toBe(125);
     expect(row.record.notes).toBe("Existing note");
     expect(row.customFields).toEqual([{ key: "referral_source", label: "Referral Source", value: "cousin" }]);
-    expect(row.extrasPreview).toEqual(["Lease Start Date (raw): George", "Monthly Rate (raw): abc", "Referral Source: cousin"]);
+    expect(row.extrasPreview).toEqual(["Lease Start Date (raw): George", "Referral Source: cousin"]);
+  });
+
+  it("uses operator settings defaults for blank or unmapped renter financial fields", () => {
+    const rows = classifyImportRows({
+      headers: ["Name", "Monthly Rate"],
+      rows: [["Alice", ""], ["Bob", "80"]],
+      mapping: {
+        name: "Name",
+        monthly_rate: "Monthly Rate",
+      },
+      fields: RENTER_FIELDS,
+      mode: "renters",
+      operatorDefaults: {
+        default_monthly_rate: 65,
+        default_install_fee: 100,
+        default_deposit: 150,
+        late_fee_amount: 30,
+      },
+    });
+
+    expect(rows[0].record).toMatchObject({
+      monthly_rate: 65,
+      install_fee: 100,
+      deposit_amount: 150,
+      late_fee: 30,
+    });
+    expect(rows[1].record).toMatchObject({
+      monthly_rate: 80,
+      install_fee: 100,
+      deposit_amount: 150,
+      late_fee: 30,
+    });
+  });
+
+  it("blocks invalid mapped renter financial values before insert", async () => {
+    const rows = classifyImportRows({
+      headers: ["Name", "Monthly Rate"],
+      rows: [["Alice", "abc"], ["Bob", "75"]],
+      mapping: {
+        name: "Name",
+        monthly_rate: "Monthly Rate",
+      },
+      fields: RENTER_FIELDS,
+      mode: "renters",
+      operatorDefaults: {
+        default_monthly_rate: 65,
+        default_install_fee: 100,
+        default_deposit: 150,
+        late_fee_amount: 30,
+      },
+    });
+
+    expect(getPreviewStatus(rows[0])).toBe("validation_blocked");
+    expect(rows[0].validationErrors).toEqual(["Monthly Rate must be a valid number"]);
+
+    const callbacks = createImportCallbacks();
+    const { summary, results } = await executeImport({
+      rows,
+      mode: "renters",
+      userId: "user-1",
+      renterSlotsAvailable: 10,
+      ...callbacks,
+    });
+
+    expect(callbacks.insertRow).toHaveBeenCalledOnce();
+    expect(callbacks.insertRow.mock.calls[0][1]).toMatchObject({ name: "Bob", monthly_rate: 75 });
+    expect(summary.validation_blocked).toBe(1);
+    expect(summary.imported).toBe(1);
+    expect(results.map((row) => row.status)).toEqual(["validation_blocked", "imported"]);
   });
 
   it("normalizes machine enums to DB-safe lowercase values", () => {
@@ -120,6 +189,34 @@ describe("import engine", () => {
     expect(summary.imported).toBe(1);
     expect(summary.blocked_by_plan).toBe(1);
     expect(results.map((row) => row.status)).toEqual(["imported", "blocked_by_plan"]);
+  });
+
+  it("does not spend plan slots on validation-blocked renter rows", async () => {
+    const rows = classifyImportRows({
+      headers: ["Name", "Monthly Rate"],
+      rows: [["Bad Rate", "nope"], ["Alice", "70"], ["Bob", "75"]],
+      mapping: {
+        name: "Name",
+        monthly_rate: "Monthly Rate",
+      },
+      fields: RENTER_FIELDS,
+      mode: "renters",
+    });
+
+    const callbacks = createImportCallbacks();
+    const { summary, results } = await executeImport({
+      rows,
+      mode: "renters",
+      userId: "user-1",
+      renterSlotsAvailable: 1,
+      ...callbacks,
+    });
+
+    expect(callbacks.insertRow).toHaveBeenCalledOnce();
+    expect(summary.validation_blocked).toBe(1);
+    expect(summary.imported).toBe(1);
+    expect(summary.blocked_by_plan).toBe(1);
+    expect(results.map((row) => row.status)).toEqual(["validation_blocked", "imported", "blocked_by_plan"]);
   });
 
   it("keeps partial success when one row fails to insert", async () => {

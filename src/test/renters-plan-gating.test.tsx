@@ -11,6 +11,10 @@ vi.mock("@/hooks/useSupabaseData", () => ({
     data: [{ id: "renter-1", name: "Alice", phone: "555-1111", status: "active", balance: 0, paid_through_date: null, days_late: 0 }],
     isLoading: false,
   }),
+  useBatchedRenterCustomFieldSearch: () => ({
+    data: {},
+    isLoading: false,
+  }),
 }));
 
 vi.mock("@/hooks/useSubscription", () => ({

@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SupportFooter } from "@/components/SupportFooter";
 import { useAuth } from "@/hooks/useAuth";
+import { useOperatorSettings } from "@/hooks/useSupabaseData";
 import { useSubscription } from "@/hooks/useSubscription";
 import { supabase } from "@/integrations/supabase/client";
 import { BILLABLE_RENTER_COUNT_QUERY_KEY } from "@/lib/billing-counts";
@@ -27,10 +28,17 @@ type Step = "upload" | "map" | "preview" | "done";
 const ROWS_PER_PAGE = 25;
 const ACCEPTED_EXTENSIONS = [".csv", ".xlsx", ".png", ".jpg", ".jpeg"];
 const ACCEPT_STRING = ".csv,.xlsx,.png,.jpg,.jpeg";
+const FALLBACK_IMPORT_DEFAULTS = {
+  default_monthly_rate: 150,
+  default_install_fee: 75,
+  default_deposit: 0,
+  late_fee_amount: 25,
+};
 
 export default function ImportPage() {
   const { user } = useAuth();
   const { tier, billableCount, subscribed, loading: planLoading } = useSubscription();
+  const { data: operatorSettings, isLoading: operatorSettingsLoading } = useOperatorSettings();
   const queryClient = useQueryClient();
 
   const [importMode, setImportMode] = useState<ImportMode>("renters");
@@ -106,12 +114,26 @@ export default function ImportPage() {
   );
 
   const goToPreview = () => {
+    if (importMode === "renters" && operatorSettingsLoading) {
+      toast.error("Loading billing defaults. Please try again in a moment.");
+      return;
+    }
+
     const rows = classifyImportRows({
       headers,
       rows: rawData,
       mapping,
       fields: activeFields,
       mode: importMode,
+      operatorDefaults:
+        importMode === "renters"
+          ? {
+              default_monthly_rate: operatorSettings?.default_monthly_rate ?? FALLBACK_IMPORT_DEFAULTS.default_monthly_rate,
+              default_install_fee: operatorSettings?.default_install_fee ?? FALLBACK_IMPORT_DEFAULTS.default_install_fee,
+              default_deposit: operatorSettings?.default_deposit ?? FALLBACK_IMPORT_DEFAULTS.default_deposit,
+              late_fee_amount: operatorSettings?.late_fee_amount ?? FALLBACK_IMPORT_DEFAULTS.late_fee_amount,
+            }
+          : null,
     });
 
     setClassifiedRows(rows);
@@ -126,7 +148,7 @@ export default function ImportPage() {
   const handleImport = async () => {
     if (!user) return;
 
-      const hasMappedColumns = Object.values(mapping).some(Boolean);
+    const hasMappedColumns = Object.values(mapping).some(Boolean);
     if (!hasMappedColumns) {
       toast.error("No columns mapped. Map at least one column before importing.");
       return;
@@ -182,6 +204,7 @@ export default function ImportPage() {
       queryClient.invalidateQueries({ queryKey: [importMode === "renters" ? "renters" : "machines"] });
       if (importMode === "renters") {
         queryClient.invalidateQueries({ queryKey: BILLABLE_RENTER_COUNT_QUERY_KEY });
+        queryClient.invalidateQueries({ queryKey: ["custom_fields", "renter", "batch"] });
       }
 
       if (summary.imported === 0) {
@@ -214,6 +237,7 @@ export default function ImportPage() {
     const counts: Record<PreviewRowStatus, number> = {
       ready: 0,
       review_needed: 0,
+      validation_blocked: 0,
       skipped_empty: 0,
       deleted_by_operator: 0,
     };
@@ -229,7 +253,7 @@ export default function ImportPage() {
     () =>
       classifiedRows.filter((row) => {
         const status = getPreviewStatus(row);
-        return status !== "skipped_empty" && status !== "deleted_by_operator";
+        return status !== "skipped_empty" && status !== "deleted_by_operator" && status !== "validation_blocked";
       }).length,
     [classifiedRows],
   );
@@ -414,6 +438,9 @@ export default function ImportPage() {
                 <Badge variant="outline" className="text-xs border-amber-300 text-amber-700">
                   {previewCounts.review_needed} review needed
                 </Badge>
+                <Badge variant="outline" className="text-xs border-destructive/40 text-destructive">
+                  {previewCounts.validation_blocked} validation blocked
+                </Badge>
                 <Badge variant="outline" className="text-xs text-muted-foreground">
                   {previewCounts.skipped_empty} fully empty
                 </Badge>
@@ -499,6 +526,11 @@ export default function ImportPage() {
                                 Review Needed
                               </Badge>
                             )}
+                            {status === "validation_blocked" && (
+                              <Badge variant="outline" className="text-xs text-destructive border-destructive/40">
+                                Blocked
+                              </Badge>
+                            )}
                             {status === "skipped_empty" && (
                               <Badge variant="outline" className="text-xs text-muted-foreground">
                                 Empty
@@ -511,7 +543,9 @@ export default function ImportPage() {
                             )}
                           </TableCell>
                           <TableCell className="text-xs text-amber-700">
-                            {row.warnings.length > 0 ? row.warnings.join(", ") : "—"}
+                            {[...row.validationErrors, ...row.warnings].length > 0
+                              ? [...row.validationErrors, ...row.warnings].join(", ")
+                              : "—"}
                           </TableCell>
                           <TableCell className="text-right">
                             {status === "skipped_empty" ? (
@@ -589,6 +623,7 @@ export default function ImportPage() {
               <CheckCircle className="h-12 w-12 text-primary mx-auto" />
               <div className="space-y-2 text-sm">
                 <SummaryLine label="Imported" value={result?.imported ?? 0} />
+                <SummaryLine label="Validation blocked" value={result?.validation_blocked ?? 0} highlight="destructive" />
                 <SummaryLine label="Blocked by plan" value={result?.blocked_by_plan ?? 0} highlight="destructive" />
                 <SummaryLine label="Failed insert" value={result?.failed_insert ?? 0} highlight="destructive" />
                 <SummaryLine label="Skipped empty" value={result?.skipped_empty ?? 0} />

@@ -729,6 +729,64 @@ export function useEntityCustomFields(entityType: CustomFieldEntityType, entityI
   return supaQuery;
 }
 
+export function useBatchedRenterCustomFieldSearch(renterIds: string[]) {
+  const { user } = useAuth();
+  const demo = useDemo();
+  const stableRenterIds = [...new Set(renterIds)].sort();
+
+  const supaQuery = useQuery({
+    queryKey: ["custom_fields", "renter", "batch", stableRenterIds.join("|")],
+    enabled: !!user && stableRenterIds.length > 0 && !demo?.isDemo,
+    queryFn: async () => {
+      const { data: valuesData, error: valuesError } = await supabase
+        .from("custom_field_values")
+        .select("*")
+        .eq("user_id", user!.id)
+        .eq("entity_type", "renter")
+        .in("entity_id", stableRenterIds);
+      if (valuesError) throw valuesError;
+
+      const values = (valuesData ?? []) as CustomFieldValueRow[];
+      if (values.length === 0) return {} as Record<string, CustomFieldEntry[]>;
+
+      const definitionIds = [...new Set(values.map((value) => value.field_definition_id))];
+      const { data: definitionsData, error: definitionsError } = await supabase
+        .from("custom_field_definitions")
+        .select("*")
+        .eq("user_id", user!.id)
+        .eq("entity_type", "renter")
+        .in("id", definitionIds);
+      if (definitionsError) throw definitionsError;
+
+      const definitions = new Map(
+        ((definitionsData ?? []) as CustomFieldDefinitionRow[]).map((definition) => [definition.id, definition]),
+      );
+
+      return values.reduce<Record<string, CustomFieldEntry[]>>((acc, value) => {
+        const definition = definitions.get(value.field_definition_id);
+        if (!definition) return acc;
+
+        const entry = {
+          field_definition_id: definition.id,
+          key: definition.key,
+          label: definition.label,
+          value_type: definition.value_type as CustomFieldValueType,
+          value: getCustomFieldValue(definition.value_type as CustomFieldValueType, value),
+        } satisfies CustomFieldEntry;
+
+        acc[value.entity_id] = [...(acc[value.entity_id] ?? []), entry];
+        return acc;
+      }, {});
+    },
+  });
+
+  if (demo?.isDemo || stableRenterIds.length === 0) {
+    return { ...supaQuery, data: {}, isLoading: false, error: null };
+  }
+
+  return supaQuery;
+}
+
 export function useUpsertCustomFieldValues(entityType: CustomFieldEntityType) {
   const queryClient = useQueryClient();
   const { user } = useAuth();

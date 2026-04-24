@@ -111,6 +111,11 @@ Autopay start behavior now means:
 | `payments.status` | `upcoming`, `due_soon`, `overdue`, `failed`, `paid` |
 | `timeline_events.type` | `created`, `machine_assigned`, `payment_succeeded`, `payment_failed`, `payment_method_saved`, `late_fee`, `maintenance_opened`, `maintenance_resolved`, `pickup_scheduled`, `pickup_completed`, `note` |
 
+## Import Contracts
+
+- Renter import financial fields use explicit app values: valid mapped values win, blank or unmapped `monthly_rate`, `install_fee`, `deposit_amount`, and `late_fee` use operator settings defaults, and invalid mapped financial values are blocked before insert.
+- Extra import columns are stored as custom fields. Renter list search may include those custom-field labels and values through the batched renter custom-field query; it is not a global app search.
+
 
 ## Project Operating Docs
 
@@ -139,6 +144,8 @@ Key contract tests:
 - `machine-assignment.test.tsx` — proves assignment lookup uses `assigned_renter_id`
 - `renter-detail-timeline.test.tsx` — proves all backend event types have UI icon mappings
 - `import-linking.test.tsx` — proves import linking uses canonical relation
+- `import-engine.test.ts` and `import-page.test.tsx` — prove importer defaults, validation-blocking, custom fields, and plan-cap behavior
+- `renter-search.test.ts` — proves renter list search text includes imported custom-field values
 
 ## Tech Stack
 

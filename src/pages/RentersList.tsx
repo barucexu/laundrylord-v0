@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
-import { useRenters } from "@/hooks/useSupabaseData";
+import { useBatchedRenterCustomFieldSearch, useRenters } from "@/hooks/useSupabaseData";
 import { useSubscription } from "@/hooks/useSubscription";
+import { buildRenterSearchText } from "@/lib/renter-search";
 import { tierUpgradeLabel } from "@/lib/pricing-tiers";
 import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
 import { Search, Plus } from "lucide-react";
@@ -32,9 +33,13 @@ export default function RentersList() {
     confirmUpgrade,
     cancelUpgrade,
   } = useSubscription();
+  const renterIds = useMemo(() => renters.map((r) => r.id), [renters]);
+  const { data: renterCustomFieldsById = {} } = useBatchedRenterCustomFieldSearch(renterIds);
 
   const filtered = renters.filter(r => {
-    const matchesSearch = r.name.toLowerCase().includes(search.toLowerCase()) || (r.phone || "").includes(search);
+    const normalizedSearch = search.trim().toLowerCase();
+    const matchesSearch =
+      !normalizedSearch || buildRenterSearchText(r, renterCustomFieldsById[r.id] ?? []).includes(normalizedSearch);
     const matchesStatus = statusFilter === "all" || r.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -85,7 +90,7 @@ export default function RentersList() {
       <div className="flex gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search name or phone..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+          <Input placeholder="Search renters..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[180px]">
