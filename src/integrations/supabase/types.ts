@@ -664,7 +664,6 @@ export type Database = {
           late_fee: number
           laundrylord_email: string | null
           lease_start_date: string | null
-          machine_id: string | null
           min_term_end_date: string | null
           monthly_rate: number
           name: string | null
@@ -700,7 +699,6 @@ export type Database = {
           late_fee?: number
           laundrylord_email?: string | null
           lease_start_date?: string | null
-          machine_id?: string | null
           min_term_end_date?: string | null
           monthly_rate?: number
           name?: string | null
@@ -736,7 +734,6 @@ export type Database = {
           late_fee?: number
           laundrylord_email?: string | null
           lease_start_date?: string | null
-          machine_id?: string | null
           min_term_end_date?: string | null
           monthly_rate?: number
           name?: string | null
@@ -752,22 +749,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "fk_renters_machine"
-            columns: ["machine_id"]
-            isOneToOne: false
-            referencedRelation: "machines"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_renters_machine"
-            columns: ["machine_id"]
-            isOneToOne: false
-            referencedRelation: "v_machines_with_owner"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       stripe_keys: {
         Row: {
@@ -986,7 +968,6 @@ export type Database = {
           install_notes: string | null
           language: string | null
           lease_start_date: string | null
-          legacy_machine_id: string | null
           min_term_end_date: string | null
           monthly_rate: number | null
           next_due_date: string | null
@@ -1005,22 +986,7 @@ export type Database = {
           updated_at: string | null
           user_id: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "fk_renters_machine"
-            columns: ["legacy_machine_id"]
-            isOneToOne: false
-            referencedRelation: "machines"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_renters_machine"
-            columns: ["legacy_machine_id"]
-            isOneToOne: false
-            referencedRelation: "v_machines_with_owner"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       v_audit_timeline_events: {
         Row: {
@@ -1140,7 +1106,6 @@ export type Database = {
           late_fee: number | null
           laundrylord_email: string | null
           lease_start_date: string | null
-          machine_id: string | null
           min_term_end_date: string | null
           monthly_rate: number | null
           name: string | null
@@ -1176,7 +1141,6 @@ export type Database = {
           late_fee?: number | null
           laundrylord_email?: string | null
           lease_start_date?: string | null
-          machine_id?: string | null
           min_term_end_date?: string | null
           monthly_rate?: number | null
           name?: string | null
@@ -1212,7 +1176,6 @@ export type Database = {
           late_fee?: number | null
           laundrylord_email?: string | null
           lease_start_date?: string | null
-          machine_id?: string | null
           min_term_end_date?: string | null
           monthly_rate?: number | null
           name?: string | null
@@ -1228,22 +1191,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "fk_renters_machine"
-            columns: ["machine_id"]
-            isOneToOne: false
-            referencedRelation: "machines"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_renters_machine"
-            columns: ["machine_id"]
-            isOneToOne: false
-            referencedRelation: "v_machines_with_owner"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       v_renters_with_owner: {
         Row: {
@@ -1265,8 +1213,8 @@ export type Database = {
           install_notes: string | null
           language: string | null
           late_fee: number | null
+          laundrylord_email: string | null
           lease_start_date: string | null
-          machine_id: string | null
           min_term_end_date: string | null
           monthly_rate: number | null
           name: string | null
@@ -1283,22 +1231,7 @@ export type Database = {
           updated_at: string | null
           user_id: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "fk_renters_machine"
-            columns: ["machine_id"]
-            isOneToOne: false
-            referencedRelation: "machines"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_renters_machine"
-            columns: ["machine_id"]
-            isOneToOne: false
-            referencedRelation: "v_machines_with_owner"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Functions: {

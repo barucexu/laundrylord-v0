@@ -25,7 +25,6 @@ function renter(overrides: Partial<RenterRow> = {}): RenterRow {
     late_fee: 25,
     laundrylord_email: null,
     lease_start_date: null,
-    machine_id: null,
     min_term_end_date: null,
     next_due_date: null,
     notes: null,

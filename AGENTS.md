@@ -29,7 +29,7 @@ Read these before making meaningful changes:
 ## Repo truths to preserve
 
 1. Machine assignment source of truth is `machines.assigned_renter_id`
-2. Do not introduce logic that reads `renters.machine_id` as canonical
+2. Do not reintroduce renter-side machine assignment state
 3. Machine assignment mutations should use the guarded assign/unassign hooks and `src/lib/machine-assignment.ts`, not ad hoc `useUpdateMachine` calls or UI-only availability filters
 4. SaaS billing and renter billing are separate systems with separate key and trust contexts
 5. Persisted enums and status values cannot drift silently; update docs, UI mappings, and tests together

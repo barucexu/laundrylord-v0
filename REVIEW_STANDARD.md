@@ -64,7 +64,7 @@ Review must confirm:
 Review must confirm:
 
 1. Canonical reads/writes use `machines.assigned_renter_id`
-2. No new canonical dependency on `renters.machine_id`
+2. No renter-side assignment field or canonical dependency is introduced
 3. Import and UI flows remain aligned with the canonical relation
 
 ### Timeline / persisted value work
