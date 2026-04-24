@@ -21,6 +21,7 @@ import ImportPage from "@/pages/ImportPage";
 import RenterArchive from "@/pages/RenterArchive";
 import AuthPage from "@/pages/AuthPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import RenterPortal from "@/pages/RenterPortal";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -60,6 +61,7 @@ const App = () => (
               <ResetPasswordPage />
             </AuthProvider>
           } />
+          <Route path="/portal/:token" element={<RenterPortal />} />
 
           {/* Demo routes — DemoProvider + AuthProvider(isDemo) */}
           <Route path="/demo" element={

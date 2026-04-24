@@ -751,6 +751,39 @@ export type Database = {
         }
         Relationships: []
       }
+      renter_portal_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          renter_id: string
+          revoked_at: string | null
+          token_hash: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          renter_id: string
+          revoked_at?: string | null
+          token_hash: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          renter_id?: string
+          revoked_at?: string | null
+          token_hash?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       stripe_keys: {
         Row: {
           created_at: string

@@ -63,6 +63,7 @@ Use this runbook before merging any plan/billing enforcement change.
 ## 8) Post-smoke billing trust checks
 
 - Update payment method for an already-autopay renter and confirm the next charge uses the newly saved method
+- Generate a renter portal link, open `/portal/:token`, confirm it shows balance, next due date, autopay/payment-method state, and that payment-method update returns to the portal cleanly
 - Returning from Stripe setup/update flow shows one success message only and does not temporarily show webhook setup as incomplete
 - Record a manual payment and confirm renter detail updates immediately:
   - balance changes
