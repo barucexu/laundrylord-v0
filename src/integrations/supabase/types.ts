@@ -643,6 +643,68 @@ export type Database = {
           },
         ]
       }
+      renter_portal_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          renter_id: string
+          revoked_at: string | null
+          token_hash: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          renter_id: string
+          revoked_at?: string | null
+          token_hash: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          renter_id?: string
+          revoked_at?: string | null
+          token_hash?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "renter_portal_tokens_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "renters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renter_portal_tokens_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_audit_renters"
+            referencedColumns: ["renter_id"]
+          },
+          {
+            foreignKeyName: "renter_portal_tokens_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_renters_for_admin"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renter_portal_tokens_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_renters_with_owner"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       renters: {
         Row: {
           address: string | null
