@@ -90,6 +90,26 @@ Do not define phases like "frontend" and "backend" unless those are independentl
 2. Wire UI to the authoritative helper
 3. Add or repair tests and docs
 
+## Phase workflow / thread hygiene
+
+Use `PHASE_WORKFLOW.md` when work is being executed in named phases across multiple threads or sessions.
+
+When the user says "work on Phase X" or similar:
+
+1. First check whether the current session already has a focused Phase X handoff
+2. If not, do not start implementation in the current session
+3. Remind the user to open a fresh Phase X thread or session
+4. Provide the exact handoff block to paste there
+
+Inside a phase thread:
+
+1. Stay scoped to that phase only
+2. Do not begin later phases without explicit approval
+3. End with manual smoke tests for the user
+4. After the user confirms the smoke tests passed, produce a concise completion packet for the master planning thread
+
+The master planning thread remains the source of truth for phase status, approvals, and next-phase handoffs.
+
 ## Review checkpoints
 
 Stop for a review when:
