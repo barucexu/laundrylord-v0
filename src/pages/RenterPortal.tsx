@@ -15,6 +15,7 @@ type PortalSummary = {
   autopay_status: "active" | "inactive" | "pending";
   has_payment_method: boolean;
   payment_updates_available: boolean;
+  portal_payments_available: boolean;
   expires_at: string;
 };
 
@@ -69,9 +70,10 @@ export default function RenterPortal() {
   const [summary, setSummary] = useState<PortalSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [updatingPaymentMethod, setUpdatingPaymentMethod] = useState(false);
+  const [payingOutstandingBalance, setPayingOutstandingBalance] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const loadSummary = useCallback(async (showSuccessToast = false) => {
+  const loadSummary = useCallback(async (toastKind: "setup-success" | "payment-success" | null = null) => {
     if (!token) {
       setErrorMessage("This portal link is invalid or expired.");
       setLoading(false);
@@ -89,8 +91,10 @@ export default function RenterPortal() {
       if (data?.error) throw new Error(data.error);
 
       setSummary(data as PortalSummary);
-      if (showSuccessToast) {
+      if (toastKind === "setup-success") {
         toast.success("Payment method updated for future charges.");
+      } else if (toastKind === "payment-success") {
+        toast.success("Payment submitted. Your balance will refresh after confirmation.");
       }
     } catch (error) {
       setSummary(null);
@@ -102,11 +106,18 @@ export default function RenterPortal() {
 
   useEffect(() => {
     const setupResult = searchParams.get("setup");
-    void loadSummary(setupResult === "success");
+    const paymentResult = searchParams.get("payment");
+    const toastKind = setupResult === "success"
+      ? "setup-success"
+      : paymentResult === "success"
+        ? "payment-success"
+        : null;
+    void loadSummary(toastKind);
 
-    if (setupResult) {
+    if (setupResult || paymentResult) {
       const nextParams = new URLSearchParams(searchParams);
       nextParams.delete("setup");
+      nextParams.delete("payment");
       setSearchParams(nextParams, { replace: true });
     }
   }, [loadSummary, searchParams, setSearchParams]);
@@ -129,6 +140,26 @@ export default function RenterPortal() {
     }
 
     setUpdatingPaymentMethod(false);
+  };
+
+  const handlePayOutstandingBalance = async () => {
+    if (!token) return;
+
+    setPayingOutstandingBalance(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("renter-portal", {
+        body: { action: "pay-outstanding-balance", token },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (!data?.url) throw new Error("Missing Stripe payment URL");
+      window.location.assign(data.url as string);
+      return;
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to open portal payment"));
+    }
+
+    setPayingOutstandingBalance(false);
   };
 
   if (loading) {
@@ -185,17 +216,31 @@ export default function RenterPortal() {
               <div className="text-sm text-muted-foreground">Current balance</div>
               <div className="text-3xl font-semibold tracking-tight">{formatMoney(summary.balance)}</div>
             </div>
-            <Button
-              onClick={handleUpdatePaymentMethod}
-              disabled={!summary.payment_updates_available || updatingPaymentMethod}
-            >
-              {updatingPaymentMethod ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <ExternalLink className="h-4 w-4" />
-              )}
-              Update Payment Method
-            </Button>
+            <div className="flex flex-col gap-2 sm:items-end">
+              <Button
+                onClick={handlePayOutstandingBalance}
+                disabled={!summary.portal_payments_available || payingOutstandingBalance}
+              >
+                {payingOutstandingBalance ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ExternalLink className="h-4 w-4" />
+                )}
+                Pay Outstanding Balance
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleUpdatePaymentMethod}
+                disabled={!summary.payment_updates_available || updatingPaymentMethod}
+              >
+                {updatingPaymentMethod ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ExternalLink className="h-4 w-4" />
+                )}
+                Update Payment Method
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

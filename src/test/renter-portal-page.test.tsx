@@ -41,6 +41,7 @@ describe("RenterPortal", () => {
         autopay_status: "pending",
         has_payment_method: true,
         payment_updates_available: true,
+        portal_payments_available: true,
         expires_at: "2026-05-08T12:00:00.000Z",
       },
       error: null,
@@ -81,6 +82,7 @@ describe("RenterPortal", () => {
           autopay_status: "active",
           has_payment_method: true,
           payment_updates_available: true,
+          portal_payments_available: true,
           expires_at: "2026-05-08T12:00:00.000Z",
         },
         error: null,
@@ -112,6 +114,51 @@ describe("RenterPortal", () => {
         body: { action: "update-payment-method", token: "token-123" },
       });
       expect(locationAssignMock).toHaveBeenCalledWith("https://checkout.stripe.com/setup/session_123");
+    });
+  });
+
+  it("opens a Stripe payment session for the outstanding balance without sending an amount from the client", async () => {
+    invokeMock
+      .mockResolvedValueOnce({
+        data: {
+          renter_name: "Maria Santos",
+          balance: 182.5,
+          next_due_date: "2026-05-15",
+          autopay_status: "inactive",
+          has_payment_method: false,
+          payment_updates_available: true,
+          portal_payments_available: true,
+          expires_at: "2026-05-08T12:00:00.000Z",
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { url: "https://checkout.stripe.com/pay/session_456" },
+        error: null,
+      });
+
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={["/portal/token-123"]}>
+          <Routes>
+            <Route path="/portal/:token" element={<RenterPortal />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await screen.findByText("Renter Portal");
+    fireEvent.click(screen.getByRole("button", { name: /pay outstanding balance/i }));
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenLastCalledWith("renter-portal", {
+        body: { action: "pay-outstanding-balance", token: "token-123" },
+      });
+      expect(locationAssignMock).toHaveBeenCalledWith("https://checkout.stripe.com/pay/session_456");
     });
   });
 });

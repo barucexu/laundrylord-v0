@@ -64,6 +64,8 @@ Use this runbook before merging any plan/billing enforcement change.
 
 - Update payment method for an already-autopay renter and confirm the next charge uses the newly saved method
 - Generate a renter portal link, open `/portal/:token`, confirm it shows balance, next due date, autopay/payment-method state, and that payment-method update returns to the portal cleanly
+- From `/portal/:token`, use `Pay Outstanding Balance` and confirm the Stripe Checkout amount matches the renter's current balance without any client-side amount entry
+- After a successful portal payment, confirm exactly one payment row and one timeline event are recorded and renter balance does not go below zero
 - Returning from Stripe setup/update flow shows one success message only and does not temporarily show webhook setup as incomplete
 - Record a manual payment and confirm renter detail updates immediately:
   - balance changes
