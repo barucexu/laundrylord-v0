@@ -517,9 +517,9 @@ export type Database = {
           payment_notes: string | null
           payment_source: string | null
           renter_id: string
+          status: string
           stripe_checkout_session_id: string | null
           stripe_payment_intent_id: string | null
-          status: string
           type: string
           updated_at: string
           user_id: string
@@ -533,9 +533,9 @@ export type Database = {
           payment_notes?: string | null
           payment_source?: string | null
           renter_id: string
+          status?: string
           stripe_checkout_session_id?: string | null
           stripe_payment_intent_id?: string | null
-          status?: string
           type?: string
           updated_at?: string
           user_id: string
@@ -549,9 +549,9 @@ export type Database = {
           payment_notes?: string | null
           payment_source?: string | null
           renter_id?: string
+          status?: string
           stripe_checkout_session_id?: string | null
           stripe_payment_intent_id?: string | null
-          status?: string
           type?: string
           updated_at?: string
           user_id?: string
@@ -985,9 +985,7 @@ export type Database = {
           renter_name: string | null
           renter_phone: string | null
           renter_status: string | null
-          stripe_checkout_session_id: string | null
           stripe_customer_id: string | null
-          stripe_payment_intent_id: string | null
           stripe_subscription_id: string | null
           updated_at: string | null
           user_id: string | null
