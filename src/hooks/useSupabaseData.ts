@@ -465,6 +465,27 @@ export function useMaintenanceLogs() {
   return supaQuery;
 }
 
+export function useArchivedMaintenanceLogs() {
+  const demo = useDemo();
+  const supaQuery = useQuery({
+    queryKey: ["maintenance_logs", "archived"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("maintenance_logs")
+        .select("*")
+        .not("archived_at", "is", null)
+        .order("archived_at", { ascending: false });
+      if (error) throw error;
+      return data as MaintenanceRow[];
+    },
+    enabled: !demo?.isDemo,
+  });
+  if (demo?.isDemo) {
+    return { ...supaQuery, data: demo.data.maintenanceLogs.filter((log) => !isActiveMaintenanceLog(log)), isLoading: false, error: null };
+  }
+  return supaQuery;
+}
+
 export function useCreateMaintenanceLog() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -490,6 +511,7 @@ export function useCreateMaintenanceLog() {
     onSuccess: (data) => {
       if (!demo?.isDemo) {
         queryClient.invalidateQueries({ queryKey: ["maintenance_logs"] });
+        queryClient.invalidateQueries({ queryKey: ["maintenance_logs", "archived"] });
         if (data.renter_id) {
           queryClient.invalidateQueries({ queryKey: ["maintenance_logs", "renter", data.renter_id] });
         }
@@ -522,6 +544,7 @@ export function useUpdateMaintenanceLog() {
     onSuccess: (data) => {
       if (!demo?.isDemo) {
         queryClient.invalidateQueries({ queryKey: ["maintenance_logs"] });
+        queryClient.invalidateQueries({ queryKey: ["maintenance_logs", "archived"] });
         if (data.renter_id) {
           queryClient.invalidateQueries({ queryKey: ["maintenance_logs", "renter", data.renter_id] });
         }
@@ -556,6 +579,7 @@ export function useArchiveMaintenanceLog() {
     onSuccess: (data) => {
       if (!demo?.isDemo) {
         queryClient.invalidateQueries({ queryKey: ["maintenance_logs"] });
+        queryClient.invalidateQueries({ queryKey: ["maintenance_logs", "archived"] });
         if (data.renter_id) {
           queryClient.invalidateQueries({ queryKey: ["maintenance_logs", "renter", data.renter_id] });
         }

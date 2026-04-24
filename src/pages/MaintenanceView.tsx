@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Archive, Pencil, Plus, X } from "lucide-react";
@@ -66,6 +66,7 @@ export default function MaintenanceView() {
   const archiveMaintenanceLog = useArchiveMaintenanceLog();
   const [editingLog, setEditingLog] = useState<MaintenanceRow | null>(null);
   const [form, setForm] = useState<MaintenanceFormState>(() => emptyForm());
+  const autoFilledRenterIdRef = useRef<string | null>(null);
 
   const sorted = useMemo(() => sortMaintenanceLogs(logs), [logs]);
   const rentersById = useMemo(() => new Map(renters.map((renter) => [renter.id, renter])), [renters]);
@@ -79,15 +80,27 @@ export default function MaintenanceView() {
   const resetForm = () => {
     setEditingLog(null);
     setForm(emptyForm());
+    autoFilledRenterIdRef.current = null;
   };
 
   const handleRenterChange = (renterId: string) => {
+    const machineId = getSingleAssignedMachineId(renterId, machines) ?? "";
+    autoFilledRenterIdRef.current = renterId || null;
     setForm((current) => ({
       ...current,
       renter_id: renterId,
-      machine_id: getSingleAssignedMachineId(renterId, machines) ?? "",
+      machine_id: machineId,
     }));
   };
+
+  useEffect(() => {
+    if (!form.renter_id || form.machine_id || autoFilledRenterIdRef.current === form.renter_id) return;
+    const machineId = getSingleAssignedMachineId(form.renter_id, machines);
+    if (!machineId) return;
+
+    autoFilledRenterIdRef.current = form.renter_id;
+    setForm((current) => ({ ...current, machine_id: machineId }));
+  }, [form.machine_id, form.renter_id, machines]);
 
   const handleEdit = (log: MaintenanceRow) => {
     setEditingLog(log);
@@ -156,7 +169,12 @@ export default function MaintenanceView() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Maintenance</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{logs.length} open issues</p>
+          <div className="flex items-center gap-3 mt-0.5">
+            <p className="text-sm text-muted-foreground">{logs.length} open issues</p>
+            <Link to="/maintenance/archive" className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2">
+              View Archive
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -185,7 +203,11 @@ export default function MaintenanceView() {
 
             <div className="space-y-2">
               <Label>Machine</Label>
-              <Select value={form.machine_id || "none"} onValueChange={(value) => setForm((current) => ({ ...current, machine_id: value === "none" ? "" : value }))}>
+              <Select
+                key={`${form.renter_id}-${assignedMachinesForSelectedRenter.length}`}
+                value={form.machine_id || "none"}
+                onValueChange={(value) => setForm((current) => ({ ...current, machine_id: value === "none" ? "" : value }))}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="No machine" />
                 </SelectTrigger>

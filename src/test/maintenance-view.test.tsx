@@ -135,6 +135,7 @@ describe("MaintenanceView", () => {
     renderPage();
 
     expect(screen.getAllByText("Valid Value Wins").length).toBeGreaterThan(0);
+    expect(screen.getByText("View Archive")).toBeInTheDocument();
     expect(screen.getByText("SQ-1")).toBeInTheDocument();
     expect(screen.getByText("Water leak")).toBeInTheDocument();
   });

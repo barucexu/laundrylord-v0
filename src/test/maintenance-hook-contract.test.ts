@@ -7,6 +7,7 @@ describe("maintenance hook contract", () => {
     const demoSource = readFileSync(`${process.cwd()}/src/contexts/DemoContext.tsx`, "utf8");
 
     expect(hooksSource).toContain('.is("archived_at", null)');
+    expect(hooksSource).toContain('.not("archived_at", "is", null)');
     expect(hooksSource).toContain("demo.addMaintenanceLog");
     expect(hooksSource).toContain("demo.updateMaintenanceLog");
     expect(hooksSource).toContain("demo.archiveMaintenanceLog");

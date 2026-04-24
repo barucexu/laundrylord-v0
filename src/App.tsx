@@ -15,6 +15,7 @@ import MachinesList from "@/pages/MachinesList";
 import MachineMapPage from "@/pages/MachineMapPage";
 import PaymentsView from "@/pages/PaymentsView";
 import MaintenanceView from "@/pages/MaintenanceView";
+import MaintenanceArchive from "@/pages/MaintenanceArchive";
 import SettingsPage from "@/pages/SettingsPage";
 import ImportPage from "@/pages/ImportPage";
 import RenterArchive from "@/pages/RenterArchive";
@@ -35,6 +36,7 @@ const PAGE_ROUTES = (
     <Route path="machine-map" element={<MachineMapPage />} />
     <Route path="payments" element={<PaymentsView />} />
     <Route path="maintenance" element={<MaintenanceView />} />
+    <Route path="maintenance/archive" element={<MaintenanceArchive />} />
     <Route path="settings" element={<SettingsPage />} />
     <Route path="import" element={<ImportPage />} />
   </>
