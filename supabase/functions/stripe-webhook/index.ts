@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getInvoiceAdjustmentIds, getInvoiceChargeKind, isMeaningfulInvoiceAmount } from "../_shared/invoice-metadata.ts";
+import { getStripeObjectId, hasPortalOutstandingBalancePurpose } from "../_shared/portal-outstanding-balance.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -28,6 +29,36 @@ async function requireWrite<T>(
   if (error) {
     throw new Error(`${operation} failed: ${error.message ?? JSON.stringify(error)}`);
   }
+  return data;
+}
+
+async function findPortalPaymentByStripeIds(userId: string, args: {
+  checkoutSessionId?: string | null;
+  paymentIntentId?: string | null;
+}) {
+  const { checkoutSessionId, paymentIntentId } = args;
+  if (!checkoutSessionId && !paymentIntentId) return null;
+
+  let query = supabase
+    .from("payments")
+    .select("id")
+    .eq("user_id", userId);
+
+  if (checkoutSessionId && paymentIntentId) {
+    query = query.or(
+      `stripe_checkout_session_id.eq.${checkoutSessionId},stripe_payment_intent_id.eq.${paymentIntentId}`,
+    );
+  } else if (checkoutSessionId) {
+    query = query.eq("stripe_checkout_session_id", checkoutSessionId);
+  } else if (paymentIntentId) {
+    query = query.eq("stripe_payment_intent_id", paymentIntentId);
+  }
+
+  const { data, error } = await query.limit(1).maybeSingle();
+  if (error) {
+    throw new Error(`find portal payment failed: ${error.message}`);
+  }
+
   return data;
 }
 
@@ -96,6 +127,43 @@ serve(async (req) => {
   try {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object;
+      if (session.mode === "payment" && hasPortalOutstandingBalancePurpose(session.metadata)) {
+        const checkoutSessionId = session.id;
+        const paymentIntentId = getStripeObjectId(session.payment_intent);
+
+        if (await findPortalPaymentByStripeIds(userId, { checkoutSessionId, paymentIntentId })) {
+          return jsonResponse({ received: true, duplicate_portal_payment: true });
+        }
+
+        if (session.payment_status !== "paid") {
+          return jsonResponse({ received: true, portal_payment_not_paid: true });
+        }
+
+        const renterId = session.metadata?.renter_id ?? null;
+        const amountPaidCents = session.amount_total ?? 0;
+
+        if (!renterId || !isMeaningfulInvoiceAmount(amountPaidCents)) {
+          return jsonResponse({ received: true, ignored_portal_payment: true });
+        }
+
+        const amountPaid = amountPaidCents / 100;
+        const paymentDate = new Date(event.created * 1000).toISOString().split("T")[0];
+
+        await requireWrite("apply portal payment success", supabase.rpc(
+          "apply_portal_outstanding_balance_payment_success",
+          {
+            p_user_id: userId,
+            p_renter_id: renterId,
+            p_amount: amountPaid,
+            p_payment_date: paymentDate,
+            p_checkout_session_id: checkoutSessionId,
+            p_payment_intent_id: paymentIntentId,
+          },
+        ));
+
+        return jsonResponse({ received: true });
+      }
+
       if (session.mode === "setup") {
         const customerId = typeof session.customer === "string" ? session.customer : null;
         const metadataRenterId = session.metadata?.renter_id ?? null;
@@ -261,6 +329,41 @@ serve(async (req) => {
             description: `Payment of $${amountPaid.toFixed(2)} succeeded`,
           }));
         }
+      }
+    }
+
+    if (event.type === "payment_intent.payment_failed") {
+      const paymentIntent = event.data.object;
+
+      if (hasPortalOutstandingBalancePurpose(paymentIntent.metadata)) {
+        const paymentIntentId = paymentIntent.id;
+
+        if (await findPortalPaymentByStripeIds(userId, { paymentIntentId })) {
+          return jsonResponse({ received: true, duplicate_portal_payment: true });
+        }
+
+        const renterId = paymentIntent.metadata?.renter_id ?? null;
+        const amountDueCents = paymentIntent.amount ?? 0;
+
+        if (!renterId || !isMeaningfulInvoiceAmount(amountDueCents)) {
+          return jsonResponse({ received: true, ignored_portal_payment_failure: true });
+        }
+
+        const amountDue = amountDueCents / 100;
+        const paymentDate = new Date(event.created * 1000).toISOString().split("T")[0];
+
+        await requireWrite("apply portal payment failure", supabase.rpc(
+          "apply_portal_outstanding_balance_payment_failure",
+          {
+            p_user_id: userId,
+            p_renter_id: renterId,
+            p_amount: amountDue,
+            p_payment_date: paymentDate,
+            p_payment_intent_id: paymentIntentId,
+          },
+        ));
+
+        return jsonResponse({ received: true });
       }
     }
 

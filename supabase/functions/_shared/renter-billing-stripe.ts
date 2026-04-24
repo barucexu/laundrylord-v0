@@ -131,3 +131,43 @@ export async function createRenterSetupSession(args: {
 
   return session.url;
 }
+
+export async function createOutstandingBalanceCheckoutSession(args: {
+  stripe: Stripe;
+  customerId: string;
+  renter: Pick<RenterStripeSummary, "id" | "user_id" | "name">;
+  amountCents: number;
+  successUrl: string;
+  cancelUrl: string;
+  metadata: Record<string, string>;
+}): Promise<string> {
+  const { stripe, customerId, renter, amountCents, successUrl, cancelUrl, metadata } = args;
+
+  const session = await stripe.checkout.sessions.create({
+    customer: customerId,
+    mode: "payment",
+    payment_method_types: ["card"],
+    line_items: [{
+      price_data: {
+        currency: "usd",
+        unit_amount: amountCents,
+        product_data: {
+          name: `LaundryLord outstanding balance for ${renter.name ?? "renter"}`,
+        },
+      },
+      quantity: 1,
+    }],
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    metadata,
+    payment_intent_data: {
+      metadata,
+    },
+  });
+
+  if (!session.url) {
+    throw new Error("Stripe did not return a payment session URL");
+  }
+
+  return session.url;
+}

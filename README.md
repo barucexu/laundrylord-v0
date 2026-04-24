@@ -47,7 +47,7 @@ Vertical SaaS for washer/dryer rental operators. Billing clarity + renter system
 
 **Canonical relation**: `machines.assigned_renter_id` → `renters.id`
 
-All reads AND writes must use `machines.assigned_renter_id`. The legacy `renters.machine_id` column was removed; do not reintroduce renter-side assignment state for assignment display or logic.
+All reads AND writes must use `machines.assigned_renter_id`. The legacy renter-side assignment column was removed; do not reintroduce renter-side assignment state for assignment display or logic.
 
 Assignment writes should go through the guarded assignment hooks in `useSupabaseData` and shared helpers in `src/lib/machine-assignment.ts`. They enforce that only unassigned `available` machines can be assigned and that unassigning clears only the current renter's assignment instead of relying on UI filtering alone.
 
@@ -131,6 +131,7 @@ Autopay start behavior now means:
 
 - `renter_portal_tokens` stores only a `token_hash`; raw portal links are created once and must be copied when generated.
 - Portal reads and payment-method updates go through the `renter-portal` Edge Function; the public page must not read renter tables directly from the browser.
+- Portal outstanding-balance payments go through the `renter-portal` Edge Function and Stripe Checkout; the browser sends only the portal token and must not choose the payment amount.
 - Portal payment-method updates use the operator's renter-billing Stripe context from `stripe_keys`, not the SaaS billing key path.
 
 

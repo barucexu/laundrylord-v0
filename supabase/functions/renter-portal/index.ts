@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isRenterBillingReady } from "../_shared/renter-billing.ts";
-import { createRenterSetupSession, ensureStripeCustomer, getOwnedRenter, getRequestOrigin, requireOperatorStripe } from "../_shared/renter-billing-stripe.ts";
+import { buildPortalReturnUrl, getPortalOutstandingBalanceAmountCents, getPortalOutstandingBalanceMetadata } from "../_shared/portal-outstanding-balance.ts";
+import { createOutstandingBalanceCheckoutSession, createRenterSetupSession, ensureStripeCustomer, getOwnedRenter, getRequestOrigin, requireOperatorStripe } from "../_shared/renter-billing-stripe.ts";
 import { hashPortalToken } from "../_shared/renter-portal-tokens.ts";
 
 const corsHeaders = {
@@ -80,6 +81,7 @@ async function buildPortalSummary(adminClient: ReturnType<typeof createClient>, 
     autopay_status: getAutopayStatus(renter),
     has_payment_method: !!renter.has_payment_method,
     payment_updates_available: isRenterBillingReady(stripeKeyRow),
+    portal_payments_available: isRenterBillingReady(stripeKeyRow) && Number(renter.balance ?? 0) > 0,
     expires_at: tokenRow.expires_at,
   };
 }
@@ -97,11 +99,47 @@ serve(async (req) => {
 
     const { action, token } = await req.json();
     if (!token) throw new Error("token is required");
-    if (!["validate", "summary", "update-payment-method"].includes(action)) {
+    if (!["validate", "summary", "update-payment-method", "pay-outstanding-balance"].includes(action)) {
       throw new Error("Unsupported action");
     }
 
     const tokenRow = await requireValidPortalToken(adminClient, token);
+
+    if (action === "pay-outstanding-balance") {
+      const { data: renter, error: renterError } = await adminClient
+        .from("renters")
+        .select("id, user_id, name, email, phone, balance, stripe_customer_id, stripe_subscription_id")
+        .eq("id", tokenRow.renter_id)
+        .eq("user_id", tokenRow.user_id)
+        .maybeSingle();
+
+      if (renterError) throw new Error(`Failed to load renter for payment: ${renterError.message}`);
+      if (!renter) throw new Error("Portal link is invalid or expired.");
+
+      const amountCents = getPortalOutstandingBalanceAmountCents(renter.balance);
+      const stripe = await requireOperatorStripe(
+        adminClient,
+        tokenRow.user_id,
+        "Portal payments are not available right now. Please contact your operator.",
+      );
+      const customerId = await ensureStripeCustomer({ adminClient, stripe, renter });
+      const origin = getRequestOrigin(req).replace(/\/$/, "");
+      const metadata = getPortalOutstandingBalanceMetadata({
+        renterId: renter.id,
+        userId: tokenRow.user_id,
+      });
+      const url = await createOutstandingBalanceCheckoutSession({
+        stripe,
+        customerId,
+        renter,
+        amountCents,
+        successUrl: buildPortalReturnUrl(origin, token, "success"),
+        cancelUrl: buildPortalReturnUrl(origin, token, "canceled"),
+        metadata,
+      });
+
+      return jsonResponse({ url });
+    }
 
     if (action === "update-payment-method") {
       const renter = await getOwnedRenter(adminClient, tokenRow.user_id, tokenRow.renter_id);
@@ -112,13 +150,12 @@ serve(async (req) => {
       );
       const customerId = await ensureStripeCustomer({ adminClient, stripe, renter });
       const origin = getRequestOrigin(req).replace(/\/$/, "");
-      const returnUrl = `${origin}/portal/${token}`;
       const url = await createRenterSetupSession({
         stripe,
         customerId,
         renter,
-        successUrl: `${returnUrl}?setup=success`,
-        cancelUrl: `${returnUrl}?setup=canceled`,
+        successUrl: `${buildPortalReturnUrl(origin, token, "success").replace("?payment=success", "?setup=success")}`,
+        cancelUrl: `${buildPortalReturnUrl(origin, token, "canceled").replace("?payment=canceled", "?setup=canceled")}`,
       });
 
       return jsonResponse({ url });

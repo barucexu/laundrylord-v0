@@ -517,6 +517,8 @@ export type Database = {
           payment_notes: string | null
           payment_source: string | null
           renter_id: string
+          stripe_checkout_session_id: string | null
+          stripe_payment_intent_id: string | null
           status: string
           type: string
           updated_at: string
@@ -531,6 +533,8 @@ export type Database = {
           payment_notes?: string | null
           payment_source?: string | null
           renter_id: string
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
           status?: string
           type?: string
           updated_at?: string
@@ -545,6 +549,8 @@ export type Database = {
           payment_notes?: string | null
           payment_source?: string | null
           renter_id?: string
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
           status?: string
           type?: string
           updated_at?: string
@@ -979,7 +985,9 @@ export type Database = {
           renter_name: string | null
           renter_phone: string | null
           renter_status: string | null
+          stripe_checkout_session_id: string | null
           stripe_customer_id: string | null
+          stripe_payment_intent_id: string | null
           stripe_subscription_id: string | null
           updated_at: string | null
           user_id: string | null
@@ -1299,6 +1307,28 @@ export type Database = {
     Functions: {
       add_renter_balance_adjustment: {
         Args: { p_amount: number; p_description: string; p_renter_id: string }
+        Returns: Json
+      }
+      apply_portal_outstanding_balance_payment_failure: {
+        Args: {
+          p_amount: number
+          p_checkout_session_id?: string
+          p_payment_date: string
+          p_payment_intent_id: string
+          p_renter_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      apply_portal_outstanding_balance_payment_success: {
+        Args: {
+          p_amount: number
+          p_checkout_session_id?: string
+          p_payment_date: string
+          p_payment_intent_id?: string
+          p_renter_id: string
+          p_user_id: string
+        }
         Returns: Json
       }
       delete_email: {
