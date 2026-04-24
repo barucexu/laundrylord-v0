@@ -27,6 +27,9 @@ interface DemoContextType {
   updateMachine: (id: string, updates: Partial<MachineRow>) => MachineRow | null;
   addMachine: (machine: Omit<MachineRow, "id" | "user_id" | "created_at" | "updated_at">) => MachineRow;
   addPayment: (payment: Omit<PaymentRow, "id" | "user_id" | "created_at" | "updated_at">) => PaymentRow;
+  addMaintenanceLog: (log: Omit<MaintenanceRow, "id" | "user_id" | "created_at" | "updated_at">) => MaintenanceRow;
+  updateMaintenanceLog: (id: string, updates: Partial<MaintenanceRow>) => MaintenanceRow | null;
+  archiveMaintenanceLog: (id: string) => MaintenanceRow | null;
   addTimelineEvent: (event: Omit<TimelineRow, "id" | "user_id" | "created_at">) => TimelineRow;
   updateSettings: (updates: Partial<OperatorSettingsRow>) => OperatorSettingsRow;
 }
@@ -86,6 +89,37 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     return newP;
   }, []);
 
+  const addMaintenanceLog = useCallback((log: Omit<MaintenanceRow, "id" | "user_id" | "created_at" | "updated_at">) => {
+    const now = new Date().toISOString();
+    const newLog: MaintenanceRow = { ...log, id: genId("mnt"), user_id: DEMO_USER_ID, created_at: now, updated_at: now } as MaintenanceRow;
+    setData(prev => ({ ...prev, maintenanceLogs: [newLog, ...prev.maintenanceLogs] }));
+    return newLog;
+  }, []);
+
+  const updateMaintenanceLog = useCallback((id: string, updates: Partial<MaintenanceRow>) => {
+    let result: MaintenanceRow | null = null;
+    setData(prev => {
+      const maintenanceLogs = prev.maintenanceLogs.map(log => {
+        if (log.id === id) { result = { ...log, ...updates, updated_at: new Date().toISOString() }; return result; }
+        return log;
+      });
+      return { ...prev, maintenanceLogs };
+    });
+    return result;
+  }, []);
+
+  const archiveMaintenanceLog = useCallback((id: string) => {
+    let result: MaintenanceRow | null = null;
+    setData(prev => {
+      const maintenanceLogs = prev.maintenanceLogs.map(log => {
+        if (log.id === id) { result = { ...log, archived_at: new Date().toISOString(), updated_at: new Date().toISOString() }; return result; }
+        return log;
+      });
+      return { ...prev, maintenanceLogs };
+    });
+    return result;
+  }, []);
+
   const addTimelineEvent = useCallback((event: Omit<TimelineRow, "id" | "user_id" | "created_at">) => {
     const now = new Date().toISOString();
     const newEvent: TimelineRow = {
@@ -108,7 +142,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   }, [data.operatorSettings]);
 
   return (
-    <DemoContext.Provider value={{ isDemo: true, data, updateRenter, addRenter, updateMachine, addMachine, addPayment, addTimelineEvent, updateSettings }}>
+    <DemoContext.Provider value={{ isDemo: true, data, updateRenter, addRenter, updateMachine, addMachine, addPayment, addMaintenanceLog, updateMaintenanceLog, archiveMaintenanceLog, addTimelineEvent, updateSettings }}>
       {children}
     </DemoContext.Provider>
   );

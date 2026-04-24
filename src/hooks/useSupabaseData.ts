@@ -5,6 +5,7 @@ import { useDemo } from "@/contexts/DemoContext";
 import { BILLABLE_RENTER_COUNT_QUERY_KEY } from "@/lib/billing-counts";
 import { buildCustomFieldValuePayload, getCustomFieldValue, type CustomFieldEntityType, type CustomFieldValueType } from "@/lib/custom-fields";
 import { getUnassignedMachineStatus, isMachineAssignable } from "@/lib/machine-assignment";
+import { isActiveMaintenanceLog } from "@/lib/maintenance";
 import type { Database } from "@/integrations/supabase/types";
 
 export type RenterRow = Database["public"]["Tables"]["renters"]["Row"];
@@ -15,6 +16,7 @@ type PaymentRow = Database["public"]["Tables"]["payments"]["Row"];
 type PaymentInsert = Database["public"]["Tables"]["payments"]["Insert"];
 export type RenterBalanceAdjustmentRow = Database["public"]["Tables"]["renter_balance_adjustments"]["Row"];
 type MaintenanceRow = Database["public"]["Tables"]["maintenance_logs"]["Row"];
+type MaintenanceInsert = Database["public"]["Tables"]["maintenance_logs"]["Insert"];
 type TimelineRow = Database["public"]["Tables"]["timeline_events"]["Row"];
 type CustomFieldDefinitionRow = Database["public"]["Tables"]["custom_field_definitions"]["Row"];
 type CustomFieldValueRow = Database["public"]["Tables"]["custom_field_values"]["Row"];
@@ -450,14 +452,116 @@ export function useMaintenanceLogs() {
       const { data, error } = await supabase
         .from("maintenance_logs")
         .select("*")
+        .is("archived_at", null)
         .order("reported_date", { ascending: false });
       if (error) throw error;
       return data as MaintenanceRow[];
     },
     enabled: !demo?.isDemo,
   });
-  if (demo?.isDemo) return { ...supaQuery, data: demo.data.maintenanceLogs, isLoading: false, error: null };
+  if (demo?.isDemo) {
+    return { ...supaQuery, data: demo.data.maintenanceLogs.filter(isActiveMaintenanceLog), isLoading: false, error: null };
+  }
   return supaQuery;
+}
+
+export function useCreateMaintenanceLog() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const demo = useDemo();
+
+  return useMutation({
+    mutationFn: async (maintenanceLog: Omit<MaintenanceInsert, "user_id" | "source">) => {
+      if (demo?.isDemo) {
+        return demo.addMaintenanceLog({
+          ...maintenanceLog,
+          source: "operator",
+        } as Parameters<typeof demo.addMaintenanceLog>[0]);
+      }
+
+      const { data, error } = await supabase
+        .from("maintenance_logs")
+        .insert({ ...maintenanceLog, source: "operator", user_id: user!.id })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as MaintenanceRow;
+    },
+    onSuccess: (data) => {
+      if (!demo?.isDemo) {
+        queryClient.invalidateQueries({ queryKey: ["maintenance_logs"] });
+        if (data.renter_id) {
+          queryClient.invalidateQueries({ queryKey: ["maintenance_logs", "renter", data.renter_id] });
+        }
+      }
+    },
+  });
+}
+
+export function useUpdateMaintenanceLog() {
+  const queryClient = useQueryClient();
+  const demo = useDemo();
+
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<MaintenanceRow> & { id: string }) => {
+      if (demo?.isDemo) {
+        const updated = demo.updateMaintenanceLog(id, updates);
+        if (!updated) throw new Error("Maintenance log not found");
+        return updated;
+      }
+
+      const { data, error } = await supabase
+        .from("maintenance_logs")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as MaintenanceRow;
+    },
+    onSuccess: (data) => {
+      if (!demo?.isDemo) {
+        queryClient.invalidateQueries({ queryKey: ["maintenance_logs"] });
+        if (data.renter_id) {
+          queryClient.invalidateQueries({ queryKey: ["maintenance_logs", "renter", data.renter_id] });
+        }
+      }
+    },
+  });
+}
+
+export function useArchiveMaintenanceLog() {
+  const queryClient = useQueryClient();
+  const demo = useDemo();
+
+  return useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const archivedAt = new Date().toISOString();
+
+      if (demo?.isDemo) {
+        const updated = demo.archiveMaintenanceLog(id);
+        if (!updated) throw new Error("Maintenance log not found");
+        return updated;
+      }
+
+      const { data, error } = await supabase
+        .from("maintenance_logs")
+        .update({ archived_at: archivedAt })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as MaintenanceRow;
+    },
+    onSuccess: (data) => {
+      if (!demo?.isDemo) {
+        queryClient.invalidateQueries({ queryKey: ["maintenance_logs"] });
+        if (data.renter_id) {
+          queryClient.invalidateQueries({ queryKey: ["maintenance_logs", "renter", data.renter_id] });
+        }
+      }
+    },
+  });
 }
 
 export function useTimelineEvents(renterId: string | undefined) {
@@ -617,6 +721,7 @@ export function useMaintenanceForRenter(renterId: string | undefined) {
         .from("maintenance_logs")
         .select("*")
         .eq("renter_id", renterId!)
+        .is("archived_at", null)
         .order("reported_date", { ascending: false });
       if (error) throw error;
       return data as MaintenanceRow[];
@@ -625,6 +730,7 @@ export function useMaintenanceForRenter(renterId: string | undefined) {
   if (demo?.isDemo) {
     const filtered = demo.data.maintenanceLogs
       .filter(m => m.renter_id === renterId)
+      .filter(isActiveMaintenanceLog)
       .sort((a, b) => b.reported_date.localeCompare(a.reported_date));
     return { ...supaQuery, data: renterId ? filtered : undefined, isLoading: false, error: null };
   }
@@ -949,6 +1055,7 @@ export type {
   PaymentRow,
   PaymentInsert,
   MaintenanceRow,
+  MaintenanceInsert,
   TimelineRow,
   CustomFieldDefinitionRow,
   CustomFieldValueRow,

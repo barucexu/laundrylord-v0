@@ -306,6 +306,8 @@ function generateMaintenanceLogs(renters: RenterRow[], machines: MachineRow[]): 
       resolved_date: isResolved ? dateOffset(reportedDaysAgo - pickRange(1, 5, i * 11)) : null,
       resolution_notes: isResolved ? "Replaced part and tested. Working normally." : null,
       cost: isResolved ? pickRange(35, 150, i * 13) : null,
+      source: "operator",
+      archived_at: null,
       created_at: dateOffset(reportedDaysAgo) + "T00:00:00.000Z",
       updated_at: NOW,
     });

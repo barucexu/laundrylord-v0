@@ -325,46 +325,52 @@ export type Database = {
       }
       maintenance_logs: {
         Row: {
+          archived_at: string | null
           cost: number | null
           created_at: string
           description: string
           id: string
           issue_category: string
-          machine_id: string
+          machine_id: string | null
           renter_id: string | null
           reported_date: string
           resolution_notes: string | null
           resolved_date: string | null
+          source: string
           status: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          archived_at?: string | null
           cost?: number | null
           created_at?: string
           description?: string
           id?: string
           issue_category: string
-          machine_id: string
+          machine_id?: string | null
           renter_id?: string | null
           reported_date?: string
           resolution_notes?: string | null
           resolved_date?: string | null
+          source?: string
           status?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          archived_at?: string | null
           cost?: number | null
           created_at?: string
           description?: string
           id?: string
           issue_category?: string
-          machine_id?: string
+          machine_id?: string | null
           renter_id?: string | null
           reported_date?: string
           resolution_notes?: string | null
           resolved_date?: string | null
+          source?: string
           status?: string
           updated_at?: string
           user_id?: string

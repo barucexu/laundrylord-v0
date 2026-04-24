@@ -107,6 +107,8 @@ Autopay start behavior now means:
 | `renters.status` | `lead`, `scheduled`, `active`, `autopay_pending`, `late`, `maintenance`, `termination_requested`, `pickup_scheduled`, `closed`, `defaulted`, `archived` |
 | `machines.type` | `washer`, `dryer`, `set` |
 | `machines.status` | `available`, `assigned`, `maintenance`, `retired` |
+| `maintenance_logs.status` | `reported`, `scheduled`, `in_progress`, `resolved` |
+| `maintenance_logs.source` | `operator`, `renter_portal` |
 | `payments.type` | `payment`, `rent`, `install_fee`, `deposit`, `late_fee`, `other` |
 | `payments.status` | `upcoming`, `due_soon`, `overdue`, `failed`, `paid` |
 | `timeline_events.type` | `created`, `machine_assigned`, `payment_succeeded`, `payment_failed`, `payment_method_saved`, `late_fee`, `maintenance_opened`, `maintenance_resolved`, `pickup_scheduled`, `pickup_completed`, `note` |
@@ -115,6 +117,12 @@ Autopay start behavior now means:
 
 - Renter import financial fields use explicit app values: valid mapped values win, blank, unmapped, or invalid `monthly_rate`, `install_fee`, `deposit_amount`, and `late_fee` values use operator settings defaults.
 - Extra import columns are stored as custom fields. Renter list search may include those custom-field labels and values through the batched renter custom-field query; it is not a global app search.
+
+## Maintenance Contracts
+
+- Operator-created maintenance logs use `source = 'operator'`; future renter-portal logs must use `source = 'renter_portal'`.
+- `maintenance_logs.machine_id` is optional. When the operator chooses a renter, the UI may prefill a machine only when exactly one machine has `machines.assigned_renter_id = renters.id`.
+- Maintenance archives use `archived_at`; active maintenance hooks hide archived rows by default.
 
 
 ## Project Operating Docs
@@ -144,8 +152,9 @@ Key contract tests:
 - `machine-assignment.test.tsx` — proves assignment lookup uses `assigned_renter_id`
 - `renter-detail-timeline.test.tsx` — proves all backend event types have UI icon mappings
 - `import-linking.test.tsx` — proves import linking uses canonical relation
-- `import-engine.test.ts` and `import-page.test.tsx` — prove importer defaults, validation-blocking, custom fields, and plan-cap behavior
+- `import-engine.test.ts` and `import-page.test.tsx` — prove importer defaults, invalid-value fallback, custom fields, and plan-cap behavior
 - `renter-search.test.ts` — proves renter list search text includes imported custom-field values
+- `maintenance-helpers.test.ts`, `maintenance-view.test.tsx`, and `maintenance-hook-contract.test.ts` — prove maintenance prefill, archive filtering, demo/auth hook parity, and no legacy renter machine lookup
 
 ## Tech Stack
 
