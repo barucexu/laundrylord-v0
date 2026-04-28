@@ -56,6 +56,12 @@ export default function ResetPasswordPage() {
   if (!isRecovery) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <SeoHead
+          title="Reset Password"
+          description="Reset your LaundryLord password."
+          canonicalPath="/reset-password"
+          robots="noindex,nofollow"
+        />
         <Card className="w-full max-w-sm text-center">
           <CardHeader>
             <img src={logoImg} alt="LaundryLord" className="mx-auto mb-4 h-14 w-14 rounded-lg object-contain" />
