@@ -18,14 +18,14 @@ import {
 } from "@/components/ui/sidebar";
 
 const navItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Renters", url: "/renters", icon: Users },
-  { title: "Machines", url: "/machines", icon: Box },
-  { title: "Machine Map", url: "/machine-map", icon: MapPin },
-  { title: "Payments", url: "/payments", icon: CreditCard },
-  { title: "Maintenance", url: "/maintenance", icon: Wrench },
-  { title: "Import", url: "/import", icon: Upload },
-  { title: "Settings", url: "/settings", icon: Settings },
+  { title: "Dashboard", url: "/app", icon: LayoutDashboard },
+  { title: "Renters", url: "/app/renters", icon: Users },
+  { title: "Machines", url: "/app/machines", icon: Box },
+  { title: "Machine Map", url: "/app/machine-map", icon: MapPin },
+  { title: "Payments", url: "/app/payments", icon: CreditCard },
+  { title: "Maintenance", url: "/app/maintenance", icon: Wrench },
+  { title: "Import", url: "/app/import", icon: Upload },
+  { title: "Settings", url: "/app/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
@@ -55,7 +55,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={item.url}
-                      end={item.url === "/"}
+                      end={item.url === "/app"}
                       className="hover:bg-sidebar-accent rounded-md transition-colors text-sidebar-foreground"
                       activeClassName="bg-sidebar-accent text-primary font-medium"
                     >

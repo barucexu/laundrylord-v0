@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SeoHead } from "@/components/SeoHead";
 import { toast } from "sonner";
 import logoImg from "@/assets/laundrylord-logo.webp";
 
@@ -47,7 +48,7 @@ export default function ResetPasswordPage() {
       toast.error(error.message);
     } else {
       toast.success("Password updated! Redirecting...");
-      setTimeout(() => navigate("/", { replace: true }), 1500);
+      setTimeout(() => navigate("/app", { replace: true }), 1500);
     }
     setLoading(false);
   };
@@ -71,6 +72,12 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <SeoHead
+        title="Reset Password"
+        description="Reset your LaundryLord password."
+        canonicalPath="/reset-password"
+        robots="noindex,nofollow"
+      />
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <img src={logoImg} alt="LaundryLord" className="mx-auto mb-4 h-14 w-14 rounded-lg object-contain" />

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -23,6 +23,8 @@ import AuthPage from "@/pages/AuthPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import RenterPortal from "@/pages/RenterPortal";
 import NotFound from "@/pages/NotFound";
+import MarketingHome from "@/pages/MarketingHome";
+import LaundryRentalSoftwarePage from "@/pages/LaundryRentalSoftwarePage";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +45,12 @@ const PAGE_ROUTES = (
   </>
 );
 
+function LegacyAppRedirect() {
+  const location = useLocation();
+
+  return <Navigate to={`/app${location.pathname}${location.search}${location.hash}`} replace />;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -50,6 +58,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          <Route path="/" element={<MarketingHome />} />
+          <Route path="/laundry-rental-software" element={<LaundryRentalSoftwarePage />} />
+
           {/* Auth routes — no demo context needed */}
           <Route path="/auth" element={
             <AuthProvider>
@@ -62,6 +73,17 @@ const App = () => (
             </AuthProvider>
           } />
           <Route path="/portal/:token" element={<RenterPortal />} />
+          <Route path="/dashboard" element={<Navigate to="/app" replace />} />
+          <Route path="/renters" element={<LegacyAppRedirect />} />
+          <Route path="/renters/archive" element={<LegacyAppRedirect />} />
+          <Route path="/renters/:id" element={<LegacyAppRedirect />} />
+          <Route path="/machines" element={<LegacyAppRedirect />} />
+          <Route path="/machine-map" element={<LegacyAppRedirect />} />
+          <Route path="/payments" element={<LegacyAppRedirect />} />
+          <Route path="/maintenance" element={<LegacyAppRedirect />} />
+          <Route path="/maintenance/archive" element={<LegacyAppRedirect />} />
+          <Route path="/settings" element={<LegacyAppRedirect />} />
+          <Route path="/import" element={<LegacyAppRedirect />} />
 
           {/* Demo routes — DemoProvider + AuthProvider(isDemo) */}
           <Route path="/demo" element={
@@ -75,7 +97,7 @@ const App = () => (
           </Route>
 
           {/* Real authenticated routes */}
-          <Route element={
+          <Route path="/app" element={
             <AuthProvider>
               <ProtectedRoute>
                 <AppLayout />

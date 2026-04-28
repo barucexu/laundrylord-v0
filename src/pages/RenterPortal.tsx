@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, Clock3, CreditCard, ExternalLink, Loader2,
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SeoHead } from "@/components/SeoHead";
 import { supabase } from "@/integrations/supabase/client";
 import { getErrorMessage } from "@/lib/errors";
 import logoImg from "@/assets/laundrylord-logo.webp";
@@ -72,6 +73,14 @@ export default function RenterPortal() {
   const [updatingPaymentMethod, setUpdatingPaymentMethod] = useState(false);
   const [payingOutstandingBalance, setPayingOutstandingBalance] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const seo = (
+    <SeoHead
+      title="Renter Portal"
+      description="LaundryLord renter payment portal."
+      canonicalPath={token ? `/portal/${token}` : "/portal"}
+      robots="noindex,nofollow"
+    />
+  );
 
   const loadSummary = useCallback(async (toastKind: "setup-success" | "payment-success" | null = null) => {
     if (!token) {
@@ -165,6 +174,7 @@ export default function RenterPortal() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background px-4 py-10">
+        {seo}
         <div className="mx-auto flex w-full max-w-3xl items-center justify-center">
           <Card className="w-full max-w-md">
             <CardContent className="flex items-center justify-center gap-3 p-8 text-sm text-muted-foreground">
@@ -180,6 +190,7 @@ export default function RenterPortal() {
   if (!summary || errorMessage) {
     return (
       <div className="min-h-screen bg-background px-4 py-10">
+        {seo}
         <div className="mx-auto w-full max-w-md">
           <Card>
             <CardHeader className="text-center">
@@ -198,6 +209,7 @@ export default function RenterPortal() {
 
   return (
     <div className="min-h-screen bg-background px-4 py-10">
+      {seo}
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
         <Card className="border-primary/20 bg-primary/[0.03]">
           <CardHeader>

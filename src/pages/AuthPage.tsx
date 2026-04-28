@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { PricingCalculator } from "@/components/PricingCalculator";
+import { SeoHead } from "@/components/SeoHead";
 import { toast } from "sonner";
 import { Play } from "lucide-react";
 import logoImg from "@/assets/laundrylord-logo.webp";
@@ -23,7 +24,7 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      navigate("/", { replace: true });
+      navigate("/app", { replace: true });
     }
   }, [user, authLoading, navigate]);
 
@@ -54,7 +55,7 @@ export default function AuthPage() {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: window.location.origin },
+        options: { emailRedirectTo: `${window.location.origin}/auth` },
       });
       if (error) {
         toast.error(error.message);
@@ -68,7 +69,7 @@ export default function AuthPage() {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     const { error } = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
+      redirect_uri: `${window.location.origin}/auth`,
     });
     if (error) {
       toast.error(error instanceof Error ? error.message : "Google sign-in failed");
@@ -86,6 +87,12 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SeoHead
+        title="Sign In"
+        description="Sign in to LaundryLord to manage renters, machines, billing, and maintenance."
+        canonicalPath="/auth"
+        robots="noindex,nofollow"
+      />
       <div className="flex flex-col items-center px-4 py-12">
         {/* Auth section */}
         <div className="w-full max-w-[400px]">
