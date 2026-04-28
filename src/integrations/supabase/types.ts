@@ -432,6 +432,9 @@ export type Database = {
           late_fee_after_days: number
           late_fee_amount: number
           owner_email: string | null
+          public_responsibility_template: string | null
+          public_responsibility_version: number
+          public_slug: string | null
           reminder_days_before: number
           reminder_failed_enabled: boolean
           reminder_latefee_enabled: boolean
@@ -460,6 +463,9 @@ export type Database = {
           late_fee_after_days?: number
           late_fee_amount?: number
           owner_email?: string | null
+          public_responsibility_template?: string | null
+          public_responsibility_version?: number
+          public_slug?: string | null
           reminder_days_before?: number
           reminder_failed_enabled?: boolean
           reminder_latefee_enabled?: boolean
@@ -488,6 +494,9 @@ export type Database = {
           late_fee_after_days?: number
           late_fee_amount?: number
           owner_email?: string | null
+          public_responsibility_template?: string | null
+          public_responsibility_version?: number
+          public_slug?: string | null
           reminder_days_before?: number
           reminder_failed_enabled?: boolean
           reminder_latefee_enabled?: boolean
@@ -587,6 +596,134 @@ export type Database = {
           },
         ]
       }
+      renter_applications: {
+        Row: {
+          address_line1: string
+          address_line2: string | null
+          applicant_name: string
+          city: string
+          converted_at: string | null
+          converted_by_user_id: string | null
+          converted_renter_id: string | null
+          created_at: string
+          dryer_connection: string
+          electric_prong: string | null
+          email: string | null
+          equipment_needed: string
+          id: string
+          layout_preference: string
+          notes: string | null
+          phone: string
+          postal_code: string
+          preferred_delivery_notes: string | null
+          preferred_timing: string
+          responsibilities_acknowledged_at: string
+          responsibility_text: string
+          responsibility_version: number
+          source_slug: string | null
+          state: string
+          status: string
+          submitted_ip: string | null
+          submitted_user_agent: string | null
+          updated_at: string
+          upstairs: boolean
+          user_id: string
+        }
+        Insert: {
+          address_line1: string
+          address_line2?: string | null
+          applicant_name: string
+          city: string
+          converted_at?: string | null
+          converted_by_user_id?: string | null
+          converted_renter_id?: string | null
+          created_at?: string
+          dryer_connection: string
+          electric_prong?: string | null
+          email?: string | null
+          equipment_needed: string
+          id?: string
+          layout_preference: string
+          notes?: string | null
+          phone: string
+          postal_code: string
+          preferred_delivery_notes?: string | null
+          preferred_timing: string
+          responsibilities_acknowledged_at: string
+          responsibility_text: string
+          responsibility_version: number
+          source_slug?: string | null
+          state: string
+          status?: string
+          submitted_ip?: string | null
+          submitted_user_agent?: string | null
+          updated_at?: string
+          upstairs?: boolean
+          user_id: string
+        }
+        Update: {
+          address_line1?: string
+          address_line2?: string | null
+          applicant_name?: string
+          city?: string
+          converted_at?: string | null
+          converted_by_user_id?: string | null
+          converted_renter_id?: string | null
+          created_at?: string
+          dryer_connection?: string
+          electric_prong?: string | null
+          email?: string | null
+          equipment_needed?: string
+          id?: string
+          layout_preference?: string
+          notes?: string | null
+          phone?: string
+          postal_code?: string
+          preferred_delivery_notes?: string | null
+          preferred_timing?: string
+          responsibilities_acknowledged_at?: string
+          responsibility_text?: string
+          responsibility_version?: number
+          source_slug?: string | null
+          state?: string
+          status?: string
+          submitted_ip?: string | null
+          submitted_user_agent?: string | null
+          updated_at?: string
+          upstairs?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "renter_applications_converted_renter_id_fkey"
+            columns: ["converted_renter_id"]
+            isOneToOne: false
+            referencedRelation: "renters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renter_applications_converted_renter_id_fkey"
+            columns: ["converted_renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_audit_renters"
+            referencedColumns: ["renter_id"]
+          },
+          {
+            foreignKeyName: "renter_applications_converted_renter_id_fkey"
+            columns: ["converted_renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_renters_for_admin"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renter_applications_converted_renter_id_fkey"
+            columns: ["converted_renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_renters_with_owner"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       renter_balance_adjustments: {
         Row: {
           amount: number
@@ -642,6 +779,142 @@ export type Database = {
           },
           {
             foreignKeyName: "renter_balance_adjustments_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_renters_with_owner"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      renter_portal_access_credentials: {
+        Row: {
+          created_at: string
+          failed_attempts: number
+          id: string
+          last_login_at: string | null
+          locked_until: string | null
+          pin_hash: string
+          pin_salt: string
+          renter_id: string
+          revoked_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          failed_attempts?: number
+          id?: string
+          last_login_at?: string | null
+          locked_until?: string | null
+          pin_hash: string
+          pin_salt: string
+          renter_id: string
+          revoked_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          failed_attempts?: number
+          id?: string
+          last_login_at?: string | null
+          locked_until?: string | null
+          pin_hash?: string
+          pin_salt?: string
+          renter_id?: string
+          revoked_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "renter_portal_access_credentials_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: true
+            referencedRelation: "renters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renter_portal_access_credentials_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: true
+            referencedRelation: "v_audit_renters"
+            referencedColumns: ["renter_id"]
+          },
+          {
+            foreignKeyName: "renter_portal_access_credentials_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: true
+            referencedRelation: "v_renters_for_admin"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renter_portal_access_credentials_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: true
+            referencedRelation: "v_renters_with_owner"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      renter_portal_sessions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          last_seen_at: string | null
+          renter_id: string
+          revoked_at: string | null
+          token_hash: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          last_seen_at?: string | null
+          renter_id: string
+          revoked_at?: string | null
+          token_hash: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          last_seen_at?: string | null
+          renter_id?: string
+          revoked_at?: string | null
+          token_hash?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "renter_portal_sessions_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "renters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renter_portal_sessions_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_audit_renters"
+            referencedColumns: ["renter_id"]
+          },
+          {
+            foreignKeyName: "renter_portal_sessions_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "v_renters_for_admin"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "renter_portal_sessions_renter_id_fkey"
             columns: ["renter_id"]
             isOneToOne: false
             referencedRelation: "v_renters_with_owner"
@@ -1329,6 +1602,10 @@ export type Database = {
         }
         Returns: Json
       }
+      convert_renter_application: {
+        Args: { p_application_id: string }
+        Returns: string
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -1369,6 +1646,7 @@ export type Database = {
         Args: { p_adjustment_id: string; p_renter_id: string }
         Returns: Json
       }
+      slugify_public_slug: { Args: { value: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
