@@ -20,6 +20,8 @@ import { getErrorMessage } from "@/lib/errors";
 import { TIERS, canFitTier, tierUpgradeLabel } from "@/lib/pricing-tiers";
 import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
 import { useSearchParams } from "react-router-dom";
+import { buildOperatorPublicPath, sanitizeOperatorSlug } from "@/lib/operator-public";
+import { DEFAULT_RESPONSIBILITY_TEMPLATE } from "@/lib/renter-applications";
 
 const DEFAULT_TEMPLATES = {
   template_upcoming_subject: "Payment Reminder",
@@ -55,6 +57,10 @@ export default function SettingsPage() {
     business_name: "LaundryLord",
     ...DEFAULT_TEMPLATES,
   });
+  const [publicForm, setPublicForm] = useState({
+    public_slug: "",
+    public_responsibility_template: DEFAULT_RESPONSIBILITY_TEMPLATE,
+  });
 
   const [stripeKey, setStripeKey] = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
@@ -85,6 +91,10 @@ export default function SettingsPage() {
         template_latefee_subject: settings.template_latefee_subject || DEFAULT_TEMPLATES.template_latefee_subject,
         template_latefee_body: settings.template_latefee_body || DEFAULT_TEMPLATES.template_latefee_body,
       });
+      setPublicForm({
+        public_slug: settings.public_slug || "",
+        public_responsibility_template: settings.public_responsibility_template || DEFAULT_RESPONSIBILITY_TEMPLATE,
+      });
     }
   }, [settings]);
 
@@ -97,6 +107,9 @@ export default function SettingsPage() {
         late_fee_amount: parseFloat(form.late_fee_amount) || 25,
         late_fee_after_days: parseInt(form.late_fee_after_days) || 7,
         reminder_days_before: parseInt(form.reminder_days_before) || 3,
+        public_slug: sanitizeOperatorSlug(publicForm.public_slug) || null,
+        public_responsibility_template: publicForm.public_responsibility_template.trim() || DEFAULT_RESPONSIBILITY_TEMPLATE,
+        public_responsibility_version: settings?.public_responsibility_version ?? 1,
         ...emailForm,
       });
       toast.success("Settings saved");
@@ -147,6 +160,9 @@ export default function SettingsPage() {
   };
 
   const subscription = useSubscription();
+  const normalizedPublicSlug = sanitizeOperatorSlug(publicForm.public_slug);
+  const applyPath = buildOperatorPublicPath(normalizedPublicSlug, "apply");
+  const portalPath = buildOperatorPublicPath(normalizedPublicSlug, "portal");
   const selectedUpgradeTier = subscription.upgradeIntent
     ? TIERS.find((tier) => tier.price_id === subscription.upgradeIntent?.priceId) ?? null
     : null;
@@ -345,6 +361,60 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader className="p-3 pb-2">
+          <CardTitle className="flex items-center gap-2">
+            <Info className="h-4 w-4 text-primary" />
+            Public Intake & Client Portal
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 p-3 pt-0">
+          <div className="space-y-1">
+            <Label htmlFor="publicSlug" className="text-xs">Public operator slug</Label>
+            <Input
+              id="publicSlug"
+              value={publicForm.public_slug}
+              onChange={e => setPublicForm((current) => ({ ...current, public_slug: e.target.value }))}
+              onBlur={() => setPublicForm((current) => ({ ...current, public_slug: sanitizeOperatorSlug(current.public_slug) }))}
+              placeholder="sunbelt-laundry-rentals"
+              className="h-8 text-sm"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              This becomes the operator-specific public route from `laundrylord.club`.
+            </p>
+          </div>
+
+          <div className="grid gap-2 md:grid-cols-2">
+            <div className="rounded-md border p-3">
+              <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Application link</div>
+              <div className="mt-1 break-all text-sm">
+                {applyPath ? `${window.location.origin}${applyPath}` : "Add a slug to generate your public application link."}
+              </div>
+            </div>
+            <div className="rounded-md border p-3">
+              <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Client portal link</div>
+              <div className="mt-1 break-all text-sm">
+                {portalPath ? `${window.location.origin}${portalPath}` : "Add a slug to generate your public client portal link."}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="responsibilityCopy" className="text-xs">Responsibilities acknowledgement copy</Label>
+            <Textarea
+              id="responsibilityCopy"
+              rows={10}
+              value={publicForm.public_responsibility_template}
+              onChange={e => setPublicForm((current) => ({ ...current, public_responsibility_template: e.target.value }))}
+              className="text-sm"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              This text is shown on the public application page and stored with every submission.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Row 2: Stripe Connection + Setup Checklist */}
       <div className="grid md:grid-cols-2 gap-3">

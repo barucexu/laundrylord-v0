@@ -14,6 +14,7 @@ Vertical SaaS for washer/dryer rental operators. Billing clarity + renter system
 |-------|------|---------|
 | `/` | Dashboard | KPIs, overdue/upcoming summary |
 | `/renters` | RentersList | Active renter table |
+| `/applications` | ApplicationsPage | Public application review + conversion area |
 | `/renters/archive` | RenterArchive | Archived renters |
 | `/renters/:id` | RenterDetail | **Center of gravity** — billing, timeline, machines, actions |
 | `/machines` | MachinesList | Machine inventory + assignment display |
@@ -25,6 +26,8 @@ Vertical SaaS for washer/dryer rental operators. Billing clarity + renter system
 | `/auth` | AuthPage | Login/signup |
 | `/reset-password` | ResetPasswordPage | Password reset |
 | `/portal/:token` | RenterPortal | Public renter portal for balance, due date, autopay status, and payment-method updates |
+| `/o/:operatorSlug/apply` | PublicOperatorApply | Operator-specific public intake page for prospects |
+| `/o/:operatorSlug/portal` | PublicClientPortal | Operator-specific existing-client portal with phone + PIN login |
 
 ## Real Mode vs Demo Mode
 
@@ -37,7 +40,7 @@ Vertical SaaS for washer/dryer rental operators. Billing clarity + renter system
 
 | Hook/Module | Responsibility |
 |-------------|---------------|
-| `useSupabaseData` | All Supabase CRUD hooks (renters, machines, payments, maintenance, timeline, settings, Stripe connection). Demo-aware. |
+| `useSupabaseData` | All Supabase CRUD hooks (renters, applications, machines, payments, maintenance, timeline, settings, Stripe connection). Demo-aware. |
 | `useSubscription` | Plan tier gating — computes `canAddRenter`, `tier`, `checkout()`, `portal()` |
 | `useAuth` | Auth state, sign-in/out, session, demo mode flag |
 | `DemoContext` | In-memory data store for demo mode |
@@ -57,9 +60,12 @@ Assignment writes should go through the guarded assignment hooks in `useSupabase
 |----------|------------|--------------|
 | `send-billing-reminders` | Service-role only | Validates `Authorization: Bearer <SERVICE_ROLE_KEY>` exactly |
 | `stripe-webhook` | Webhook | Operator token in URL + per-operator Stripe signature verification |
+| `public-operator-intake` | Public | Validates operator slug + writes only application records via service role |
+| `public-client-portal` | Public | Validates operator slug, phone + hashed PIN, and renter-scoped hashed session token |
 | `create-checkout` | User-authenticated | Standard JWT via Supabase client |
 | `create-subscription` | User-authenticated | Standard JWT |
 | `create-setup-link` | User-authenticated | Standard JWT |
+| `renter-portal-access-admin` | User-authenticated | Standard JWT checked inside the function |
 | `renter-portal-admin` | User-authenticated | Standard JWT checked inside the function |
 | `renter-portal` | Public token-based | Validates hashed portal token inside the function |
 | `customer-portal` | User-authenticated | Standard JWT |
@@ -73,6 +79,7 @@ Assignment writes should go through the guarded assignment hooks in `useSupabase
 
 - This project uses a Lovable Cloud-managed Supabase backend.
 - In the Lovable editor, migrations, read queries, Edge Function deploys, and secret checks can be handled through Lovable's managed tooling.
+- Lovable syncs from GitHub, so code meant to appear in Lovable needs to be pushed and merged. This is especially important for Edge Function work.
 - In external coding environments, frontend env values allow app access, but do not by themselves grant direct database-admin execution.
 
 ## Billing / Reminder / Webhook Flow
@@ -108,6 +115,7 @@ Autopay start behavior now means:
 | Domain | Values |
 |--------|--------|
 | `renters.status` | `lead`, `scheduled`, `active`, `autopay_pending`, `late`, `maintenance`, `termination_requested`, `pickup_scheduled`, `closed`, `defaulted`, `archived` |
+| `renter_applications.status` | `new`, `contacted`, `approved_not_billable`, `converted_billable`, `rejected` |
 | `machines.type` | `washer`, `dryer`, `set` |
 | `machines.status` | `available`, `assigned`, `maintenance`, `retired` |
 | `maintenance_logs.status` | `reported`, `scheduled`, `in_progress`, `resolved` |
@@ -127,12 +135,19 @@ Autopay start behavior now means:
 - `maintenance_logs.machine_id` is optional. When the operator chooses a renter, the UI may prefill a machine only when exactly one machine has `machines.assigned_renter_id = renters.id`.
 - Maintenance archives use `archived_at`; active maintenance hooks hide archived rows by default.
 
+## Public Application Contract
+
+- Public intake creates `renter_applications` rows only; it must never create active renters directly.
+- `renter_applications` stay outside renter billing counts, renter metrics, delinquency logic, and paid-through calculations until converted.
+- Converting an application to a renter uses the authoritative `convert_renter_application` path so duplicate clicks return the same renter instead of creating a second one.
+
 ## Renter Portal Contract
 
 - `renter_portal_tokens` stores only a `token_hash`; raw portal links are created once and must be copied when generated.
 - Portal reads and payment-method updates go through the `renter-portal` Edge Function; the public page must not read renter tables directly from the browser.
 - Portal outstanding-balance payments go through the `renter-portal` Edge Function and Stripe Checkout; the browser sends only the portal token and must not choose the payment amount.
 - Portal payment-method updates use the operator's renter-billing Stripe context from `stripe_keys`, not the SaaS billing key path.
+- The permanent maintenance portal at `/o/:operatorSlug/portal` uses phone + hashed PIN plus hashed session tokens in `renter_portal_access_credentials` and `renter_portal_sessions`; it is separate from the temporary billing link model at `/portal/:token`.
 
 
 ## Project Operating Docs

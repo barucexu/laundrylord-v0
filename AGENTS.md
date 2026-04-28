@@ -162,7 +162,8 @@ Before wrapping up, confirm:
 4. If the environment cannot verify remote state, say so clearly before continuing with risky work
 5. If the user has asked for implementation rather than planning-only, default to committing, pushing, opening a PR, and merging after validation passes unless the user explicitly says not to publish yet
 6. Treat push-and-merge as the normal finish state for validated implementation work so Lovable can see it immediately; do not stop at a local commit unless the user explicitly wants a checkpoint before publishing
-7. After publishing code needed for Lovable testing, give the user a tiny Lovable-ready redeploy message naming only the changed edge functions that need redeploy
+7. IMPORTANT: for this repo, code that is not pushed and merged is often not usable in Lovable. Lovable syncs from GitHub, so Edge Function changes especially must be pushed and merged before telling the user the work is ready in Lovable
+8. When in doubt, publish first, then give the user the tiny Lovable-ready redeploy message naming only the changed edge functions that need redeploy
 
 ## Database access guidance
 

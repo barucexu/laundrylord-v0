@@ -10,6 +10,7 @@ import { DemoProvider } from "@/contexts/DemoContext";
 import { DemoLayout } from "@/components/DemoLayout";
 import Dashboard from "@/pages/Dashboard";
 import RentersList from "@/pages/RentersList";
+import ApplicationsPage from "@/pages/ApplicationsPage";
 import RenterDetail from "@/pages/RenterDetail";
 import MachinesList from "@/pages/MachinesList";
 import MachineMapPage from "@/pages/MachineMapPage";
@@ -22,6 +23,8 @@ import RenterArchive from "@/pages/RenterArchive";
 import AuthPage from "@/pages/AuthPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import RenterPortal from "@/pages/RenterPortal";
+import PublicOperatorApply from "@/pages/PublicOperatorApply";
+import PublicClientPortal from "@/pages/PublicClientPortal";
 import NotFound from "@/pages/NotFound";
 import MarketingHome from "@/pages/MarketingHome";
 import LaundryRentalSoftwarePage from "@/pages/LaundryRentalSoftwarePage";
@@ -33,6 +36,7 @@ const PAGE_ROUTES = (
   <>
     <Route index element={<Dashboard />} />
     <Route path="renters" element={<RentersList />} />
+    <Route path="applications" element={<ApplicationsPage />} />
     <Route path="renters/archive" element={<RenterArchive />} />
     <Route path="renters/:id" element={<RenterDetail />} />
     <Route path="machines" element={<MachinesList />} />
@@ -73,8 +77,11 @@ const App = () => (
             </AuthProvider>
           } />
           <Route path="/portal/:token" element={<RenterPortal />} />
+          <Route path="/o/:operatorSlug/apply" element={<PublicOperatorApply />} />
+          <Route path="/o/:operatorSlug/portal" element={<PublicClientPortal />} />
           <Route path="/dashboard" element={<Navigate to="/app" replace />} />
           <Route path="/renters" element={<LegacyAppRedirect />} />
+          <Route path="/applications" element={<LegacyAppRedirect />} />
           <Route path="/renters/archive" element={<LegacyAppRedirect />} />
           <Route path="/renters/:id" element={<LegacyAppRedirect />} />
           <Route path="/machines" element={<LegacyAppRedirect />} />

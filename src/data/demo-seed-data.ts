@@ -10,6 +10,7 @@ type MachineRow = Database["public"]["Tables"]["machines"]["Row"];
 type PaymentRow = Database["public"]["Tables"]["payments"]["Row"];
 type MaintenanceRow = Database["public"]["Tables"]["maintenance_logs"]["Row"];
 type TimelineRow = Database["public"]["Tables"]["timeline_events"]["Row"];
+type RenterApplicationRow = Database["public"]["Tables"]["renter_applications"]["Row"];
 type OperatorSettingsRow = Database["public"]["Tables"]["operator_settings"]["Row"];
 
 // ─── Deterministic ID generation ───
@@ -369,6 +370,75 @@ function generateTimelineEvents(renters: RenterRow[]): TimelineRow[] {
   return events;
 }
 
+function generateRenterApplications(): RenterApplicationRow[] {
+  return [
+    {
+      id: demoId("appl", 0),
+      user_id: DEMO_USER_ID,
+      applicant_name: "Taylor Morgan",
+      phone: "(917) 555-0101",
+      email: "taylor@example.com",
+      address_line1: "145 W 81st St",
+      address_line2: "Apt 4B",
+      city: "New York",
+      state: "NY",
+      postal_code: "10024",
+      equipment_needed: "washer_and_dryer",
+      layout_preference: "stackable",
+      dryer_connection: "electric",
+      electric_prong: "4-prong",
+      upstairs: true,
+      preferred_timing: "asap",
+      preferred_delivery_notes: "Call before arrival. Narrow hallway on second floor.",
+      notes: "Gate code 1882.",
+      status: "new",
+      source_slug: "nyc-laundry-rentals-demo",
+      responsibilities_acknowledged_at: NOW,
+      responsibility_text: "Demo responsibilities acknowledged.",
+      responsibility_version: 1,
+      submitted_ip: "203.0.113.10",
+      submitted_user_agent: "Demo Browser",
+      converted_renter_id: null,
+      converted_at: null,
+      converted_by_user_id: null,
+      created_at: NOW,
+      updated_at: NOW,
+    },
+    {
+      id: demoId("appl", 1),
+      user_id: DEMO_USER_ID,
+      applicant_name: "Jordan Lee",
+      phone: "(646) 555-0134",
+      email: null,
+      address_line1: "420 Atlantic Ave",
+      address_line2: null,
+      city: "Brooklyn",
+      state: "NY",
+      postal_code: "11217",
+      equipment_needed: "washer_only",
+      layout_preference: "side_by_side",
+      dryer_connection: "gas",
+      electric_prong: null,
+      upstairs: false,
+      preferred_timing: "specific",
+      preferred_delivery_notes: "Prefers Friday afternoon delivery.",
+      notes: null,
+      status: "contacted",
+      source_slug: "nyc-laundry-rentals-demo",
+      responsibilities_acknowledged_at: NOW,
+      responsibility_text: "Demo responsibilities acknowledged.",
+      responsibility_version: 1,
+      submitted_ip: "203.0.113.11",
+      submitted_user_agent: "Demo Browser",
+      converted_renter_id: null,
+      converted_at: null,
+      converted_by_user_id: null,
+      created_at: NOW,
+      updated_at: NOW,
+    },
+  ];
+}
+
 // ─── Operator settings ───
 function generateOperatorSettings(): OperatorSettingsRow {
   return {
@@ -376,6 +446,9 @@ function generateOperatorSettings(): OperatorSettingsRow {
     user_id: DEMO_USER_ID,
     business_name: "NYC Laundry Rentals",
     owner_email: "demo@laundrylord.com",
+    public_slug: "nyc-laundry-rentals-demo",
+    public_responsibility_template: "Demo responsibilities copy.",
+    public_responsibility_version: 1,
     default_monthly_rate: 65,
     default_install_fee: 100,
     default_deposit: 150,
@@ -410,8 +483,9 @@ function _generate() {
   const payments = generatePayments(renters);
   const maintenanceLogs = generateMaintenanceLogs(renters, machines);
   const timelineEvents = generateTimelineEvents(renters);
+  const renterApplications = generateRenterApplications();
   const operatorSettings = generateOperatorSettings();
-  return { renters, machines, payments, maintenanceLogs, timelineEvents, operatorSettings };
+  return { renters, machines, payments, maintenanceLogs, timelineEvents, renterApplications, operatorSettings };
 }
 
 export function getDemoData() {
@@ -428,6 +502,7 @@ export function cloneDemoData() {
     payments: [...src.payments.map(p => ({ ...p }))],
     maintenanceLogs: [...src.maintenanceLogs.map(l => ({ ...l }))],
     timelineEvents: [...src.timelineEvents.map(e => ({ ...e }))],
+    renterApplications: [...src.renterApplications.map((a) => ({ ...a }))],
     operatorSettings: { ...src.operatorSettings },
   };
 }
@@ -455,4 +530,4 @@ export function buildDemoGeoCache(): Record<string, { lat: number; lng: number }
 }
 
 export { DEMO_USER_ID };
-export type { RenterRow, MachineRow, PaymentRow, MaintenanceRow, TimelineRow, OperatorSettingsRow };
+export type { RenterRow, MachineRow, PaymentRow, MaintenanceRow, TimelineRow, RenterApplicationRow, OperatorSettingsRow };

@@ -43,6 +43,7 @@ vi.mock("@/hooks/useSupabaseData", () => ({
   useMaintenanceForRenter: () => ({ data: [], isLoading: false }),
   usePaymentsForRenter: () => ({ data: [], isLoading: false }),
   useRenterBalanceAdjustments: () => ({ data: [], isLoading: false }),
+  useOperatorSettings: () => ({ data: { public_slug: "demo-operator" }, isLoading: false }),
   useStripeConnection: () => ({
     data: {
       connected: true,

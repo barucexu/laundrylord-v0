@@ -18,6 +18,8 @@ export type RenterBalanceAdjustmentRow = Database["public"]["Tables"]["renter_ba
 type MaintenanceRow = Database["public"]["Tables"]["maintenance_logs"]["Row"];
 type MaintenanceInsert = Database["public"]["Tables"]["maintenance_logs"]["Insert"];
 type TimelineRow = Database["public"]["Tables"]["timeline_events"]["Row"];
+export type RenterApplicationRow = Database["public"]["Tables"]["renter_applications"]["Row"];
+type RenterApplicationInsert = Database["public"]["Tables"]["renter_applications"]["Insert"];
 type CustomFieldDefinitionRow = Database["public"]["Tables"]["custom_field_definitions"]["Row"];
 type CustomFieldValueRow = Database["public"]["Tables"]["custom_field_values"]["Row"];
 
@@ -68,6 +70,84 @@ export function useRenters() {
     return { ...supaQuery, data: nonArchived, isLoading: false, error: null };
   }
   return supaQuery;
+}
+
+export function useRenterApplications() {
+  const demo = useDemo();
+  const supaQuery = useQuery({
+    queryKey: ["renter_applications"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("renter_applications")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as RenterApplicationRow[];
+    },
+    enabled: !demo?.isDemo,
+  });
+  if (demo?.isDemo) {
+    return { ...supaQuery, data: demo.data.renterApplications, isLoading: false, error: null };
+  }
+  return supaQuery;
+}
+
+export function useUpdateRenterApplication() {
+  const queryClient = useQueryClient();
+  const demo = useDemo();
+
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<RenterApplicationRow> & { id: string }) => {
+      if (demo?.isDemo) {
+        const updated = demo.updateRenterApplication(id, updates);
+        if (!updated) throw new Error("Application not found");
+        return updated;
+      }
+
+      const { data, error } = await supabase
+        .from("renter_applications")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as RenterApplicationRow;
+    },
+    onSuccess: () => {
+      if (!demo?.isDemo) {
+        queryClient.invalidateQueries({ queryKey: ["renter_applications"] });
+      }
+    },
+  });
+}
+
+export function useConvertRenterApplication() {
+  const queryClient = useQueryClient();
+  const demo = useDemo();
+
+  return useMutation({
+    mutationFn: async ({ applicationId }: { applicationId: string }) => {
+      if (demo?.isDemo) {
+        const converted = demo.convertRenterApplication(applicationId);
+        if (!converted) throw new Error("Application not found");
+        return converted;
+      }
+
+      const { data, error } = await supabase.rpc("convert_renter_application", {
+        p_application_id: applicationId,
+      });
+      if (error) throw error;
+      return data as string;
+    },
+    onSuccess: (renterId) => {
+      if (!demo?.isDemo) {
+        queryClient.invalidateQueries({ queryKey: ["renter_applications"] });
+        queryClient.invalidateQueries({ queryKey: ["renters"] });
+        queryClient.invalidateQueries({ queryKey: ["renters", renterId] });
+        queryClient.invalidateQueries({ queryKey: BILLABLE_RENTER_COUNT_QUERY_KEY });
+      }
+    },
+  });
 }
 
 export function useArchivedRenters() {
@@ -1048,6 +1128,9 @@ export function useSaveOperatorSettings() {
       reminder_failed_enabled?: boolean;
       reminder_latefee_enabled?: boolean;
       business_name?: string;
+      public_slug?: string | null;
+      public_responsibility_template?: string | null;
+      public_responsibility_version?: number;
       template_upcoming_subject?: string;
       template_upcoming_body?: string;
       template_failed_subject?: string;
@@ -1083,4 +1166,5 @@ export type {
   TimelineRow,
   CustomFieldDefinitionRow,
   CustomFieldValueRow,
+  RenterApplicationInsert,
 };
