@@ -207,3 +207,13 @@ A task is not done unless:
 5. Passing checks and untested areas have been summarized
 6. Docs are updated if logic or policy changed
 7. The result has been reviewed at the level appropriate to the task size, including a fresh-review pass that tries to break the solution
+8. If the user wants the result available in Lovable, the code has been pushed and merged so GitHub -> Lovable sync can surface the changes
+
+## Lovable publish rule
+
+For this repo, do not treat "local commit only" as a real finish state unless the user explicitly asks for a checkpoint.
+
+1. Lovable syncs from GitHub
+2. That means pushed-and-merged code is the normal completion state
+3. Edge Function changes are not meaningfully ready for Lovable testing until the relevant code is pushed and merged
+4. After push+merge, tell the user exactly which Edge Functions need redeploy in Lovable

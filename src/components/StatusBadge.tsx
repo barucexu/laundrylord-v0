@@ -27,6 +27,11 @@ const statusStyles: Record<string, string> = {
   reported: "bg-warning/10 text-warning",
   in_progress: "bg-primary/10 text-primary",
   resolved: "bg-success/10 text-success",
+  new: "bg-primary/10 text-primary",
+  contacted: "bg-warning/10 text-warning",
+  approved_not_billable: "bg-muted text-muted-foreground",
+  converted_billable: "bg-success/10 text-success",
+  rejected: "bg-destructive/10 text-destructive",
   // Archive status
   archived: "bg-muted text-muted-foreground",
 };
@@ -54,6 +59,11 @@ const statusLabels: Record<string, string> = {
   reported: "Reported",
   in_progress: "In Progress",
   resolved: "Resolved",
+  new: "New",
+  contacted: "Contacted",
+  approved_not_billable: "Approved",
+  converted_billable: "Converted",
+  rejected: "Rejected",
   archived: "Archived",
 };
 

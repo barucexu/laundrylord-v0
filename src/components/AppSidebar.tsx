@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Box, CreditCard, Wrench, Settings, LogOut, Upload, Mail, MapPin } from "lucide-react";
+import { LayoutDashboard, Users, Box, CreditCard, Wrench, Settings, LogOut, Upload, Mail, MapPin, ClipboardList } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import {
 const navItems = [
   { title: "Dashboard", url: "/app", icon: LayoutDashboard },
   { title: "Renters", url: "/app/renters", icon: Users },
+  { title: "Applications", url: "/app/applications", icon: ClipboardList },
   { title: "Machines", url: "/app/machines", icon: Box },
   { title: "Machine Map", url: "/app/machine-map", icon: MapPin },
   { title: "Payments", url: "/app/payments", icon: CreditCard },

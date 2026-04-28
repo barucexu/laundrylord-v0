@@ -51,6 +51,9 @@ export default function RentersList() {
           <h1 className="text-xl font-semibold tracking-tight">Renters</h1>
           <div className="flex items-center gap-3 mt-0.5">
             <p className="text-sm text-muted-foreground">{filtered.length} renters</p>
+            <Link to="/applications" className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2">
+              Applications
+            </Link>
             <Link to="/renters/archive" className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2">
               View Archive
             </Link>

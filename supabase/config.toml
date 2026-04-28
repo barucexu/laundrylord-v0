@@ -35,3 +35,12 @@ verify_jwt = false
 
 [functions.renter-portal]
 verify_jwt = false
+
+[functions.public-operator-intake]
+verify_jwt = false
+
+[functions.public-client-portal]
+verify_jwt = false
+
+[functions.renter-portal-access-admin]
+verify_jwt = false

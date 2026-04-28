@@ -3,7 +3,7 @@
  * Reuses the same nav items and layout.
  */
 
-import { LayoutDashboard, Users, Box, CreditCard, Wrench, Settings, LogOut, Upload, MapPin } from "lucide-react";
+import { LayoutDashboard, Users, Box, CreditCard, Wrench, Settings, LogOut, Upload, MapPin, ClipboardList } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -26,6 +26,7 @@ import {
 const navItems = [
   { title: "Dashboard", url: "/demo", icon: LayoutDashboard },
   { title: "Renters", url: "/demo/renters", icon: Users },
+  { title: "Applications", url: "/demo/applications", icon: ClipboardList },
   { title: "Machines", url: "/demo/machines", icon: Box },
   { title: "Machine Map", url: "/demo/machine-map", icon: MapPin },
   { title: "Payments", url: "/demo/payments", icon: CreditCard },

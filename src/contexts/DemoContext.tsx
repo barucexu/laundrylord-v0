@@ -7,7 +7,8 @@
 
 import { createContext, useContext, useState, useCallback, ReactNode } from "react";
 import { cloneDemoData, DEMO_USER_ID } from "@/data/demo-seed-data";
-import type { RenterRow, MachineRow, PaymentRow, MaintenanceRow, TimelineRow, OperatorSettingsRow } from "@/data/demo-seed-data";
+import type { RenterRow, MachineRow, PaymentRow, MaintenanceRow, TimelineRow, RenterApplicationRow, OperatorSettingsRow } from "@/data/demo-seed-data";
+import { formatApplicationAddress } from "@/lib/renter-applications";
 
 interface DemoState {
   renters: RenterRow[];
@@ -15,6 +16,7 @@ interface DemoState {
   payments: PaymentRow[];
   maintenanceLogs: MaintenanceRow[];
   timelineEvents: TimelineRow[];
+  renterApplications: RenterApplicationRow[];
   operatorSettings: OperatorSettingsRow;
 }
 
@@ -31,6 +33,8 @@ interface DemoContextType {
   updateMaintenanceLog: (id: string, updates: Partial<MaintenanceRow>) => MaintenanceRow | null;
   archiveMaintenanceLog: (id: string) => MaintenanceRow | null;
   addTimelineEvent: (event: Omit<TimelineRow, "id" | "user_id" | "created_at">) => TimelineRow;
+  updateRenterApplication: (id: string, updates: Partial<RenterApplicationRow>) => RenterApplicationRow | null;
+  convertRenterApplication: (id: string) => string | null;
   updateSettings: (updates: Partial<OperatorSettingsRow>) => OperatorSettingsRow;
 }
 
@@ -132,6 +136,97 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     return newEvent;
   }, []);
 
+  const updateRenterApplication = useCallback((id: string, updates: Partial<RenterApplicationRow>) => {
+    let result: RenterApplicationRow | null = null;
+    setData((prev) => {
+      const renterApplications = prev.renterApplications.map((application) => {
+        if (application.id === id) {
+          result = { ...application, ...updates, updated_at: new Date().toISOString() };
+          return result;
+        }
+        return application;
+      });
+      return { ...prev, renterApplications };
+    });
+    return result;
+  }, []);
+
+  const convertRenterApplication = useCallback((id: string) => {
+    let renterId: string | null = null;
+
+    setData((prev) => {
+      const application = prev.renterApplications.find((entry) => entry.id === id);
+      if (!application) return prev;
+      if (application.converted_renter_id) {
+        renterId = application.converted_renter_id;
+        return prev;
+      }
+
+      const now = new Date().toISOString();
+      const newRenterId = genId("rntr");
+      renterId = newRenterId;
+
+      const newRenter: RenterRow = {
+        id: newRenterId,
+        user_id: DEMO_USER_ID,
+        name: application.applicant_name,
+        phone: application.phone,
+        email: application.email,
+        address: formatApplicationAddress(application),
+        status: "scheduled",
+        monthly_rate: prev.operatorSettings.default_monthly_rate,
+        balance: 0,
+        days_late: 0,
+        deposit_amount: prev.operatorSettings.default_deposit,
+        deposit_collected: false,
+        install_fee: prev.operatorSettings.default_install_fee,
+        install_fee_collected: false,
+        install_notes: `Application intake details:\nEquipment needed: ${application.equipment_needed.replaceAll("_", " ")}\nLayout: ${application.layout_preference.replaceAll("_", " ")}\nDryer connection: ${application.dryer_connection}${application.electric_prong ? ` (${application.electric_prong})` : ""}\nUpstairs: ${application.upstairs ? "Yes" : "No"}`,
+        late_fee: prev.operatorSettings.late_fee_amount,
+        lease_start_date: null,
+        min_term_end_date: null,
+        next_due_date: null,
+        paid_through_date: null,
+        rent_collected: 0,
+        has_payment_method: false,
+        stripe_customer_id: null,
+        stripe_subscription_id: null,
+        language: "en",
+        dryer_outlet: application.dryer_connection === "electric" && application.electric_prong !== "unknown"
+          ? application.electric_prong
+          : null,
+        notes: application.notes,
+        secondary_contact: null,
+        laundrylord_email: null,
+        archived_at: null,
+        billable_until: null,
+        created_at: now,
+        updated_at: now,
+      };
+
+      const renterApplications = prev.renterApplications.map((entry) => (
+        entry.id === id
+          ? {
+            ...entry,
+            status: "converted_billable",
+            converted_renter_id: newRenterId,
+            converted_at: now,
+            converted_by_user_id: DEMO_USER_ID,
+            updated_at: now,
+          }
+          : entry
+      ));
+
+      return {
+        ...prev,
+        renters: [newRenter, ...prev.renters],
+        renterApplications,
+      };
+    });
+
+    return renterId;
+  }, []);
+
   const updateSettings = useCallback((updates: Partial<OperatorSettingsRow>) => {
     let result: OperatorSettingsRow = data.operatorSettings;
     setData(prev => {
@@ -142,7 +237,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   }, [data.operatorSettings]);
 
   return (
-    <DemoContext.Provider value={{ isDemo: true, data, updateRenter, addRenter, updateMachine, addMachine, addPayment, addMaintenanceLog, updateMaintenanceLog, archiveMaintenanceLog, addTimelineEvent, updateSettings }}>
+    <DemoContext.Provider value={{ isDemo: true, data, updateRenter, addRenter, updateMachine, addMachine, addPayment, addMaintenanceLog, updateMaintenanceLog, archiveMaintenanceLog, addTimelineEvent, updateRenterApplication, convertRenterApplication, updateSettings }}>
       {children}
     </DemoContext.Provider>
   );

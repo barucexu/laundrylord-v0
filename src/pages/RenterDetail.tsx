@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PaymentSourceBadge } from "@/components/PaymentSourceBadge";
 import { supabase } from "@/integrations/supabase/client";
-import { useRenter, useUpdateRenter, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection, useEntityCustomFields, useRenterBalanceAdjustments, useAddRenterBalanceAdjustment, useRemoveRenterBalanceAdjustment } from "@/hooks/useSupabaseData";
+import { useRenter, useUpdateRenter, useTimelineEvents, useMaintenanceForRenter, usePaymentsForRenter, useStripeConnection, useEntityCustomFields, useRenterBalanceAdjustments, useAddRenterBalanceAdjustment, useRemoveRenterBalanceAdjustment, useOperatorSettings } from "@/hooks/useSupabaseData";
 import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
 import { formatProjectedRecurringCharge, getAchProcessingExplanation, getAutopayActivationMessage, getProjectedNextRecurringDate } from "@/lib/renter-billing";
 import { getPaymentTypeLabel } from "@/lib/payment-display";
@@ -29,6 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { buildOperatorPublicPath } from "@/lib/operator-public";
 
 const timelineIcons: Record<string, typeof User> = {
   created: User,
@@ -56,11 +57,13 @@ export default function RenterDetail() {
   const { data: renterPayments = [] } = usePaymentsForRenter(id);
   const { data: balanceAdjustments = [] } = useRenterBalanceAdjustments(id);
   const { data: stripeStatus } = useStripeConnection();
+  const { data: operatorSettings } = useOperatorSettings();
   const updateRenter = useUpdateRenter();
   const addBalanceAdjustment = useAddRenterBalanceAdjustment();
   const removeBalanceAdjustment = useRemoveRenterBalanceAdjustment();
   const [sendingSetup, setSendingSetup] = useState(false);
   const [creatingPortalLink, setCreatingPortalLink] = useState(false);
+  const [creatingClientPortalAccess, setCreatingClientPortalAccess] = useState(false);
   const [activating, setActivating] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -278,6 +281,37 @@ export default function RenterDetail() {
       toast.error(getErrorMessage(err, "Failed to activate billing"));
     } finally {
       setActivating(false);
+    }
+  };
+
+  const handleGenerateClientPortalAccess = async () => {
+    if (!id || !renter) return;
+    if (!operatorSettings?.public_slug) {
+      toast.error("Add a public operator slug in Settings before generating client portal access.");
+      return;
+    }
+
+    setCreatingClientPortalAccess(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("renter-portal-access-admin", {
+        body: { renter_id: id },
+      });
+      if (error) throw error;
+      if (!data?.pin) throw new Error("Missing portal PIN");
+
+      const portalPath = buildOperatorPublicPath(operatorSettings.public_slug, "portal");
+      const portalMessage = [
+        `${window.location.origin}${portalPath}`,
+        `Phone: ${renter.phone || "Use the phone number on file"}`,
+        `PIN: ${data.pin}`,
+      ].join("\n");
+
+      await navigator.clipboard.writeText(portalMessage);
+      toast.success("Client portal access copied to clipboard.");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Failed to generate client portal access"));
+    } finally {
+      setCreatingClientPortalAccess(false);
     }
   };
 
@@ -605,6 +639,25 @@ export default function RenterDetail() {
                 </Button>
                 <p className="mt-2 text-xs text-muted-foreground">
                   → Lets the renter review balance, next due date, autopay status, and update their payment method.
+                </p>
+              </div>
+
+              <div className="border-t border-border/60 pt-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleGenerateClientPortalAccess}
+                  disabled={creatingClientPortalAccess}
+                >
+                  {creatingClientPortalAccess ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  ) : (
+                    <Globe className="h-4 w-4" />
+                  )}
+                  Generate Client Portal PIN
+                </Button>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  → Copies the permanent `/o/:slug/portal` login plus this renter&apos;s phone + fresh PIN. Regenerating revokes prior portal sessions.
                 </p>
               </div>
             </CardContent>

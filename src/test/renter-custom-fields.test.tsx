@@ -52,6 +52,7 @@ vi.mock("@/hooks/useSupabaseData", () => ({
   useRenterBalanceAdjustments: () => ({ data: [], isLoading: false }),
   useAddRenterBalanceAdjustment: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useRemoveRenterBalanceAdjustment: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useOperatorSettings: () => ({ data: { public_slug: "demo-operator" }, isLoading: false }),
   useStripeConnection: () => ({ data: { connected: false }, isLoading: false }),
 }));
 
