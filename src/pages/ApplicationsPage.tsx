@@ -28,6 +28,7 @@ import {
 } from "@/hooks/useSupabaseData";
 import {
   APPLICATION_STATUS_OPTIONS,
+  formatElevatorPreference,
   formatApplicationAddress,
   formatEquipmentNeeded,
   formatLayoutPreference,
@@ -303,7 +304,16 @@ export default function ApplicationsPage() {
                   </div>
                   <div className="rounded-lg border p-3">
                     <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Access</div>
-                    <div className="mt-1 text-sm">{selectedApplication.upstairs ? "Upstairs" : "Ground floor / no stairs"}</div>
+                    <div className="mt-1 text-sm">
+                      {selectedApplication.floor_number
+                        ? `Floor ${selectedApplication.floor_number}`
+                        : selectedApplication.upstairs
+                          ? "Upper floor"
+                          : "Ground floor / no stairs"}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Elevator: {formatElevatorPreference(selectedApplication.has_elevator)}
+                    </div>
                   </div>
                 </div>
 

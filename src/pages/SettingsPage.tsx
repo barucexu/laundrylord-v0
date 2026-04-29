@@ -100,6 +100,14 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     try {
+      const normalizedResponsibilityTemplate = publicForm.public_responsibility_template.trim() || DEFAULT_RESPONSIBILITY_TEMPLATE;
+      const responsibilityTemplateChanged = normalizedResponsibilityTemplate !== (settings?.public_responsibility_template || DEFAULT_RESPONSIBILITY_TEMPLATE);
+      const nextResponsibilityVersion = settings?.public_responsibility_version
+        ? responsibilityTemplateChanged
+          ? settings.public_responsibility_version + 1
+          : settings.public_responsibility_version
+        : 1;
+
       await saveSettings.mutateAsync({
         default_monthly_rate: parseFloat(form.default_monthly_rate) || 150,
         default_install_fee: parseFloat(form.default_install_fee) || 75,
@@ -108,8 +116,8 @@ export default function SettingsPage() {
         late_fee_after_days: parseInt(form.late_fee_after_days) || 7,
         reminder_days_before: parseInt(form.reminder_days_before) || 3,
         public_slug: sanitizeOperatorSlug(publicForm.public_slug) || null,
-        public_responsibility_template: publicForm.public_responsibility_template.trim() || DEFAULT_RESPONSIBILITY_TEMPLATE,
-        public_responsibility_version: settings?.public_responsibility_version ?? 1,
+        public_responsibility_template: normalizedResponsibilityTemplate,
+        public_responsibility_version: nextResponsibilityVersion,
         ...emailForm,
       });
       toast.success("Settings saved");
@@ -401,7 +409,22 @@ export default function SettingsPage() {
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="responsibilityCopy" className="text-xs">Responsibilities acknowledgement copy</Label>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label htmlFor="responsibilityCopy" className="text-xs">Responsibilities acknowledgement copy</Label>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Operators can customize this. Each submitted application stores the exact copy and version shown at the time of submission.
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setPublicForm((current) => ({ ...current, public_responsibility_template: DEFAULT_RESPONSIBILITY_TEMPLATE }))}
+              >
+                Reset default
+              </Button>
+            </div>
             <Textarea
               id="responsibilityCopy"
               rows={10}
@@ -409,9 +432,10 @@ export default function SettingsPage() {
               onChange={e => setPublicForm((current) => ({ ...current, public_responsibility_template: e.target.value }))}
               className="text-sm"
             />
-            <p className="text-[11px] text-muted-foreground">
-              This text is shown on the public application page and stored with every submission.
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+              <span>This text is shown on the public application page and stored with every submission.</span>
+              <span>Current version: {settings?.public_responsibility_version ?? 1}</span>
+            </div>
           </div>
         </CardContent>
       </Card>

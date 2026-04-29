@@ -28,6 +28,12 @@ export const ELECTRIC_PRONG_OPTIONS = [
   { value: "unknown", label: "Unknown" },
 ] as const;
 
+export const ELEVATOR_OPTIONS = [
+  { value: "yes", label: "Yes" },
+  { value: "no", label: "No" },
+  { value: "unknown", label: "Not sure" },
+] as const;
+
 export const PREFERRED_TIMING_OPTIONS = [
   { value: "asap", label: "ASAP" },
   { value: "specific", label: "Preferred date/time or notes" },
@@ -59,6 +65,11 @@ export function formatLayoutPreference(value: string) {
 
 export function formatTimingPreference(value: string) {
   return PREFERRED_TIMING_OPTIONS.find((option) => option.value === value)?.label ?? value;
+}
+
+export function formatElevatorPreference(value: string | null | undefined) {
+  if (!value) return "Not provided";
+  return ELEVATOR_OPTIONS.find((option) => option.value === value)?.label ?? value;
 }
 
 export function formatApplicationAddress(application: {

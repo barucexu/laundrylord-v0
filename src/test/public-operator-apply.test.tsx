@@ -55,7 +55,8 @@ describe("PublicOperatorApply", () => {
     fireEvent.change(screen.getByLabelText("City"), { target: { value: "Austin" } });
     fireEvent.change(screen.getByLabelText("State"), { target: { value: "tx" } });
     fireEvent.change(screen.getByLabelText("ZIP"), { target: { value: "78701" } });
-    fireEvent.click(screen.getAllByRole("checkbox")[1]);
+    fireEvent.change(screen.getByLabelText("What floor is the install on?"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: "Submit application" }));
 
     await waitFor(() => {
@@ -65,6 +66,8 @@ describe("PublicOperatorApply", () => {
           operatorSlug: "sunbelt",
           payload: expect.objectContaining({
             full_name: "Jamie Carter",
+            floor_number: 2,
+            has_elevator: "unknown",
             responsibilities_accepted: true,
             state: "TX",
           }),

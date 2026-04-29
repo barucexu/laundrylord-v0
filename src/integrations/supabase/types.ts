@@ -610,6 +610,8 @@ export type Database = {
           electric_prong: string | null
           email: string | null
           equipment_needed: string
+          floor_number: number | null
+          has_elevator: string | null
           id: string
           layout_preference: string
           notes: string | null
@@ -642,6 +644,8 @@ export type Database = {
           electric_prong?: string | null
           email?: string | null
           equipment_needed: string
+          floor_number?: number | null
+          has_elevator?: string | null
           id?: string
           layout_preference: string
           notes?: string | null
@@ -674,6 +678,8 @@ export type Database = {
           electric_prong?: string | null
           email?: string | null
           equipment_needed?: string
+          floor_number?: number | null
+          has_elevator?: string | null
           id?: string
           layout_preference?: string
           notes?: string | null

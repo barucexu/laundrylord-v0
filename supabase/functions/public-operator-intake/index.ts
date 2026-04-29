@@ -26,6 +26,14 @@ function optionalText(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function optionalInteger(value: unknown, fieldName: string) {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 99) {
+    throw new Error(`${fieldName} must be a whole number between 1 and 99`);
+  }
+  return value;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -90,6 +98,7 @@ serve(async (req) => {
     const dryerConnection = requireText(payload?.dryer_connection, "Dryer connection");
     const preferredTiming = requireText(payload?.preferred_timing, "Preferred timing");
     const responsibilitiesAccepted = payload?.responsibilities_accepted === true;
+    const floorNumber = optionalInteger(payload?.floor_number, "Floor");
 
     if (!responsibilitiesAccepted) {
       throw new Error("Responsibilities acknowledgement is required");
@@ -115,6 +124,14 @@ serve(async (req) => {
       throw new Error("Invalid prong type");
     }
 
+    const hasElevator = payload?.has_elevator ?? null;
+    if (hasElevator !== null && hasElevator !== "yes" && hasElevator !== "no" && hasElevator !== "unknown") {
+      throw new Error("Invalid elevator selection");
+    }
+    if (!floorNumber && hasElevator !== null) {
+      throw new Error("Floor is required before elevator details can be submitted");
+    }
+
     const preferredDeliveryNotes = optionalText(payload?.preferred_delivery_notes);
     if (preferredTiming === "specific" && !preferredDeliveryNotes) {
       throw new Error("Preferred date/time or notes are required");
@@ -136,7 +153,9 @@ serve(async (req) => {
         layout_preference: layoutPreference,
         dryer_connection: dryerConnection,
         electric_prong: electricProng,
-        upstairs: payload?.upstairs === true,
+        upstairs: floorNumber ? floorNumber > 1 : payload?.upstairs === true,
+        floor_number: floorNumber,
+        has_elevator: floorNumber ? hasElevator : null,
         preferred_timing: preferredTiming,
         preferred_delivery_notes: preferredDeliveryNotes,
         notes: optionalText(payload?.notes),

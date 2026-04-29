@@ -181,7 +181,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         deposit_collected: false,
         install_fee: prev.operatorSettings.default_install_fee,
         install_fee_collected: false,
-        install_notes: `Application intake details:\nEquipment needed: ${application.equipment_needed.replaceAll("_", " ")}\nLayout: ${application.layout_preference.replaceAll("_", " ")}\nDryer connection: ${application.dryer_connection}${application.electric_prong ? ` (${application.electric_prong})` : ""}\nUpstairs: ${application.upstairs ? "Yes" : "No"}`,
+        install_notes: `Application intake details:\nEquipment needed: ${application.equipment_needed.replaceAll("_", " ")}\nLayout: ${application.layout_preference.replaceAll("_", " ")}\nDryer connection: ${application.dryer_connection}${application.electric_prong ? ` (${application.electric_prong})` : ""}\n${application.floor_number ? `Install floor: ${application.floor_number}` : `Upstairs: ${application.upstairs ? "Yes" : "No"}`}${application.has_elevator ? `\nElevator: ${application.has_elevator}` : ""}`,
         late_fee: prev.operatorSettings.late_fee_amount,
         lease_start_date: null,
         min_term_end_date: null,
