@@ -14,6 +14,7 @@ const LOGIN_LOCK_ATTEMPTS = 5;
 const LOGIN_LOCK_MINUTES = 15;
 const SESSION_TTL_DAYS = 30;
 const PORTAL_ALLOWED_STATUSES = new Set([
+  "scheduled",
   "active",
   "late",
   "maintenance",

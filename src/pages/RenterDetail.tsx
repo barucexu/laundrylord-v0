@@ -654,10 +654,10 @@ export default function RenterDetail() {
                   ) : (
                     <Globe className="h-4 w-4" />
                   )}
-                  Generate Client Portal PIN
+                  Copy Client Portal Access
                 </Button>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  → Copies the permanent `/o/:slug/portal` login plus this renter&apos;s phone + fresh PIN. Regenerating revokes prior portal sessions.
+                  → Copies the permanent `/o/:slug/portal` login, this renter&apos;s phone number, and a fresh PIN. Regenerating revokes prior portal sessions.
                 </p>
               </div>
             </CardContent>
