@@ -83,7 +83,7 @@ vi.mock("sonner", () => ({
   },
 }));
 
-describe("RenterDetail portal link actions", () => {
+describe("RenterDetail client portal access", () => {
   beforeEach(() => {
     invokeMock.mockReset();
     clipboardWriteTextMock.mockReset();
@@ -92,9 +92,9 @@ describe("RenterDetail portal link actions", () => {
     });
   });
 
-  it("creates a renter portal link through the operator-only admin function", async () => {
+  it("copies the permanent client portal login plus phone and PIN", async () => {
     invokeMock.mockResolvedValueOnce({
-      data: { url: "https://laundrylord-v0.lovable.app/portal/raw-token" },
+      data: { pin: "123456" },
       error: null,
     });
 
@@ -112,13 +112,15 @@ describe("RenterDetail portal link actions", () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /copy renter portal link/i }));
+    fireEvent.click(screen.getByRole("button", { name: /copy permanent client portal access/i }));
 
     await waitFor(() => {
-      expect(invokeMock).toHaveBeenCalledWith("renter-portal-admin", {
-        body: { action: "create", renter_id: "renter-1" },
+      expect(invokeMock).toHaveBeenCalledWith("renter-portal-access-admin", {
+        body: { renter_id: "renter-1" },
       });
-      expect(clipboardWriteTextMock).toHaveBeenCalledWith("https://laundrylord-v0.lovable.app/portal/raw-token");
+      expect(clipboardWriteTextMock).toHaveBeenCalledWith(
+        "http://localhost:3000/o/demo-operator/portal\nPhone: (555) 555-5555\nPIN: 123456",
+      );
     });
   });
 });

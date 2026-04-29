@@ -1,8 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getOperatorPublicProfile, normalizePhone } from "../_shared/operator-public.ts";
+import { isRenterBillingReady } from "../_shared/renter-billing.ts";
+import { getPortalOutstandingBalanceAmountCents, getPortalOutstandingBalanceMetadata } from "../_shared/portal-outstanding-balance.ts";
 import { hashPortalPin } from "../_shared/portal-pin.ts";
 import { createPortalToken, hashPortalToken } from "../_shared/renter-portal-tokens.ts";
+import { createOutstandingBalanceCheckoutSession, createRenterSetupSession, ensureStripeCustomer, getRequestOrigin, requireOperatorStripe } from "../_shared/renter-billing-stripe.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -35,6 +38,21 @@ function requireText(value: unknown, fieldName: string) {
     throw new Error(`${fieldName} is required`);
   }
   return value.trim();
+}
+
+function getAutopayStatus(renter: {
+  status: string | null;
+  stripe_subscription_id: string | null;
+}) {
+  if (renter.status === "autopay_pending") return "pending";
+  if (renter.stripe_subscription_id && !["archived", "closed"].includes(renter.status ?? "")) {
+    return "active";
+  }
+  return "inactive";
+}
+
+function buildPublicPortalReturnUrl(origin: string, slug: string, resultType: "payment" | "setup", result: "success" | "canceled") {
+  return `${origin.replace(/\/$/, "")}/o/${slug}/portal?${resultType}=${result}`;
 }
 
 async function resolvePortalSession(
@@ -201,7 +219,7 @@ serve(async (req) => {
 
     const { data: renter, error: renterError } = await adminClient
       .from("renters")
-      .select("id, name, phone, address, status")
+      .select("id, name, phone, address, status, balance, next_due_date, has_payment_method, stripe_customer_id, stripe_subscription_id, email")
       .eq("id", session.renter_id)
       .eq("user_id", session.user_id)
       .maybeSingle();
@@ -213,8 +231,18 @@ serve(async (req) => {
       throw new Error("Portal session expired. Please sign in again.");
     }
 
+    const { data: operator, error: operatorError } = await adminClient
+      .from("operator_settings")
+      .select("business_name, public_slug")
+      .eq("user_id", session.user_id)
+      .maybeSingle();
+
+    if (operatorError) {
+      throw new Error(`Failed to load operator profile: ${operatorError.message}`);
+    }
+
     if (action === "summary") {
-      const [{ data: logs, error: logsError }, { data: operator, error: operatorError }] = await Promise.all([
+      const [{ data: logs, error: logsError }, { data: stripeKeyRow, error: stripeError }] = await Promise.all([
         adminClient
           .from("maintenance_logs")
           .select("id, issue_category, description, status, reported_date, resolved_date, resolution_notes, created_at")
@@ -223,14 +251,14 @@ serve(async (req) => {
           .is("archived_at", null)
           .order("reported_date", { ascending: false }),
         adminClient
-          .from("operator_settings")
-          .select("business_name")
+          .from("stripe_keys")
+          .select("encrypted_key, webhook_endpoint_token, webhook_signing_secret")
           .eq("user_id", session.user_id)
           .maybeSingle(),
       ]);
 
       if (logsError) throw new Error(`Failed to load maintenance requests: ${logsError.message}`);
-      if (operatorError) throw new Error(`Failed to load operator name: ${operatorError.message}`);
+      if (stripeError) throw new Error(`Failed to load Stripe readiness: ${stripeError.message}`);
 
       return jsonResponse({
         renter: {
@@ -238,12 +266,74 @@ serve(async (req) => {
           phone: renter.phone,
           address: renter.address,
           status: renter.status,
+          balance: Number(renter.balance ?? 0),
+          next_due_date: renter.next_due_date,
+          autopay_status: getAutopayStatus(renter),
+          has_payment_method: !!renter.has_payment_method,
+          payment_updates_available: isRenterBillingReady(stripeKeyRow),
+          portal_payments_available: isRenterBillingReady(stripeKeyRow) && Number(renter.balance ?? 0) > 0,
         },
         operator: {
           business_name: operator?.business_name ?? "Laundry rental portal",
+          public_slug: operator?.public_slug ?? null,
         },
         maintenance_requests: logs ?? [],
       });
+    }
+
+    if (action === "update-payment-method") {
+      const publicSlug = operator?.public_slug;
+      if (!publicSlug) {
+        throw new Error("Client portal link is not configured for this operator.");
+      }
+
+      const stripe = await requireOperatorStripe(
+        adminClient,
+        session.user_id,
+        "Payment updates are not available right now. Please contact your operator.",
+      );
+      const customerId = await ensureStripeCustomer({ adminClient, stripe, renter });
+      const origin = getRequestOrigin(req).replace(/\/$/, "");
+      const url = await createRenterSetupSession({
+        stripe,
+        customerId,
+        renter,
+        successUrl: buildPublicPortalReturnUrl(origin, publicSlug, "setup", "success"),
+        cancelUrl: buildPublicPortalReturnUrl(origin, publicSlug, "setup", "canceled"),
+      });
+
+      return jsonResponse({ url });
+    }
+
+    if (action === "pay-outstanding-balance") {
+      const publicSlug = operator?.public_slug;
+      if (!publicSlug) {
+        throw new Error("Client portal link is not configured for this operator.");
+      }
+
+      const amountCents = getPortalOutstandingBalanceAmountCents(renter.balance);
+      const stripe = await requireOperatorStripe(
+        adminClient,
+        session.user_id,
+        "Portal payments are not available right now. Please contact your operator.",
+      );
+      const customerId = await ensureStripeCustomer({ adminClient, stripe, renter });
+      const origin = getRequestOrigin(req).replace(/\/$/, "");
+      const metadata = getPortalOutstandingBalanceMetadata({
+        renterId: renter.id,
+        userId: session.user_id,
+      });
+      const url = await createOutstandingBalanceCheckoutSession({
+        stripe,
+        customerId,
+        renter,
+        amountCents,
+        successUrl: buildPublicPortalReturnUrl(origin, publicSlug, "payment", "success"),
+        cancelUrl: buildPublicPortalReturnUrl(origin, publicSlug, "payment", "canceled"),
+        metadata,
+      });
+
+      return jsonResponse({ url });
     }
 
     if (action === "create-maintenance") {

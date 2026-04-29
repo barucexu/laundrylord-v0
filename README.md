@@ -147,7 +147,8 @@ Autopay start behavior now means:
 - Portal reads and payment-method updates go through the `renter-portal` Edge Function; the public page must not read renter tables directly from the browser.
 - Portal outstanding-balance payments go through the `renter-portal` Edge Function and Stripe Checkout; the browser sends only the portal token and must not choose the payment amount.
 - Portal payment-method updates use the operator's renter-billing Stripe context from `stripe_keys`, not the SaaS billing key path.
-- The permanent maintenance portal at `/o/:operatorSlug/portal` uses phone + hashed PIN plus hashed session tokens in `renter_portal_access_credentials` and `renter_portal_sessions`; it is separate from the temporary billing link model at `/portal/:token`.
+- The permanent renter portal at `/o/:operatorSlug/portal` is the primary customer-facing portal for both billing and maintenance. It uses phone + hashed PIN plus hashed session tokens in `renter_portal_access_credentials` and `renter_portal_sessions`.
+- The older `/portal/:token` billing link model is now legacy compatibility for previously issued token links, not the default operator workflow.
 
 
 ## Project Operating Docs

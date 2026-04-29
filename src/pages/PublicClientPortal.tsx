@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
-import { CheckCircle2, Loader2, LogOut, PhoneCall, ShieldCheck, Wrench } from "lucide-react";
+import { useParams, useSearchParams } from "react-router-dom";
+import { AlertTriangle, CheckCircle2, Clock3, CreditCard, ExternalLink, Loader2, LogOut, PhoneCall, ShieldCheck, Wallet, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,9 +23,16 @@ type PortalSummary = {
     phone: string | null;
     address: string | null;
     status: string;
+    balance: number;
+    next_due_date: string | null;
+    autopay_status: "active" | "inactive" | "pending";
+    has_payment_method: boolean;
+    payment_updates_available: boolean;
+    portal_payments_available: boolean;
   };
   operator: {
     business_name: string;
+    public_slug: string | null;
   };
   maintenance_requests: Array<{
     id: string;
@@ -42,14 +49,62 @@ function sessionStorageKey(slug: string) {
   return `laundrylord-client-portal:${slug}`;
 }
 
+function formatMoney(amount: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(amount ?? 0);
+}
+
+function formatDate(value: string | null) {
+  if (!value) return "—";
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function getAutopayCopy(status: PortalSummary["renter"]["autopay_status"]) {
+  if (status === "active") {
+    return {
+      label: "Autopay active",
+      description: "Recurring automatic payments are active for this renter.",
+      icon: CheckCircle2,
+      tone: "text-success",
+    };
+  }
+
+  if (status === "pending") {
+    return {
+      label: "Autopay pending",
+      description: "A bank payment is still processing before autopay fully activates.",
+      icon: Clock3,
+      tone: "text-warning",
+    };
+  }
+
+  return {
+    label: "Autopay not active",
+    description: "Automatic recurring payments are not active yet.",
+    icon: AlertTriangle,
+    tone: "text-muted-foreground",
+  };
+}
+
 export default function PublicClientPortal() {
   const { operatorSlug } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [profile, setProfile] = useState<PortalProfile | null>(null);
   const [summary, setSummary] = useState<PortalSummary | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
   const [submittingMaintenance, setSubmittingMaintenance] = useState(false);
+  const [updatingPaymentMethod, setUpdatingPaymentMethod] = useState(false);
+  const [payingOutstandingBalance, setPayingOutstandingBalance] = useState(false);
   const [loginForm, setLoginForm] = useState({ phone: "", pin: "" });
   const [maintenanceForm, setMaintenanceForm] = useState({ category: "leak", description: "" });
   const [sessionToken, setSessionToken] = useState<string | null>(null);
@@ -113,8 +168,30 @@ export default function PublicClientPortal() {
 
   useEffect(() => {
     if (!sessionToken) return;
-    void loadSummary(sessionToken);
-  }, [loadSummary, sessionToken]);
+
+    const setupResult = searchParams.get("setup");
+    const paymentResult = searchParams.get("payment");
+    const toastKind = setupResult === "success"
+      ? "setup-success"
+      : paymentResult === "success"
+        ? "payment-success"
+        : null;
+
+    void loadSummary(sessionToken).then(() => {
+      if (toastKind === "setup-success") {
+        toast.success("Payment method updated for future charges.");
+      } else if (toastKind === "payment-success") {
+        toast.success("Payment submitted. Your balance will refresh after confirmation.");
+      }
+    });
+
+    if (setupResult || paymentResult) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("setup");
+      nextParams.delete("payment");
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [loadSummary, searchParams, sessionToken, setSearchParams]);
 
   const sortedRequests = useMemo(
     () => [...(summary?.maintenance_requests ?? [])].sort((a, b) => b.reported_date.localeCompare(a.reported_date)),
@@ -191,6 +268,46 @@ export default function PublicClientPortal() {
     }
   };
 
+  const handleUpdatePaymentMethod = async () => {
+    if (!sessionToken) return;
+
+    setUpdatingPaymentMethod(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("public-client-portal", {
+        body: { action: "update-payment-method", sessionToken },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (!data?.url) throw new Error("Missing Stripe setup URL");
+      window.location.assign(data.url as string);
+      return;
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to open payment update"));
+    }
+
+    setUpdatingPaymentMethod(false);
+  };
+
+  const handlePayOutstandingBalance = async () => {
+    if (!sessionToken) return;
+
+    setPayingOutstandingBalance(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("public-client-portal", {
+        body: { action: "pay-outstanding-balance", sessionToken },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (!data?.url) throw new Error("Missing Stripe payment URL");
+      window.location.assign(data.url as string);
+      return;
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to open portal payment"));
+    }
+
+    setPayingOutstandingBalance(false);
+  };
+
   if (loadingProfile) {
     return (
       <div className="min-h-screen bg-background px-4 py-10">
@@ -216,6 +333,9 @@ export default function PublicClientPortal() {
     );
   }
 
+  const autopayCopy = summary ? getAutopayCopy(summary.renter.autopay_status) : null;
+  const AutopayIcon = autopayCopy?.icon ?? AlertTriangle;
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.10),_transparent_35%),linear-gradient(180deg,_rgba(15,23,42,0.02),_transparent_30%)] px-4 py-8">
       <div className="mx-auto max-w-4xl space-y-4">
@@ -235,7 +355,7 @@ export default function PublicClientPortal() {
             </div>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            Secure phone + PIN access for maintenance requests and status updates.
+            Secure phone + PIN access for billing, maintenance requests, and status updates.
           </CardContent>
         </Card>
 
@@ -279,6 +399,80 @@ export default function PublicClientPortal() {
         ) : (
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
             <div className="space-y-4">
+              <Card className="border-primary/20 bg-primary/[0.03]">
+                <CardHeader>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-1">
+                      <div className="text-sm text-muted-foreground">Current balance</div>
+                      <div className="text-3xl font-semibold tracking-tight">{formatMoney(summary.renter.balance)}</div>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:items-end">
+                      <Button
+                        onClick={handlePayOutstandingBalance}
+                        disabled={!summary.renter.portal_payments_available || payingOutstandingBalance}
+                      >
+                        {payingOutstandingBalance ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
+                        Pay Outstanding Balance
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={handleUpdatePaymentMethod}
+                        disabled={!summary.renter.payment_updates_available || updatingPaymentMethod}
+                      >
+                        {updatingPaymentMethod ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
+                        Update Payment Method
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+              </Card>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Wallet className="h-4 w-4" />
+                      Next Due Date
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-lg font-semibold">{formatDate(summary.renter.next_due_date)}</div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <AutopayIcon className={`h-4 w-4 ${autopayCopy?.tone ?? "text-muted-foreground"}`} />
+                      Autopay
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-1">
+                    <div className={`font-medium ${autopayCopy?.tone ?? "text-muted-foreground"}`}>{autopayCopy?.label ?? "Autopay"}</div>
+                    <p className="text-sm text-muted-foreground">{autopayCopy?.description ?? "Billing details unavailable."}</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <CreditCard className="h-4 w-4" />
+                      Payment Method
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-1">
+                    <div className={`font-medium ${summary.renter.has_payment_method ? "text-success" : "text-muted-foreground"}`}>
+                      {summary.renter.has_payment_method ? "On file" : "Missing"}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {summary.renter.payment_updates_available
+                        ? "Use the button above any time to securely replace the saved payment method."
+                        : "Payment updates are temporarily unavailable. Please contact your operator."}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
@@ -348,43 +542,54 @@ export default function PublicClientPortal() {
               </Card>
             </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Report a maintenance issue</CardTitle>
-                <CardDescription>
-                  New requests start as <span className="font-medium">Reported</span> and your operator can update the status as work progresses.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmitMaintenance} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Category</Label>
-                    <Select value={maintenanceForm.category} onValueChange={(value) => setMaintenanceForm((current) => ({ ...current, category: value }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {MAINTENANCE_CATEGORY_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="maintenance-description">Description</Label>
-                    <Textarea
-                      id="maintenance-description"
-                      rows={6}
-                      value={maintenanceForm.description}
-                      onChange={(event) => setMaintenanceForm((current) => ({ ...current, description: event.target.value }))}
-                      placeholder="Describe what is happening, when it started, and anything your operator should know."
-                    />
-                  </div>
-                  <Button className="w-full" type="submit" disabled={submittingMaintenance}>
-                    {submittingMaintenance ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                    Submit request
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Report a maintenance issue</CardTitle>
+                  <CardDescription>
+                    New requests start as <span className="font-medium">Reported</span> and your operator can update the status as work progresses.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSubmitMaintenance} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Category</Label>
+                      <Select value={maintenanceForm.category} onValueChange={(value) => setMaintenanceForm((current) => ({ ...current, category: value }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {MAINTENANCE_CATEGORY_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="maintenance-description">Description</Label>
+                      <Textarea
+                        id="maintenance-description"
+                        rows={6}
+                        value={maintenanceForm.description}
+                        onChange={(event) => setMaintenanceForm((current) => ({ ...current, description: event.target.value }))}
+                        placeholder="Describe what is happening, when it started, and anything your operator should know."
+                      />
+                    </div>
+                    <Button className="w-full" type="submit" disabled={submittingMaintenance}>
+                      {submittingMaintenance ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                      Submit request
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Portal access</CardTitle>
+                  <CardDescription>
+                    This permanent portal is the renter&apos;s home for both billing and maintenance.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </div>
           </div>
         )}
 
