@@ -295,14 +295,18 @@ export default function PublicOperatorApply() {
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <div className="overflow-hidden rounded-lg border bg-muted/20">
-                      <img src={outlet3ProngImage} alt="Example of a 3-prong dryer outlet" className="h-40 w-full object-cover" />
+                      <div className="flex h-40 items-center justify-center bg-white p-2">
+                        <img src={outlet3ProngImage} alt="Example of a 3-prong dryer outlet" className="h-full w-full object-contain" />
+                      </div>
                       <div className="p-3">
                         <div className="text-sm font-medium">3-prong example</div>
                         <div className="text-xs text-muted-foreground">Older-style outlet with three openings.</div>
                       </div>
                     </div>
                     <div className="overflow-hidden rounded-lg border bg-muted/20">
-                      <img src={outlet4ProngImage} alt="Example of a 4-prong dryer outlet" className="h-40 w-full object-cover" />
+                      <div className="flex h-40 items-center justify-center bg-white p-2">
+                        <img src={outlet4ProngImage} alt="Example of a 4-prong dryer outlet" className="h-full w-full object-contain" />
+                      </div>
                       <div className="p-3">
                         <div className="text-sm font-medium">4-prong example</div>
                         <div className="text-xs text-muted-foreground">Newer-style outlet with four openings.</div>
