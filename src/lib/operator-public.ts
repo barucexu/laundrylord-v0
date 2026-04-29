@@ -10,3 +10,14 @@ export function buildOperatorPublicPath(slug: string | null | undefined, path: "
   if (!slug) return null;
   return `/o/${slug}/${path}`;
 }
+
+export function getPublicAppOrigin() {
+  const configuredOrigin = import.meta.env.VITE_PUBLIC_APP_ORIGIN?.trim();
+  if (configuredOrigin) {
+    return configuredOrigin.replace(/\/$/, "");
+  }
+  if (typeof window !== "undefined") {
+    return window.location.origin.replace(/\/$/, "");
+  }
+  return "https://laundrylord.club";
+}

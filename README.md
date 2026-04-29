@@ -66,6 +66,7 @@ Assignment writes should go through the guarded assignment hooks in `useSupabase
 | `create-subscription` | User-authenticated | Standard JWT |
 | `create-setup-link` | User-authenticated | Standard JWT |
 | `renter-portal-access-admin` | User-authenticated | Standard JWT checked inside the function |
+| `send-client-portal-sms` | User-authenticated | Sends renter portal access by SMS when Twilio is configured; otherwise returns a safe preview draft |
 | `renter-portal-admin` | User-authenticated | Standard JWT checked inside the function |
 | `renter-portal` | Public token-based | Validates hashed portal token inside the function |
 | `customer-portal` | User-authenticated | Standard JWT |

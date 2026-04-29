@@ -92,7 +92,7 @@ describe("RenterDetail client portal access", () => {
     });
   });
 
-  it("copies the permanent client portal login plus phone and PIN", async () => {
+  it("shows and copies client portal access after generating a fresh PIN", async () => {
     invokeMock.mockResolvedValueOnce({
       data: { pin: "123456" },
       error: null,
@@ -112,7 +112,7 @@ describe("RenterDetail client portal access", () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /copy permanent client portal access/i }));
+    fireEvent.click(screen.getByRole("button", { name: /copy client portal access/i }));
 
     await waitFor(() => {
       expect(invokeMock).toHaveBeenCalledWith("renter-portal-access-admin", {
@@ -122,5 +122,9 @@ describe("RenterDetail client portal access", () => {
         "http://localhost:3000/o/demo-operator/portal\nPhone: (555) 555-5555\nPIN: 123456",
       );
     });
+
+    expect(await screen.findByText("Client Portal Access")).toBeInTheDocument();
+    expect(screen.getByText("http://localhost:3000/o/demo-operator/portal")).toBeInTheDocument();
+    expect(screen.getByText("123456")).toBeInTheDocument();
   });
 });

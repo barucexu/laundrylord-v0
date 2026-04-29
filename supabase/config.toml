@@ -27,6 +27,8 @@ project_id = "olbedjfebvbojlahhvpq"
     verify_jwt = false
   [functions.renter-portal-admin]
     verify_jwt = false
+  [functions.send-client-portal-sms]
+    verify_jwt = false
   [functions.save-stripe-key]
     verify_jwt = false
   [functions.send-billing-reminders]

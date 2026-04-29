@@ -29,7 +29,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { buildOperatorPublicPath } from "@/lib/operator-public";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { buildOperatorPublicPath, getPublicAppOrigin } from "@/lib/operator-public";
 
 const timelineIcons: Record<string, typeof User> = {
   created: User,
@@ -43,6 +44,13 @@ const timelineIcons: Record<string, typeof User> = {
   pickup_scheduled: Truck,
   pickup_completed: Truck,
   note: MessageSquare,
+};
+
+type ClientPortalAccessPreview = {
+  portalUrl: string;
+  phone: string;
+  pin: string;
+  smsDraft: string;
 };
 
 export default function RenterDetail() {
@@ -63,10 +71,12 @@ export default function RenterDetail() {
   const removeBalanceAdjustment = useRemoveRenterBalanceAdjustment();
   const [sendingSetup, setSendingSetup] = useState(false);
   const [creatingClientPortalAccess, setCreatingClientPortalAccess] = useState(false);
+  const [sendingClientPortalSms, setSendingClientPortalSms] = useState(false);
   const [activating, setActivating] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [clientPortalAccessPreview, setClientPortalAccessPreview] = useState<ClientPortalAccessPreview | null>(null);
   const [feeForm, setFeeForm] = useState({ description: "", amount: "" });
   const [optimisticBillingState, setOptimisticBillingState] = useState<"pending" | null>(null);
   const [optimisticPendingNextDue, setOptimisticPendingNextDue] = useState<string | null>(null);
@@ -280,18 +290,72 @@ export default function RenterDetail() {
       if (!data?.pin) throw new Error("Missing portal PIN");
 
       const portalPath = buildOperatorPublicPath(operatorSettings.public_slug, "portal");
+      if (!portalPath) throw new Error("Client portal path is unavailable");
+      const portalUrl = `${getPublicAppOrigin()}${portalPath}`;
+      const renterPhone = renter.phone || "Use the phone number on file";
       const portalMessage = [
-        `${window.location.origin}${portalPath}`,
-        `Phone: ${renter.phone || "Use the phone number on file"}`,
+        portalUrl,
+        `Phone: ${renterPhone}`,
         `PIN: ${data.pin}`,
       ].join("\n");
+      const smsDraft = `LaundryLord client portal: ${portalUrl}\nPhone: ${renterPhone}\nPIN: ${data.pin}`;
 
       await navigator.clipboard.writeText(portalMessage);
+      setClientPortalAccessPreview({
+        portalUrl,
+        phone: renterPhone,
+        pin: data.pin,
+        smsDraft,
+      });
       toast.success("Client portal access copied to clipboard.");
     } catch (err: unknown) {
       toast.error(getErrorMessage(err, "Failed to generate client portal access"));
     } finally {
       setCreatingClientPortalAccess(false);
+    }
+  };
+
+  const handleCopyClientPortalAccessAgain = async () => {
+    if (!clientPortalAccessPreview) return;
+    await navigator.clipboard.writeText([
+      clientPortalAccessPreview.portalUrl,
+      `Phone: ${clientPortalAccessPreview.phone}`,
+      `PIN: ${clientPortalAccessPreview.pin}`,
+    ].join("\n"));
+    toast.success("Client portal access copied to clipboard.");
+  };
+
+  const handleCopyPortalSmsDraft = async () => {
+    if (!clientPortalAccessPreview) return;
+    await navigator.clipboard.writeText(clientPortalAccessPreview.smsDraft);
+    toast.success("SMS draft copied to clipboard.");
+  };
+
+  const handleSendClientPortalSms = async () => {
+    if (!id || !clientPortalAccessPreview) return;
+
+    setSendingClientPortalSms(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-client-portal-sms", {
+        body: {
+          renter_id: id,
+          portal_url: clientPortalAccessPreview.portalUrl,
+          pin: clientPortalAccessPreview.pin,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      if (data?.sms_configured) {
+        toast.success("Client portal text sent.");
+      } else {
+        await navigator.clipboard.writeText(data?.preview_message || clientPortalAccessPreview.smsDraft);
+        toast.info("Twilio is not configured yet. SMS draft copied to clipboard.");
+      }
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Failed to send client portal text"));
+    } finally {
+      setSendingClientPortalSms(false);
     }
   };
 
@@ -620,10 +684,10 @@ export default function RenterDetail() {
                   ) : (
                     <Globe className="h-4 w-4" />
                   )}
-                  Copy Permanent Client Portal Access
+                  Copy Client Portal Access
                 </Button>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  → Copies the permanent `/o/:slug/portal` login, this renter&apos;s phone number, and a fresh PIN. Renters use this one portal for billing and maintenance. Regenerating revokes prior portal sessions.
+                  → Generates the one renter portal for billing and maintenance, shows the fresh PIN on screen, and gives you easy copy/text actions. Regenerating revokes prior portal sessions.
                 </p>
               </div>
             </CardContent>
@@ -907,6 +971,54 @@ export default function RenterDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!clientPortalAccessPreview} onOpenChange={(open) => !open && setClientPortalAccessPreview(null)}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Client Portal Access</DialogTitle>
+            <DialogDescription>
+              This renter uses one permanent portal for billing and maintenance. The fresh PIN is shown below right after generation.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-md border p-3">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Portal link</div>
+              <div className="mt-1 break-all text-sm">{clientPortalAccessPreview?.portalUrl}</div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-md border p-3">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Phone</div>
+                <div className="mt-1 text-sm">{clientPortalAccessPreview?.phone}</div>
+              </div>
+              <div className="rounded-md border p-3">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Fresh PIN</div>
+                <div className="mt-1 font-mono text-lg font-semibold">{clientPortalAccessPreview?.pin}</div>
+              </div>
+            </div>
+
+            <div className="rounded-md border border-dashed p-3">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">SMS draft</div>
+              <div className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{clientPortalAccessPreview?.smsDraft}</div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button type="button" variant="outline" onClick={() => void handleCopyPortalSmsDraft()}>
+              Copy SMS Draft
+            </Button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
+              <Button type="button" variant="outline" onClick={() => void handleSendClientPortalSms()} disabled={sendingClientPortalSms}>
+                {sendingClientPortalSms ? "Sending..." : "Text Renter"}
+              </Button>
+              <Button type="button" onClick={() => void handleCopyClientPortalAccessAgain()}>
+                Copy Access
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
