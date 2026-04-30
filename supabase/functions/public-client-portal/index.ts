@@ -219,7 +219,7 @@ serve(async (req) => {
 
     const { data: renter, error: renterError } = await adminClient
       .from("renters")
-      .select("id, name, phone, address, status, balance, next_due_date, has_payment_method, stripe_customer_id, stripe_subscription_id, email")
+      .select("id, user_id, name, phone, address, status, balance, next_due_date, has_payment_method, stripe_customer_id, stripe_subscription_id, email")
       .eq("id", session.renter_id)
       .eq("user_id", session.user_id)
       .maybeSingle();

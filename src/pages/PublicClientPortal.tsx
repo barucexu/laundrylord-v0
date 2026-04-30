@@ -49,6 +49,31 @@ function sessionStorageKey(slug: string) {
   return `laundrylord-client-portal:${slug}`;
 }
 
+async function getFunctionErrorMessage(error: unknown, fallback: string) {
+  if (error && typeof error === "object" && "context" in error) {
+    const response = (error as { context?: Response }).context;
+    if (response) {
+      try {
+        const body = await response.clone().json() as { error?: string };
+        if (typeof body?.error === "string" && body.error.trim()) {
+          return body.error;
+        }
+      } catch {
+        try {
+          const text = await response.clone().text();
+          if (text.trim()) {
+            return text;
+          }
+        } catch {
+          // fall through to the standard fallback
+        }
+      }
+    }
+  }
+
+  return getErrorMessage(error, fallback);
+}
+
 function formatMoney(amount: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -154,7 +179,7 @@ export default function PublicClientPortal() {
       setSummary(data as PortalSummary);
       setErrorMessage(null);
     } catch (error) {
-      const message = getErrorMessage(error, "Portal session expired. Please sign in again.");
+      const message = await getFunctionErrorMessage(error, "Portal session expired. Please sign in again.");
       setSummary(null);
       setSessionToken(null);
       if (operatorSlug) {
@@ -220,7 +245,7 @@ export default function PublicClientPortal() {
       setLoginForm({ phone: "", pin: "" });
       toast.success("Signed in.");
     } catch (error) {
-      toast.error(getErrorMessage(error, "Unable to sign in."));
+      toast.error(await getFunctionErrorMessage(error, "Unable to sign in."));
     } finally {
       setLoggingIn(false);
     }
@@ -262,7 +287,7 @@ export default function PublicClientPortal() {
       toast.success("Maintenance request submitted.");
       await loadSummary(sessionToken);
     } catch (error) {
-      toast.error(getErrorMessage(error, "Unable to submit maintenance request."));
+      toast.error(await getFunctionErrorMessage(error, "Unable to submit maintenance request."));
     } finally {
       setSubmittingMaintenance(false);
     }
@@ -282,7 +307,7 @@ export default function PublicClientPortal() {
       window.location.assign(data.url as string);
       return;
     } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to open payment update"));
+      toast.error(await getFunctionErrorMessage(error, "Failed to open payment update"));
     }
 
     setUpdatingPaymentMethod(false);
@@ -302,7 +327,7 @@ export default function PublicClientPortal() {
       window.location.assign(data.url as string);
       return;
     } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to open portal payment"));
+      toast.error(await getFunctionErrorMessage(error, "Failed to open portal payment"));
     }
 
     setPayingOutstandingBalance(false);
