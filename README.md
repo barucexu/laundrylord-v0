@@ -61,7 +61,7 @@ Assignment writes should go through the guarded assignment hooks in `useSupabase
 | `send-billing-reminders` | Service-role only | Validates `Authorization: Bearer <SERVICE_ROLE_KEY>` exactly |
 | `stripe-webhook` | Webhook | Operator token in URL + per-operator Stripe signature verification |
 | `public-operator-intake` | Public | Validates operator slug + writes only application records via service role |
-| `public-client-portal` | Public | Validates operator slug, phone + hashed PIN, and renter-scoped hashed session token |
+| `public-client-portal` | Public | Validates operator slug, phone + hashed PIN, and renter-scoped hashed session token; supports billing, maintenance, and renter cancellation actions |
 | `create-checkout` | User-authenticated | Standard JWT via Supabase client |
 | `create-subscription` | User-authenticated | Standard JWT |
 | `create-setup-link` | User-authenticated | Standard JWT |

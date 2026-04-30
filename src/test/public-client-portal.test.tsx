@@ -162,4 +162,111 @@ describe("PublicClientPortal", () => {
       expect(locationAssignMock).toHaveBeenCalledWith("https://checkout.stripe.com/setup/session_123");
     });
   });
+
+  it("lets a renter cancel their own maintenance request from the permanent portal", async () => {
+    invokeMock
+      .mockResolvedValueOnce({
+        data: { business_name: "Sunbelt Laundry Rentals" },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          session_token: "session-123",
+          expires_at: "2026-05-31T00:00:00.000Z",
+          renter_name: "Maria Santos",
+          business_name: "Sunbelt Laundry Rentals",
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          renter: {
+            name: "Maria Santos",
+            phone: "(555) 555-5555",
+            address: "123 Main St",
+            status: "active",
+            balance: 0,
+            next_due_date: "2026-05-15",
+            autopay_status: "active",
+            has_payment_method: true,
+            payment_updates_available: true,
+            portal_payments_available: false,
+          },
+          operator: { business_name: "Sunbelt Laundry Rentals", public_slug: "sunbelt" },
+          maintenance_requests: [
+            {
+              id: "maint-1",
+              issue_category: "leak",
+              description: "Water pooling under the washer",
+              status: "reported",
+              reported_date: "2026-04-29",
+              resolved_date: null,
+              resolution_notes: null,
+            },
+          ],
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { success: true },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          renter: {
+            name: "Maria Santos",
+            phone: "(555) 555-5555",
+            address: "123 Main St",
+            status: "active",
+            balance: 0,
+            next_due_date: "2026-05-15",
+            autopay_status: "active",
+            has_payment_method: true,
+            payment_updates_available: true,
+            portal_payments_available: false,
+          },
+          operator: { business_name: "Sunbelt Laundry Rentals", public_slug: "sunbelt" },
+          maintenance_requests: [
+            {
+              id: "maint-1",
+              issue_category: "leak",
+              description: "Water pooling under the washer",
+              status: "cancelled",
+              reported_date: "2026-04-29",
+              resolved_date: null,
+              resolution_notes: "Cancelled by renter through the permanent portal.",
+            },
+          ],
+        },
+        error: null,
+      });
+
+    render(
+      <MemoryRouter initialEntries={["/o/sunbelt/portal"]}>
+        <Routes>
+          <Route path="/o/:operatorSlug/portal" element={<PublicClientPortal />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(await screen.findByLabelText("Phone number"), { target: { value: "(555) 555-5555" } });
+    fireEvent.change(screen.getByLabelText("PIN"), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByText("Water pooling under the washer");
+
+    fireEvent.click(screen.getByRole("button", { name: /cancel request/i }));
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenNthCalledWith(4, "public-client-portal", {
+        body: {
+          action: "cancel-maintenance",
+          sessionToken: "session-123",
+          maintenanceId: "maint-1",
+        },
+      });
+    });
+
+    expect(await screen.findByText("Cancelled")).toBeInTheDocument();
+    expect(await screen.findByText("Cancelled by renter through the permanent portal.")).toBeInTheDocument();
+  });
 });

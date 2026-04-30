@@ -90,7 +90,7 @@ serve(async (req) => {
   );
 
   try {
-    const { action, operatorSlug, phone, pin, sessionToken, category, description } = await req.json();
+    const { action, operatorSlug, phone, pin, sessionToken, category, description, maintenanceId } = await req.json();
 
     if (action === "profile") {
       const operator = await getOperatorPublicProfile(adminClient, requireText(operatorSlug, "operatorSlug"));
@@ -359,6 +359,60 @@ serve(async (req) => {
       }
 
       return jsonResponse({ success: true, request: createdLog }, 201);
+    }
+
+    if (action === "cancel-maintenance") {
+      const requestId = requireText(maintenanceId, "maintenanceId");
+      const { data: request, error: requestError } = await adminClient
+        .from("maintenance_logs")
+        .select("id, renter_id, user_id, issue_category, status")
+        .eq("id", requestId)
+        .eq("user_id", session.user_id)
+        .eq("renter_id", session.renter_id)
+        .maybeSingle();
+
+      if (requestError) {
+        throw new Error(`Failed to load maintenance request: ${requestError.message}`);
+      }
+      if (!request) {
+        return jsonResponse({ error: "Maintenance request not found." }, 404);
+      }
+      if (request.status === "resolved" || request.status === "cancelled") {
+        return jsonResponse({ error: "This maintenance request can no longer be cancelled." }, 409);
+      }
+
+      const cancelledAt = new Date().toISOString();
+      const { error: updateError } = await adminClient
+        .from("maintenance_logs")
+        .update({
+          status: "cancelled",
+          resolution_notes: "Cancelled by renter through the permanent portal.",
+          resolved_date: null,
+          updated_at: cancelledAt,
+        })
+        .eq("id", request.id)
+        .eq("user_id", session.user_id)
+        .eq("renter_id", session.renter_id);
+
+      if (updateError) {
+        throw new Error(`Failed to cancel maintenance request: ${updateError.message}`);
+      }
+
+      const { error: timelineError } = await adminClient
+        .from("timeline_events")
+        .insert({
+          user_id: session.user_id,
+          renter_id: session.renter_id,
+          type: "maintenance_cancelled",
+          description: `Renter cancelled maintenance request: ${request.issue_category.replaceAll("_", " ")}`,
+          date: cancelledAt,
+        });
+
+      if (timelineError) {
+        throw new Error(`Failed to record maintenance cancellation: ${timelineError.message}`);
+      }
+
+      return jsonResponse({ success: true });
     }
 
     throw new Error("Unsupported action");

@@ -62,7 +62,7 @@ export interface MaintenanceLog {
 export interface TimelineEvent {
   id: string;
   renterId: string;
-  type: 'created' | 'machine_assigned' | 'payment_succeeded' | 'payment_failed' | 'late_fee' | 'maintenance_opened' | 'maintenance_resolved' | 'pickup_scheduled' | 'pickup_completed' | 'note';
+  type: 'created' | 'machine_assigned' | 'payment_succeeded' | 'payment_failed' | 'late_fee' | 'maintenance_opened' | 'maintenance_resolved' | 'maintenance_cancelled' | 'pickup_scheduled' | 'pickup_completed' | 'note';
   description: string;
   date: string;
 }

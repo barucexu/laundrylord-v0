@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { User, Box, CheckCircle, AlertTriangle, CreditCard, DollarSign, Wrench, Truck, MessageSquare } from "lucide-react";
+import { User, Box, CheckCircle, AlertTriangle, CreditCard, DollarSign, Wrench, Truck, MessageSquare, XCircle } from "lucide-react";
 
 /**
  * Contract test: the timelineIcons map in RenterDetail must include
@@ -18,6 +18,7 @@ const timelineIcons: Record<string, unknown> = {
   late_fee: DollarSign,
   maintenance_opened: Wrench,
   maintenance_resolved: CheckCircle,
+  maintenance_cancelled: XCircle,
   pickup_scheduled: Truck,
   pickup_completed: Truck,
   note: MessageSquare,
@@ -32,6 +33,7 @@ const BACKEND_EVENT_TYPES = [
   "created",               // various insert flows
   "machine_assigned",      // assignment flows
   "note",                  // stripe-webhook (subscription.deleted)
+  "maintenance_cancelled", // renter portal cancellation
 ] as const;
 
 describe("Timeline event type contract", () => {

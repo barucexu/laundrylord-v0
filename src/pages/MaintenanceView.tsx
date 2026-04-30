@@ -69,6 +69,10 @@ export default function MaintenanceView() {
   const autoFilledRenterIdRef = useRef<string | null>(null);
 
   const sorted = useMemo(() => sortMaintenanceLogs(logs), [logs]);
+  const openIssueCount = useMemo(
+    () => logs.filter((log) => log.status !== "resolved" && log.status !== "cancelled").length,
+    [logs],
+  );
   const rentersById = useMemo(() => new Map(renters.map((renter) => [renter.id, renter])), [renters]);
   const machinesById = useMemo(() => new Map(machines.map((machine) => [machine.id, machine])), [machines]);
 
@@ -170,7 +174,7 @@ export default function MaintenanceView() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Maintenance</h1>
           <div className="flex items-center gap-3 mt-0.5">
-            <p className="text-sm text-muted-foreground">{logs.length} open issues</p>
+            <p className="text-sm text-muted-foreground">{openIssueCount} open issues</p>
             <Link to="/maintenance/archive" className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2">
               View Archive
             </Link>

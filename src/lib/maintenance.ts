@@ -5,6 +5,7 @@ export const MAINTENANCE_STATUS_OPTIONS = [
   { value: "scheduled", label: "Scheduled" },
   { value: "in_progress", label: "In Progress" },
   { value: "resolved", label: "Resolved" },
+  { value: "cancelled", label: "Cancelled" },
 ] as const;
 
 export const MAINTENANCE_CATEGORY_OPTIONS = [
@@ -32,7 +33,7 @@ export function isActiveMaintenanceLog(log: Pick<MaintenanceRow, "archived_at">)
 }
 
 export function sortMaintenanceLogs(logs: MaintenanceRow[]): MaintenanceRow[] {
-  const order: Record<string, number> = { reported: 0, scheduled: 1, in_progress: 2, resolved: 3 };
+  const order: Record<string, number> = { reported: 0, scheduled: 1, in_progress: 2, resolved: 3, cancelled: 4 };
 
   return [...logs].sort((a, b) => {
     const statusOrder = (order[a.status] ?? 4) - (order[b.status] ?? 4);

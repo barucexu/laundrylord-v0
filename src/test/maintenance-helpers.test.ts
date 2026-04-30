@@ -50,13 +50,14 @@ describe("maintenance helpers", () => {
     expect(isActiveMaintenanceLog(maintenance({ archived_at: "2026-04-02T00:00:00.000Z" }))).toBe(false);
   });
 
-  it("sorts open statuses before resolved logs", () => {
+  it("sorts open statuses before resolved and cancelled logs", () => {
     const sorted = sortMaintenanceLogs([
       maintenance({ id: "resolved", status: "resolved", reported_date: "2026-04-03" }),
+      maintenance({ id: "cancelled", status: "cancelled", reported_date: "2026-04-04" }),
       maintenance({ id: "reported", status: "reported", reported_date: "2026-04-01" }),
       maintenance({ id: "progress", status: "in_progress", reported_date: "2026-04-02" }),
     ]);
 
-    expect(sorted.map((log) => log.id)).toEqual(["reported", "progress", "resolved"]);
+    expect(sorted.map((log) => log.id)).toEqual(["reported", "progress", "resolved", "cancelled"]);
   });
 });

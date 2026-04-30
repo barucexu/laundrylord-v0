@@ -10,7 +10,7 @@ import { BANK_ACCOUNT_RECOMMENDATION } from "@/lib/billing-copy";
 import { formatProjectedRecurringCharge, getAchProcessingExplanation, getAutopayActivationMessage, getProjectedNextRecurringDate } from "@/lib/renter-billing";
 import { getPaymentTypeLabel } from "@/lib/payment-display";
 import { formatTimelineDate } from "@/lib/timeline-date";
-import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil, Globe, Plug, Archive, ArchiveRestore, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MapPin, DollarSign, Box, FileText, Wrench, Clock, User, CreditCard, AlertTriangle, CheckCircle, MessageSquare, Truck, Send, Play, Settings, Pencil, Globe, Plug, Archive, ArchiveRestore, Plus, Trash2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -41,6 +41,7 @@ const timelineIcons: Record<string, typeof User> = {
   late_fee: DollarSign,
   maintenance_opened: Wrench,
   maintenance_resolved: CheckCircle,
+  maintenance_cancelled: XCircle,
   pickup_scheduled: Truck,
   pickup_completed: Truck,
   note: MessageSquare,

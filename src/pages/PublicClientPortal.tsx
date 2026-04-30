@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { AlertTriangle, CheckCircle2, Clock3, CreditCard, ExternalLink, Loader2, LogOut, PhoneCall, ShieldCheck, Wallet, Wrench } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, CreditCard, ExternalLink, Loader2, LogOut, PhoneCall, ShieldCheck, XCircle, Wallet, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -128,6 +128,7 @@ export default function PublicClientPortal() {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
   const [submittingMaintenance, setSubmittingMaintenance] = useState(false);
+  const [cancelingRequestId, setCancelingRequestId] = useState<string | null>(null);
   const [updatingPaymentMethod, setUpdatingPaymentMethod] = useState(false);
   const [payingOutstandingBalance, setPayingOutstandingBalance] = useState(false);
   const [loginForm, setLoginForm] = useState({ phone: "", pin: "" });
@@ -223,6 +224,11 @@ export default function PublicClientPortal() {
     [summary?.maintenance_requests],
   );
 
+  const cancellableRequestIds = useMemo(
+    () => new Set(sortedRequests.filter((request) => request.status !== "resolved" && request.status !== "cancelled").map((request) => request.id)),
+    [sortedRequests],
+  );
+
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!operatorSlug) return;
@@ -290,6 +296,29 @@ export default function PublicClientPortal() {
       toast.error(await getFunctionErrorMessage(error, "Unable to submit maintenance request."));
     } finally {
       setSubmittingMaintenance(false);
+    }
+  };
+
+  const handleCancelMaintenance = async (requestId: string) => {
+    if (!sessionToken) return;
+
+    setCancelingRequestId(requestId);
+    try {
+      const { data, error } = await supabase.functions.invoke("public-client-portal", {
+        body: {
+          action: "cancel-maintenance",
+          sessionToken,
+          maintenanceId: requestId,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      await loadSummary(sessionToken);
+      toast.success("Maintenance request cancelled.");
+    } catch (error) {
+      toast.error(await getFunctionErrorMessage(error, "Unable to cancel maintenance request."));
+    } finally {
+      setCancelingRequestId(null);
     }
   };
 
@@ -548,7 +577,25 @@ export default function PublicClientPortal() {
                       <div key={request.id} className="rounded-lg border p-4">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="font-medium capitalize">{request.issue_category.replaceAll("_", " ")}</div>
-                          <StatusBadge status={request.status} />
+                          <div className="flex items-center gap-2">
+                            <StatusBadge status={request.status} />
+                            {cancellableRequestIds.has(request.id) && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void handleCancelMaintenance(request.id)}
+                                disabled={cancelingRequestId === request.id}
+                              >
+                                {cancelingRequestId === request.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <XCircle className="h-4 w-4" />
+                                )}
+                                Cancel request
+                              </Button>
+                            )}
+                          </div>
                         </div>
                         <div className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{request.description}</div>
                         <div className="mt-3 text-xs text-muted-foreground">
